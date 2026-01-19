@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { api } from '../api/client'
 
 type Tab = 'stats' | 'users' | 'bans' | 'promo' | 'plans'
@@ -57,6 +58,7 @@ interface PlanItem {
 }
 
 export default function AdminPage() {
+  const navigate = useNavigate()
   const [tab, setTab] = useState<Tab>('stats')
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -287,7 +289,7 @@ export default function AdminPage() {
 
       setShowPlanModal(false)
       resetPlanForm()
-      loadData()
+      await loadData()
     } catch (e) {
       alert((e as Error).message)
     }
@@ -297,7 +299,7 @@ export default function AdminPage() {
     if (!confirm('Удалить тариф?')) return
     try {
       await api.admin.deletePlan(planId)
-      loadData()
+      await loadData()
     } catch (e) {
       alert((e as Error).message)
     }
@@ -306,7 +308,7 @@ export default function AdminPage() {
   const handleTogglePlanActive = async (plan: PlanItem) => {
     try {
       await api.admin.updatePlan(plan.id, { is_active: !plan.is_active })
-      loadData()
+      await loadData()
     } catch (e) {
       alert((e as Error).message)
     }
@@ -328,7 +330,15 @@ export default function AdminPage() {
 
   return (
     <div className="p-4">
-      <h1 className="text-2xl font-bold mb-4">Admin Panel</h1>
+      <div className="flex justify-between items-center mb-4">
+        <h1 className="text-2xl font-bold">Admin Panel</h1>
+        <button
+          onClick={() => navigate('/')}
+          className="bg-tg-secondary-bg px-3 py-1.5 rounded-lg text-sm"
+        >
+          ← Выход
+        </button>
+      </div>
 
       {/* Tabs */}
       <div className="flex gap-2 mb-4 overflow-x-auto">

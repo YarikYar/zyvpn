@@ -27,8 +27,9 @@ export default function PlanCard({ plan, onSelect }: PlanCardProps) {
           <h3 className="font-semibold text-lg">{plan.name}</h3>
           <p className="text-sm text-hint mt-1">{plan.description}</p>
           <div className="flex gap-3 mt-2 text-xs text-hint">
-            <span>📅 {plan.duration_days} дней</span>
-            <span>📊 {plan.traffic_gb > 0 ? `${plan.traffic_gb} ГБ` : 'Безлимит'}</span>
+            <span>📅 {plan.duration_days} дн</span>
+            <span>📊 {plan.traffic_gb > 0 ? `${plan.traffic_gb} ГБ` : '∞'}</span>
+            <span>📱 {plan.max_devices || 3} устр</span>
           </div>
         </div>
         <div className="text-right ml-4">

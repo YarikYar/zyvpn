@@ -33,6 +33,7 @@ export interface Plan {
   description: string
   duration_days: number
   traffic_gb: number
+  max_devices: number
   price_ton: number
   price_stars: number
   price_usd: number
