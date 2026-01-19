@@ -15,18 +15,19 @@ const (
 )
 
 type Subscription struct {
-	ID           uuid.UUID          `json:"id" db:"id"`
-	UserID       int64              `json:"user_id" db:"user_id"`
-	PlanID       uuid.UUID          `json:"plan_id" db:"plan_id"`
-	Status       SubscriptionStatus `json:"status" db:"status"`
-	XUIClientID  string             `json:"xui_client_id" db:"xui_client_id"`
-	XUIEmail     string             `json:"xui_email" db:"xui_email"`
-	ConnectionKey string            `json:"connection_key,omitempty" db:"connection_key"`
-	StartedAt    *time.Time         `json:"started_at,omitempty" db:"started_at"`
-	ExpiresAt    *time.Time         `json:"expires_at,omitempty" db:"expires_at"`
-	TrafficLimit int64              `json:"traffic_limit" db:"traffic_limit"`
-	TrafficUsed  int64              `json:"traffic_used" db:"traffic_used"`
-	CreatedAt    time.Time          `json:"created_at" db:"created_at"`
+	ID            uuid.UUID          `json:"id" db:"id"`
+	UserID        int64              `json:"user_id" db:"user_id"`
+	PlanID        uuid.UUID          `json:"plan_id" db:"plan_id"`
+	Status        SubscriptionStatus `json:"status" db:"status"`
+	XUIClientID   string             `json:"xui_client_id" db:"xui_client_id"`
+	XUIEmail      string             `json:"xui_email" db:"xui_email"`
+	ConnectionKey string             `json:"connection_key,omitempty" db:"connection_key"`
+	StartedAt     *time.Time         `json:"started_at,omitempty" db:"started_at"`
+	ExpiresAt     *time.Time         `json:"expires_at,omitempty" db:"expires_at"`
+	TrafficLimit  int64              `json:"traffic_limit" db:"traffic_limit"`
+	TrafficUsed   int64              `json:"traffic_used" db:"traffic_used"`
+	MaxDevices    int                `json:"max_devices" db:"max_devices"`
+	CreatedAt     time.Time          `json:"created_at" db:"created_at"`
 }
 
 type SubscriptionWithPlan struct {

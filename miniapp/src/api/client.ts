@@ -228,5 +228,47 @@ export const api = {
 
     getLogs: (limit = 50, offset = 0) =>
       request<{ logs: any[] }>(`/api/admin/logs?limit=${limit}&offset=${offset}`),
+
+    // Plans
+    listPlans: () =>
+      request<{ plans: any[] }>('/api/admin/plans'),
+
+    createPlan: (data: {
+      name: string
+      description: string
+      duration_days: number
+      traffic_gb: number
+      max_devices: number
+      price_ton: number
+      price_stars: number
+      price_usd: number
+      sort_order: number
+    }) =>
+      request<any>('/api/admin/plans', {
+        method: 'POST',
+        body: JSON.stringify(data),
+      }),
+
+    updatePlan: (planId: string, data: {
+      name?: string
+      description?: string
+      duration_days?: number
+      traffic_gb?: number
+      max_devices?: number
+      price_ton?: number
+      price_stars?: number
+      price_usd?: number
+      is_active?: boolean
+      sort_order?: number
+    }) =>
+      request<any>(`/api/admin/plans/${planId}`, {
+        method: 'PUT',
+        body: JSON.stringify(data),
+      }),
+
+    deletePlan: (planId: string) =>
+      request<{ success: boolean }>(`/api/admin/plans/${planId}`, {
+        method: 'DELETE',
+      }),
   },
 }

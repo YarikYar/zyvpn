@@ -12,6 +12,7 @@ type Plan struct {
 	Description  string    `json:"description" db:"description"`
 	DurationDays int       `json:"duration_days" db:"duration_days"`
 	TrafficGB    int       `json:"traffic_gb" db:"traffic_gb"`
+	MaxDevices   int       `json:"max_devices" db:"max_devices"`
 	PriceTON     float64   `json:"price_ton" db:"price_ton"`
 	PriceStars   int       `json:"price_stars" db:"price_stars"`
 	PriceUSD     float64   `json:"price_usd" db:"price_usd"`

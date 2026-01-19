@@ -28,14 +28,6 @@ func (s *PlanService) GetAllPlans(ctx context.Context) ([]model.Plan, error) {
 	return s.repo.GetAllPlans(ctx)
 }
 
-func (s *PlanService) CreatePlan(ctx context.Context, plan *model.Plan) error {
-	return s.repo.CreatePlan(ctx, plan)
-}
-
-func (s *PlanService) UpdatePlan(ctx context.Context, plan *model.Plan) error {
-	return s.repo.UpdatePlan(ctx, plan)
-}
-
 func (s *PlanService) DeletePlan(ctx context.Context, id uuid.UUID) error {
-	return s.repo.DeletePlan(ctx, id)
+	return s.repo.DeletePlanByID(ctx, id)
 }

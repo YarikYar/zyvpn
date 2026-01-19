@@ -83,10 +83,15 @@ func (s *SubscriptionService) CreateSubscription(ctx context.Context, userID int
 	// Generate unique email for 3x-ui client
 	email := fmt.Sprintf("user_%d_%d", userID, time.Now().Unix())
 
-	log.Printf("Creating VPN client for user %d, email: %s, traffic: %d GB, days: %d", userID, email, plan.TrafficGB, plan.DurationDays)
+	maxDevices := plan.MaxDevices
+	if maxDevices <= 0 {
+		maxDevices = 3
+	}
+
+	log.Printf("Creating VPN client for user %d, email: %s, traffic: %d GB, days: %d, devices: %d", userID, email, plan.TrafficGB, plan.DurationDays, maxDevices)
 
 	// Create client in 3x-ui
-	xuiClient, err := s.xuiClient.AddClient(email, int64(plan.TrafficGB), plan.DurationDays)
+	xuiClient, err := s.xuiClient.AddClient(email, int64(plan.TrafficGB), plan.DurationDays, maxDevices)
 	if err != nil {
 		log.Printf("ERROR: Failed to create VPN client for user %d: %v", userID, err)
 		return nil, fmt.Errorf("failed to create VPN client: %w", err)
@@ -111,6 +116,7 @@ func (s *SubscriptionService) CreateSubscription(ctx context.Context, userID int
 		ExpiresAt:     &expiresAt,
 		TrafficLimit:  plan.TrafficBytes(),
 		TrafficUsed:   0,
+		MaxDevices:    maxDevices,
 	}
 
 	if err := s.repo.CreateSubscription(ctx, sub); err != nil {
@@ -134,7 +140,11 @@ func (s *SubscriptionService) ExtendSubscription(ctx context.Context, subID uuid
 
 	// Update in 3x-ui FIRST (before database, so we can fail early)
 	newExpiry := sub.ExpiresAt.Add(time.Duration(days) * 24 * time.Hour)
-	if err := s.xuiClient.UpdateClientTraffic(sub.XUIClientID, sub.XUIEmail, sub.TrafficLimit/(1024*1024*1024), newExpiry.UnixMilli()); err != nil {
+	maxDevices := sub.MaxDevices
+	if maxDevices <= 0 {
+		maxDevices = 3
+	}
+	if err := s.xuiClient.UpdateClientTraffic(sub.XUIClientID, sub.XUIEmail, sub.TrafficLimit/(1024*1024*1024), newExpiry.UnixMilli(), maxDevices); err != nil {
 		return fmt.Errorf("failed to update VPN client: %w", err)
 	}
 

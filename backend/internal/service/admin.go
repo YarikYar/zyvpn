@@ -501,3 +501,96 @@ func generateRandomCode(length int) string {
 
 	return sb.String()
 }
+
+// --- Plan Management ---
+
+// UpdatePlanParams holds parameters for updating a plan
+type UpdatePlanParams struct {
+	Name         *string
+	Description  *string
+	DurationDays *int
+	TrafficGB    *int
+	MaxDevices   *int
+	PriceTON     *float64
+	PriceStars   *int
+	PriceUSD     *float64
+	IsActive     *bool
+	SortOrder    *int
+}
+
+// CreatePlanParams holds parameters for creating a plan
+type CreatePlanParams struct {
+	Name         string
+	Description  string
+	DurationDays int
+	TrafficGB    int
+	MaxDevices   int
+	PriceTON     float64
+	PriceStars   int
+	PriceUSD     float64
+	SortOrder    int
+}
+
+// ListAllPlans lists all plans including inactive
+func (s *AdminService) ListAllPlans(ctx context.Context) ([]model.Plan, error) {
+	return s.repo.GetAllPlans(ctx)
+}
+
+// UpdatePlan updates a plan
+func (s *AdminService) UpdatePlan(ctx context.Context, adminID int64, planID string, params UpdatePlanParams) (*model.Plan, error) {
+	if ok, _ := s.IsAdmin(ctx, adminID); !ok {
+		return nil, ErrNotAdmin
+	}
+
+	plan, err := s.repo.UpdatePlan(ctx, planID, params.Name, params.Description, params.DurationDays, params.TrafficGB, params.MaxDevices, params.PriceTON, params.PriceStars, params.PriceUSD, params.IsActive, params.SortOrder)
+	if err != nil {
+		return nil, err
+	}
+
+	// Log action
+	_ = s.repo.LogAdminAction(ctx, adminID, model.AdminActionUpdatePlan, nil, map[string]interface{}{
+		"plan_id": planID,
+		"params":  params,
+	})
+
+	return plan, nil
+}
+
+// CreatePlan creates a new plan
+func (s *AdminService) CreatePlan(ctx context.Context, adminID int64, params CreatePlanParams) (*model.Plan, error) {
+	if ok, _ := s.IsAdmin(ctx, adminID); !ok {
+		return nil, ErrNotAdmin
+	}
+
+	plan, err := s.repo.CreatePlan(ctx, params.Name, params.Description, params.DurationDays, params.TrafficGB, params.MaxDevices, params.PriceTON, params.PriceStars, params.PriceUSD, params.SortOrder)
+	if err != nil {
+		return nil, err
+	}
+
+	// Log action
+	_ = s.repo.LogAdminAction(ctx, adminID, model.AdminActionCreatePlan, nil, map[string]interface{}{
+		"plan_id": plan.ID,
+		"name":    params.Name,
+	})
+
+	return plan, nil
+}
+
+// DeletePlan soft-deletes a plan (sets is_active = false)
+func (s *AdminService) DeletePlan(ctx context.Context, adminID int64, planID string) error {
+	if ok, _ := s.IsAdmin(ctx, adminID); !ok {
+		return ErrNotAdmin
+	}
+
+	isActive := false
+	if _, err := s.repo.UpdatePlan(ctx, planID, nil, nil, nil, nil, nil, nil, nil, nil, &isActive, nil); err != nil {
+		return err
+	}
+
+	// Log action
+	_ = s.repo.LogAdminAction(ctx, adminID, model.AdminActionDeletePlan, nil, map[string]interface{}{
+		"plan_id": planID,
+	})
+
+	return nil
+}

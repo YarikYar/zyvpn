@@ -38,55 +38,7 @@ func (r *Repository) GetAllPlans(ctx context.Context) ([]model.Plan, error) {
 	return plans, err
 }
 
-func (r *Repository) CreatePlan(ctx context.Context, plan *model.Plan) error {
-	query := `
-		INSERT INTO plans (name, description, duration_days, traffic_gb, price_ton, price_stars, price_usd, is_active, sort_order)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-		RETURNING id, created_at`
-
-	return r.db.QueryRowContext(ctx, query,
-		plan.Name,
-		plan.Description,
-		plan.DurationDays,
-		plan.TrafficGB,
-		plan.PriceTON,
-		plan.PriceStars,
-		plan.PriceUSD,
-		plan.IsActive,
-		plan.SortOrder,
-	).Scan(&plan.ID, &plan.CreatedAt)
-}
-
-func (r *Repository) UpdatePlan(ctx context.Context, plan *model.Plan) error {
-	query := `
-		UPDATE plans SET
-			name = $2,
-			description = $3,
-			duration_days = $4,
-			traffic_gb = $5,
-			price_ton = $6,
-			price_stars = $7,
-			price_usd = $8,
-			is_active = $9,
-			sort_order = $10
-		WHERE id = $1`
-
-	_, err := r.db.ExecContext(ctx, query,
-		plan.ID,
-		plan.Name,
-		plan.Description,
-		plan.DurationDays,
-		plan.TrafficGB,
-		plan.PriceTON,
-		plan.PriceStars,
-		plan.PriceUSD,
-		plan.IsActive,
-		plan.SortOrder,
-	)
-	return err
-}
-
-func (r *Repository) DeletePlan(ctx context.Context, id uuid.UUID) error {
+func (r *Repository) DeletePlanByID(ctx context.Context, id uuid.UUID) error {
 	_, err := r.db.ExecContext(ctx, "DELETE FROM plans WHERE id = $1", id)
 	return err
 }
@@ -101,4 +53,96 @@ func (r *Repository) GetTrialPlan(ctx context.Context) (*model.Plan, error) {
 		return nil, err
 	}
 	return &plan, nil
+}
+
+// CreatePlan creates a new plan with parameters
+func (r *Repository) CreatePlan(ctx context.Context, name, description string, durationDays, trafficGB, maxDevices int, priceTON float64, priceStars int, priceUSD float64, sortOrder int) (*model.Plan, error) {
+	var plan model.Plan
+	query := `
+		INSERT INTO plans (name, description, duration_days, traffic_gb, max_devices, price_ton, price_stars, price_usd, is_active, sort_order)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, true, $9)
+		RETURNING *`
+
+	err := r.db.QueryRowxContext(ctx, query, name, description, durationDays, trafficGB, maxDevices, priceTON, priceStars, priceUSD, sortOrder).StructScan(&plan)
+	if err != nil {
+		return nil, err
+	}
+	return &plan, nil
+}
+
+// UpdatePlan updates a plan with optional parameters
+func (r *Repository) UpdatePlan(ctx context.Context, planID string, name, description *string, durationDays, trafficGB, maxDevices *int, priceTON *float64, priceStars *int, priceUSD *float64, isActive *bool, sortOrder *int) (*model.Plan, error) {
+	id, err := uuid.Parse(planID)
+	if err != nil {
+		return nil, err
+	}
+
+	// Get current plan
+	plan, err := r.GetPlan(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+
+	// Apply updates
+	if name != nil {
+		plan.Name = *name
+	}
+	if description != nil {
+		plan.Description = *description
+	}
+	if durationDays != nil {
+		plan.DurationDays = *durationDays
+	}
+	if trafficGB != nil {
+		plan.TrafficGB = *trafficGB
+	}
+	if maxDevices != nil {
+		plan.MaxDevices = *maxDevices
+	}
+	if priceTON != nil {
+		plan.PriceTON = *priceTON
+	}
+	if priceStars != nil {
+		plan.PriceStars = *priceStars
+	}
+	if priceUSD != nil {
+		plan.PriceUSD = *priceUSD
+	}
+	if isActive != nil {
+		plan.IsActive = *isActive
+	}
+	if sortOrder != nil {
+		plan.SortOrder = *sortOrder
+	}
+
+	query := `
+		UPDATE plans SET
+			name = $2,
+			description = $3,
+			duration_days = $4,
+			traffic_gb = $5,
+			max_devices = $6,
+			price_ton = $7,
+			price_stars = $8,
+			price_usd = $9,
+			is_active = $10,
+			sort_order = $11
+		WHERE id = $1
+		RETURNING *`
+
+	err = r.db.QueryRowxContext(ctx, query,
+		plan.ID,
+		plan.Name,
+		plan.Description,
+		plan.DurationDays,
+		plan.TrafficGB,
+		plan.MaxDevices,
+		plan.PriceTON,
+		plan.PriceStars,
+		plan.PriceUSD,
+		plan.IsActive,
+		plan.SortOrder,
+	).StructScan(plan)
+
+	return plan, err
 }

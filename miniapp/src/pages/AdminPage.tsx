@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { api } from '../api/client'
 
-type Tab = 'stats' | 'users' | 'bans' | 'promo'
+type Tab = 'stats' | 'users' | 'bans' | 'promo' | 'plans'
 
 interface Stats {
   total_users: number
@@ -42,6 +42,20 @@ interface PromoItem {
   expires_at?: string
 }
 
+interface PlanItem {
+  id: string
+  name: string
+  description: string
+  duration_days: number
+  traffic_gb: number
+  max_devices: number
+  price_ton: number
+  price_stars: number
+  price_usd: number
+  is_active: boolean
+  sort_order: number
+}
+
 export default function AdminPage() {
   const [tab, setTab] = useState<Tab>('stats')
   const [loading, setLoading] = useState(true)
@@ -51,8 +65,10 @@ export default function AdminPage() {
   const [usersTotal, setUsersTotal] = useState(0)
   const [bans, setBans] = useState<BanItem[]>([])
   const [promos, setPromos] = useState<PromoItem[]>([])
+  const [plans, setPlans] = useState<PlanItem[]>([])
   const [search, setSearch] = useState('')
   const [selectedUser, setSelectedUser] = useState<UserItem | null>(null)
+  const [selectedPlan, setSelectedPlan] = useState<PlanItem | null>(null)
 
   // Modal states
   const [showBalanceModal, setShowBalanceModal] = useState(false)
@@ -66,6 +82,19 @@ export default function AdminPage() {
   const [promoValue, setPromoValue] = useState('')
   const [promoCount, setPromoCount] = useState('1')
   const [promoMaxUses, setPromoMaxUses] = useState('1')
+
+  // Plan modal states
+  const [showPlanModal, setShowPlanModal] = useState(false)
+  const [planName, setPlanName] = useState('')
+  const [planDescription, setPlanDescription] = useState('')
+  const [planDuration, setPlanDuration] = useState('')
+  const [planTraffic, setPlanTraffic] = useState('')
+  const [planDevices, setPlanDevices] = useState('3')
+  const [planPriceTon, setPlanPriceTon] = useState('')
+  const [planPriceStars, setPlanPriceStars] = useState('')
+  const [planPriceUsd, setPlanPriceUsd] = useState('')
+  const [planSortOrder, setPlanSortOrder] = useState('0')
+  const [planIsActive, setPlanIsActive] = useState(true)
 
   useEffect(() => {
     loadData()
@@ -88,6 +117,9 @@ export default function AdminPage() {
       } else if (tab === 'promo') {
         const data = await api.admin.listPromoCodes()
         setPromos(data.promo_codes || [])
+      } else if (tab === 'plans') {
+        const data = await api.admin.listPlans()
+        setPlans(data.plans || [])
       }
     } catch (e) {
       setError((e as Error).message)
@@ -195,6 +227,91 @@ export default function AdminPage() {
     }
   }
 
+  const resetPlanForm = () => {
+    setSelectedPlan(null)
+    setPlanName('')
+    setPlanDescription('')
+    setPlanDuration('')
+    setPlanTraffic('')
+    setPlanDevices('3')
+    setPlanPriceTon('')
+    setPlanPriceStars('')
+    setPlanPriceUsd('')
+    setPlanSortOrder('0')
+    setPlanIsActive(true)
+  }
+
+  const openPlanModal = (plan?: PlanItem) => {
+    if (plan) {
+      setSelectedPlan(plan)
+      setPlanName(plan.name)
+      setPlanDescription(plan.description)
+      setPlanDuration(plan.duration_days.toString())
+      setPlanTraffic(plan.traffic_gb.toString())
+      setPlanDevices(plan.max_devices.toString())
+      setPlanPriceTon(plan.price_ton.toString())
+      setPlanPriceStars(plan.price_stars.toString())
+      setPlanPriceUsd(plan.price_usd.toString())
+      setPlanSortOrder(plan.sort_order.toString())
+      setPlanIsActive(plan.is_active)
+    } else {
+      resetPlanForm()
+    }
+    setShowPlanModal(true)
+  }
+
+  const handleSavePlan = async () => {
+    if (!planName || !planDuration || !planTraffic) {
+      alert('Заполните обязательные поля: название, длительность, трафик')
+      return
+    }
+    try {
+      const data = {
+        name: planName,
+        description: planDescription,
+        duration_days: parseInt(planDuration),
+        traffic_gb: parseInt(planTraffic),
+        max_devices: parseInt(planDevices) || 3,
+        price_ton: parseFloat(planPriceTon) || 0,
+        price_stars: parseInt(planPriceStars) || 0,
+        price_usd: parseFloat(planPriceUsd) || 0,
+        sort_order: parseInt(planSortOrder) || 0,
+        is_active: planIsActive,
+      }
+
+      if (selectedPlan) {
+        await api.admin.updatePlan(selectedPlan.id, data)
+      } else {
+        await api.admin.createPlan(data)
+      }
+
+      setShowPlanModal(false)
+      resetPlanForm()
+      loadData()
+    } catch (e) {
+      alert((e as Error).message)
+    }
+  }
+
+  const handleDeletePlan = async (planId: string) => {
+    if (!confirm('Удалить тариф?')) return
+    try {
+      await api.admin.deletePlan(planId)
+      loadData()
+    } catch (e) {
+      alert((e as Error).message)
+    }
+  }
+
+  const handleTogglePlanActive = async (plan: PlanItem) => {
+    try {
+      await api.admin.updatePlan(plan.id, { is_active: !plan.is_active })
+      loadData()
+    } catch (e) {
+      alert((e as Error).message)
+    }
+  }
+
   const formatDate = (dateStr?: string) => {
     if (!dateStr) return '-'
     return new Date(dateStr).toLocaleDateString('ru-RU')
@@ -215,7 +332,7 @@ export default function AdminPage() {
 
       {/* Tabs */}
       <div className="flex gap-2 mb-4 overflow-x-auto">
-        {(['stats', 'users', 'bans', 'promo'] as Tab[]).map((t) => (
+        {(['stats', 'users', 'bans', 'promo', 'plans'] as Tab[]).map((t) => (
           <button
             key={t}
             onClick={() => setTab(t)}
@@ -227,6 +344,7 @@ export default function AdminPage() {
             {t === 'users' && 'Users'}
             {t === 'bans' && 'Bans'}
             {t === 'promo' && 'Promo'}
+            {t === 'plans' && 'Plans'}
           </button>
         ))}
       </div>
@@ -451,6 +569,60 @@ export default function AdminPage() {
         </div>
       )}
 
+      {/* Plans Tab */}
+      {tab === 'plans' && !loading && (
+        <div>
+          <button
+            onClick={() => openPlanModal()}
+            className="btn-primary w-full mb-4"
+          >
+            + Создать тариф
+          </button>
+          <div className="space-y-2">
+            {plans.length === 0 && <p className="text-hint">Нет тарифов</p>}
+            {plans.map((plan) => (
+              <div key={plan.id} className={`card ${!plan.is_active ? 'opacity-50' : ''}`}>
+                <div className="flex justify-between items-start">
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2">
+                      <p className="font-semibold">{plan.name}</p>
+                      {!plan.is_active && <span className="text-xs bg-red-500 text-white px-2 py-0.5 rounded">OFF</span>}
+                    </div>
+                    <p className="text-hint text-sm">{plan.description}</p>
+                    <div className="text-hint text-sm mt-1">
+                      <p>{plan.duration_days} дней • {plan.traffic_gb} GB • {plan.max_devices} устр.</p>
+                      <p className="font-medium text-tg-text">
+                        {plan.price_ton} TON / {plan.price_stars} ⭐ / ${plan.price_usd}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex flex-col gap-1">
+                    <button
+                      onClick={() => openPlanModal(plan)}
+                      className="text-xs bg-tg-secondary-bg px-2 py-1 rounded"
+                    >
+                      Edit
+                    </button>
+                    <button
+                      onClick={() => handleTogglePlanActive(plan)}
+                      className={`text-xs px-2 py-1 rounded ${plan.is_active ? 'bg-yellow-500' : 'bg-green-500'} text-white`}
+                    >
+                      {plan.is_active ? 'OFF' : 'ON'}
+                    </button>
+                    <button
+                      onClick={() => handleDeletePlan(plan.id)}
+                      className="text-xs bg-red-500 text-white px-2 py-1 rounded"
+                    >
+                      Delete
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Balance Modal */}
       {showBalanceModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
@@ -576,6 +748,132 @@ export default function AdminPage() {
               </button>
               <button onClick={handleCreatePromo} className="flex-1 btn-primary">
                 Create
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Plan Modal */}
+      {showPlanModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
+          <div className="bg-tg-bg rounded-xl p-4 w-full max-w-sm max-h-[90vh] overflow-y-auto">
+            <h3 className="font-bold mb-4">{selectedPlan ? 'Редактировать тариф' : 'Создать тариф'}</h3>
+            <div className="space-y-3">
+              <input
+                type="text"
+                value={planName}
+                onChange={(e) => setPlanName(e.target.value)}
+                placeholder="Название *"
+                className="input w-full"
+              />
+              <input
+                type="text"
+                value={planDescription}
+                onChange={(e) => setPlanDescription(e.target.value)}
+                placeholder="Описание"
+                className="input w-full"
+              />
+              <div className="grid grid-cols-3 gap-2">
+                <div>
+                  <label className="text-hint text-xs">Дней *</label>
+                  <input
+                    type="number"
+                    value={planDuration}
+                    onChange={(e) => setPlanDuration(e.target.value)}
+                    placeholder="30"
+                    className="input w-full"
+                  />
+                </div>
+                <div>
+                  <label className="text-hint text-xs">GB *</label>
+                  <input
+                    type="number"
+                    value={planTraffic}
+                    onChange={(e) => setPlanTraffic(e.target.value)}
+                    placeholder="100"
+                    className="input w-full"
+                  />
+                </div>
+                <div>
+                  <label className="text-hint text-xs">Устр.</label>
+                  <input
+                    type="number"
+                    value={planDevices}
+                    onChange={(e) => setPlanDevices(e.target.value)}
+                    placeholder="3"
+                    className="input w-full"
+                  />
+                </div>
+              </div>
+              <div className="grid grid-cols-3 gap-2">
+                <div>
+                  <label className="text-hint text-xs">TON</label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    value={planPriceTon}
+                    onChange={(e) => setPlanPriceTon(e.target.value)}
+                    placeholder="1.5"
+                    className="input w-full"
+                  />
+                </div>
+                <div>
+                  <label className="text-hint text-xs">Stars</label>
+                  <input
+                    type="number"
+                    value={planPriceStars}
+                    onChange={(e) => setPlanPriceStars(e.target.value)}
+                    placeholder="100"
+                    className="input w-full"
+                  />
+                </div>
+                <div>
+                  <label className="text-hint text-xs">USD</label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    value={planPriceUsd}
+                    onChange={(e) => setPlanPriceUsd(e.target.value)}
+                    placeholder="3.99"
+                    className="input w-full"
+                  />
+                </div>
+              </div>
+              <div className="flex items-center gap-4">
+                <div className="flex-1">
+                  <label className="text-hint text-xs">Порядок</label>
+                  <input
+                    type="number"
+                    value={planSortOrder}
+                    onChange={(e) => setPlanSortOrder(e.target.value)}
+                    placeholder="0"
+                    className="input w-full"
+                  />
+                </div>
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={planIsActive}
+                    onChange={(e) => setPlanIsActive(e.target.checked)}
+                    className="w-5 h-5"
+                  />
+                  <span className="text-sm">Активен</span>
+                </label>
+              </div>
+            </div>
+            <div className="flex gap-2 mt-4">
+              <button
+                onClick={() => {
+                  setShowPlanModal(false)
+                  resetPlanForm()
+                }}
+                className="flex-1 bg-tg-secondary-bg py-2 rounded-lg"
+              >
+                Отмена
+              </button>
+              <button onClick={handleSavePlan} className="flex-1 btn-primary">
+                {selectedPlan ? 'Сохранить' : 'Создать'}
               </button>
             </div>
           </div>

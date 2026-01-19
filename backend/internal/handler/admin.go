@@ -496,3 +496,129 @@ func (h *AdminHandler) GetLogs(c *fiber.Ctx) error {
 
 	return c.JSON(fiber.Map{"logs": logs})
 }
+
+// --- Plan Management ---
+
+// ListPlans lists all plans (including inactive)
+func (h *AdminHandler) ListPlans(c *fiber.Ctx) error {
+	plans, err := h.adminSvc.ListAllPlans(c.Context())
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": err.Error(),
+		})
+	}
+	return c.JSON(fiber.Map{"plans": plans})
+}
+
+type UpdatePlanRequest struct {
+	Name         *string  `json:"name,omitempty"`
+	Description  *string  `json:"description,omitempty"`
+	DurationDays *int     `json:"duration_days,omitempty"`
+	TrafficGB    *int     `json:"traffic_gb,omitempty"`
+	MaxDevices   *int     `json:"max_devices,omitempty"`
+	PriceTON     *float64 `json:"price_ton,omitempty"`
+	PriceStars   *int     `json:"price_stars,omitempty"`
+	PriceUSD     *float64 `json:"price_usd,omitempty"`
+	IsActive     *bool    `json:"is_active,omitempty"`
+	SortOrder    *int     `json:"sort_order,omitempty"`
+}
+
+// UpdatePlan updates a plan
+func (h *AdminHandler) UpdatePlan(c *fiber.Ctx) error {
+	adminID := middleware.GetAdminID(c)
+	planID := c.Params("plan_id")
+
+	var req UpdatePlanRequest
+	if err := c.BodyParser(&req); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "Неверный формат запроса",
+		})
+	}
+
+	plan, err := h.adminSvc.UpdatePlan(c.Context(), adminID, planID, service.UpdatePlanParams{
+		Name:         req.Name,
+		Description:  req.Description,
+		DurationDays: req.DurationDays,
+		TrafficGB:    req.TrafficGB,
+		MaxDevices:   req.MaxDevices,
+		PriceTON:     req.PriceTON,
+		PriceStars:   req.PriceStars,
+		PriceUSD:     req.PriceUSD,
+		IsActive:     req.IsActive,
+		SortOrder:    req.SortOrder,
+	})
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": err.Error(),
+		})
+	}
+
+	return c.JSON(plan)
+}
+
+type CreatePlanRequest struct {
+	Name         string  `json:"name"`
+	Description  string  `json:"description"`
+	DurationDays int     `json:"duration_days"`
+	TrafficGB    int     `json:"traffic_gb"`
+	MaxDevices   int     `json:"max_devices"`
+	PriceTON     float64 `json:"price_ton"`
+	PriceStars   int     `json:"price_stars"`
+	PriceUSD     float64 `json:"price_usd"`
+	SortOrder    int     `json:"sort_order"`
+}
+
+// CreatePlan creates a new plan
+func (h *AdminHandler) CreatePlan(c *fiber.Ctx) error {
+	adminID := middleware.GetAdminID(c)
+
+	var req CreatePlanRequest
+	if err := c.BodyParser(&req); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "Неверный формат запроса",
+		})
+	}
+
+	if req.Name == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "Название обязательно",
+		})
+	}
+
+	if req.MaxDevices <= 0 {
+		req.MaxDevices = 3
+	}
+
+	plan, err := h.adminSvc.CreatePlan(c.Context(), adminID, service.CreatePlanParams{
+		Name:         req.Name,
+		Description:  req.Description,
+		DurationDays: req.DurationDays,
+		TrafficGB:    req.TrafficGB,
+		MaxDevices:   req.MaxDevices,
+		PriceTON:     req.PriceTON,
+		PriceStars:   req.PriceStars,
+		PriceUSD:     req.PriceUSD,
+		SortOrder:    req.SortOrder,
+	})
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": err.Error(),
+		})
+	}
+
+	return c.JSON(plan)
+}
+
+// DeletePlan deactivates a plan (soft delete)
+func (h *AdminHandler) DeletePlan(c *fiber.Ctx) error {
+	adminID := middleware.GetAdminID(c)
+	planID := c.Params("plan_id")
+
+	if err := h.adminSvc.DeletePlan(c.Context(), adminID, planID); err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": err.Error(),
+		})
+	}
+
+	return c.JSON(fiber.Map{"success": true})
+}

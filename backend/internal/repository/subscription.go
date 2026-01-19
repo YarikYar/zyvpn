@@ -53,8 +53,8 @@ func (r *Repository) CreateSubscription(ctx context.Context, sub *model.Subscrip
 	query := `
 		INSERT INTO subscriptions (
 			user_id, plan_id, status, xui_client_id, xui_email, connection_key,
-			started_at, expires_at, traffic_limit, traffic_used
-		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+			started_at, expires_at, traffic_limit, traffic_used, max_devices
+		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
 		RETURNING id, created_at`
 
 	return r.db.QueryRowContext(ctx, query,
@@ -68,6 +68,7 @@ func (r *Repository) CreateSubscription(ctx context.Context, sub *model.Subscrip
 		sub.ExpiresAt,
 		sub.TrafficLimit,
 		sub.TrafficUsed,
+		sub.MaxDevices,
 	).Scan(&sub.ID, &sub.CreatedAt)
 }
 

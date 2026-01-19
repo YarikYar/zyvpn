@@ -122,7 +122,7 @@ func (c *Client) ensureLoggedIn() error {
 	return nil
 }
 
-func (c *Client) AddClient(email string, trafficLimitGB int64, expiryDays int) (*ClientConfig, error) {
+func (c *Client) AddClient(email string, trafficLimitGB int64, expiryDays int, maxDevices int) (*ClientConfig, error) {
 	if err := c.ensureLoggedIn(); err != nil {
 		return nil, err
 	}
@@ -139,12 +139,16 @@ func (c *Client) AddClient(email string, trafficLimitGB int64, expiryDays int) (
 		totalGB = trafficLimitGB * 1024 * 1024 * 1024
 	}
 
+	if maxDevices <= 0 {
+		maxDevices = 3 // Default to 3 devices
+	}
+
 	client := ClientConfig{
 		ID:         clientID,
 		Email:      email,
 		Enable:     true,
 		Flow:       "xtls-rprx-vision",
-		LimitIP:    2,
+		LimitIP:    maxDevices,
 		TotalGB:    totalGB,
 		ExpiryTime: expiryTime,
 	}
@@ -313,8 +317,11 @@ func (c *Client) GetClientTraffic(email string) (*Traffic, error) {
 	return result.Obj, nil
 }
 
-func (c *Client) UpdateClientTraffic(clientUUID string, email string, totalGB int64, expiryTime int64) error {
-	err := c.updateClientTrafficWithRetry(clientUUID, email, totalGB, expiryTime, true)
+func (c *Client) UpdateClientTraffic(clientUUID string, email string, totalGB int64, expiryTime int64, maxDevices int) error {
+	if maxDevices <= 0 {
+		maxDevices = 3
+	}
+	err := c.updateClientTrafficWithRetry(clientUUID, email, totalGB, expiryTime, maxDevices, true)
 
 	// If client not found (404), try to recreate it
 	if err != nil && (strings.Contains(err.Error(), "status=404") || strings.Contains(err.Error(), "not found")) {
@@ -324,13 +331,13 @@ func (c *Client) UpdateClientTraffic(clientUUID string, email string, totalGB in
 		_ = c.DeleteClientByEmail(email)
 
 		// Try to create with original email first
-		createErr := c.addClientWithUUID(clientUUID, email, totalGB, expiryTime)
+		createErr := c.addClientWithUUID(clientUUID, email, totalGB, expiryTime, maxDevices)
 
 		// If duplicate email (exists in another inbound), use new unique email
 		if createErr != nil && strings.Contains(createErr.Error(), "duplicate") {
 			newEmail := fmt.Sprintf("%s_%d", email, time.Now().Unix())
 			fmt.Printf("[XUI] Duplicate email in another inbound, using new email: %s\n", newEmail)
-			return c.addClientWithUUID(clientUUID, newEmail, totalGB, expiryTime)
+			return c.addClientWithUUID(clientUUID, newEmail, totalGB, expiryTime, maxDevices)
 		}
 
 		return createErr
@@ -341,16 +348,20 @@ func (c *Client) UpdateClientTraffic(clientUUID string, email string, totalGB in
 		fmt.Printf("[XUI] Duplicate email detected, trying with new email...\n")
 		_ = c.DeleteClientByEmail(email)
 		newEmail := fmt.Sprintf("%s_%d", email, time.Now().Unix())
-		return c.addClientWithUUID(clientUUID, newEmail, totalGB, expiryTime)
+		return c.addClientWithUUID(clientUUID, newEmail, totalGB, expiryTime, maxDevices)
 	}
 
 	return err
 }
 
 // addClientWithUUID adds a client with a specific UUID (for recreating deleted clients)
-func (c *Client) addClientWithUUID(clientUUID string, email string, totalGB int64, expiryTime int64) error {
+func (c *Client) addClientWithUUID(clientUUID string, email string, totalGB int64, expiryTime int64, maxDevices int) error {
 	if err := c.ensureLoggedIn(); err != nil {
 		return err
+	}
+
+	if maxDevices <= 0 {
+		maxDevices = 3
 	}
 
 	client := ClientConfig{
@@ -358,7 +369,7 @@ func (c *Client) addClientWithUUID(clientUUID string, email string, totalGB int6
 		Email:      email,
 		Enable:     true,
 		Flow:       "xtls-rprx-vision",
-		LimitIP:    2,
+		LimitIP:    maxDevices,
 		TotalGB:    totalGB * 1024 * 1024 * 1024,
 		ExpiryTime: expiryTime,
 	}
@@ -408,9 +419,13 @@ func (c *Client) addClientWithUUID(clientUUID string, email string, totalGB int6
 	return nil
 }
 
-func (c *Client) updateClientTrafficWithRetry(clientUUID string, email string, totalGB int64, expiryTime int64, canRetry bool) error {
+func (c *Client) updateClientTrafficWithRetry(clientUUID string, email string, totalGB int64, expiryTime int64, maxDevices int, canRetry bool) error {
 	if err := c.ensureLoggedIn(); err != nil {
 		return err
+	}
+
+	if maxDevices <= 0 {
+		maxDevices = 3
 	}
 
 	client := ClientConfig{
@@ -418,7 +433,7 @@ func (c *Client) updateClientTrafficWithRetry(clientUUID string, email string, t
 		Email:      email,
 		Enable:     true,
 		Flow:       "xtls-rprx-vision",
-		LimitIP:    2,
+		LimitIP:    maxDevices,
 		TotalGB:    totalGB * 1024 * 1024 * 1024,
 		ExpiryTime: expiryTime,
 	}
@@ -465,7 +480,7 @@ func (c *Client) updateClientTrafficWithRetry(clientUUID string, email string, t
 			return fmt.Errorf("re-login failed: %w", err)
 		}
 		if canRetry {
-			return c.updateClientTrafficWithRetry(clientUUID, email, totalGB, expiryTime, false)
+			return c.updateClientTrafficWithRetry(clientUUID, email, totalGB, expiryTime, maxDevices, false)
 		}
 		return fmt.Errorf("update client failed after re-login: status=%d, body=%s", resp.StatusCode, string(respBody))
 	}

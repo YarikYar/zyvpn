@@ -184,6 +184,12 @@ func main() {
 	admin.Post("/promo/bulk", adminHandler.CreateBulkPromoCodes)
 	admin.Post("/promo/deactivate", adminHandler.DeactivatePromoCode)
 
+	// Admin - Plans
+	admin.Get("/plans", adminHandler.ListPlans)
+	admin.Post("/plans", adminHandler.CreatePlan)
+	admin.Put("/plans/:plan_id", adminHandler.UpdatePlan)
+	admin.Delete("/plans/:plan_id", adminHandler.DeletePlan)
+
 	// Admin - Logs
 	admin.Get("/logs", adminHandler.GetLogs)
 

@@ -60,4 +60,7 @@ const (
 	AdminActionUnbanUser        = "unban_user"
 	AdminActionCreatePromoCode  = "create_promo_code"
 	AdminActionDeactivatePromo  = "deactivate_promo_code"
+	AdminActionCreatePlan       = "create_plan"
+	AdminActionUpdatePlan       = "update_plan"
+	AdminActionDeletePlan       = "delete_plan"
 )
