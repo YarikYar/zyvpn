@@ -36,12 +36,18 @@ func (s *ReferralService) CreateReferral(ctx context.Context, referrerID, referr
 		return err
 	}
 
+	// Get referral bonus from settings
+	bonusTON, err := s.repo.GetSettingFloat(ctx, "referral_bonus_ton")
+	if err != nil {
+		bonusTON = model.DefaultReferralBonusTON // Fallback to default
+	}
+
 	referral := &model.Referral{
 		ReferrerID: referrerID,
 		ReferredID: referredID,
 		BonusType:  model.DefaultReferralBonusType,
 		BonusValue: 0,
-		BonusTON:   model.DefaultReferralBonusTON,
+		BonusTON:   bonusTON,
 		Status:     model.ReferralStatusPending,
 	}
 

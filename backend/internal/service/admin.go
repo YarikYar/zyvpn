@@ -594,3 +594,61 @@ func (s *AdminService) DeletePlan(ctx context.Context, adminID int64, planID str
 
 	return nil
 }
+
+// --- Settings Management ---
+
+// GetSettings returns all settings
+func (s *AdminService) GetSettings(ctx context.Context, adminID int64) (map[string]string, error) {
+	if ok, _ := s.IsAdmin(ctx, adminID); !ok {
+		return nil, ErrNotAdmin
+	}
+	return s.repo.GetAllSettings(ctx)
+}
+
+// SetSetting sets a setting value
+func (s *AdminService) SetSetting(ctx context.Context, adminID int64, key, value string) error {
+	if ok, _ := s.IsAdmin(ctx, adminID); !ok {
+		return ErrNotAdmin
+	}
+	return s.repo.SetSetting(ctx, key, value)
+}
+
+// GetTopupBonusPercent returns current topup bonus percentage
+func (s *AdminService) GetTopupBonusPercent(ctx context.Context) (float64, error) {
+	value, err := s.repo.GetSettingFloat(ctx, "topup_bonus_percent")
+	if err != nil {
+		return 0, nil // Default to 0 if not set
+	}
+	return value, nil
+}
+
+// SetTopupBonusPercent sets topup bonus percentage (0-10)
+func (s *AdminService) SetTopupBonusPercent(ctx context.Context, adminID int64, percent float64) error {
+	if ok, _ := s.IsAdmin(ctx, adminID); !ok {
+		return ErrNotAdmin
+	}
+	if percent < 0 || percent > 10 {
+		return errors.New("процент бонуса должен быть от 0 до 10")
+	}
+	return s.repo.SetSetting(ctx, "topup_bonus_percent", fmt.Sprintf("%.1f", percent))
+}
+
+// GetReferralBonusTON returns current referral bonus in TON
+func (s *AdminService) GetReferralBonusTON(ctx context.Context) (float64, error) {
+	value, err := s.repo.GetSettingFloat(ctx, "referral_bonus_ton")
+	if err != nil {
+		return 0.1, nil // Default to 0.1 TON if not set
+	}
+	return value, nil
+}
+
+// SetReferralBonusTON sets referral bonus in TON (0-1)
+func (s *AdminService) SetReferralBonusTON(ctx context.Context, adminID int64, amount float64) error {
+	if ok, _ := s.IsAdmin(ctx, adminID); !ok {
+		return ErrNotAdmin
+	}
+	if amount < 0 || amount > 1 {
+		return errors.New("бонус должен быть от 0 до 1 TON")
+	}
+	return s.repo.SetSetting(ctx, "referral_bonus_ton", fmt.Sprintf("%.2f", amount))
+}

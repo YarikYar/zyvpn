@@ -229,6 +229,28 @@ export const api = {
     getLogs: (limit = 50, offset = 0) =>
       request<{ logs: any[] }>(`/api/admin/logs?limit=${limit}&offset=${offset}`),
 
+    // Settings
+    getSettings: () =>
+      request<{ settings: Record<string, string> }>('/api/admin/settings'),
+
+    getTopupBonus: () =>
+      request<{ topup_bonus_percent: number }>('/api/admin/settings/topup-bonus'),
+
+    setTopupBonus: (percent: number) =>
+      request<{ success: boolean; topup_bonus_percent: number }>('/api/admin/settings/topup-bonus', {
+        method: 'POST',
+        body: JSON.stringify({ percent }),
+      }),
+
+    getReferralBonus: () =>
+      request<{ referral_bonus_ton: number }>('/api/admin/settings/referral-bonus'),
+
+    setReferralBonus: (amount: number) =>
+      request<{ success: boolean; referral_bonus_ton: number }>('/api/admin/settings/referral-bonus', {
+        method: 'POST',
+        body: JSON.stringify({ amount }),
+      }),
+
     // Plans
     listPlans: () =>
       request<{ plans: any[] }>('/api/admin/plans'),

@@ -193,6 +193,13 @@ func main() {
 	// Admin - Logs
 	admin.Get("/logs", adminHandler.GetLogs)
 
+	// Admin - Settings
+	admin.Get("/settings", adminHandler.GetSettings)
+	admin.Get("/settings/topup-bonus", adminHandler.GetTopupBonus)
+	admin.Post("/settings/topup-bonus", adminHandler.SetTopupBonus)
+	admin.Get("/settings/referral-bonus", adminHandler.GetReferralBonus)
+	admin.Post("/settings/referral-bonus", adminHandler.SetReferralBonus)
+
 	// Internal endpoints (for cron jobs)
 	internal := app.Group("/internal")
 	internal.Post("/cron/expire", func(c *fiber.Ctx) error {

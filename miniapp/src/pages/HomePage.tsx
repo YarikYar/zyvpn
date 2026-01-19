@@ -11,12 +11,13 @@ const ONBOARDING_KEY = 'zyvpn_onboarding_seen'
 export default function HomePage() {
   const navigate = useNavigate()
   const { user } = useTelegram()
-  const { plans, subscriptionStatus, fetchSubscriptionStatus, user: storeUser } = useStore()
+  const { plans, subscriptionStatus, fetchSubscriptionStatus, fetchPlans, user: storeUser } = useStore()
   const [isAdmin, setIsAdmin] = useState(false)
   const [showOnboarding, setShowOnboarding] = useState(false)
 
   useEffect(() => {
     fetchSubscriptionStatus()
+    fetchPlans() // Refresh plans on every visit
     // Check if user is admin
     api.admin.checkAccess().then(setIsAdmin)
 
@@ -24,7 +25,7 @@ export default function HomePage() {
     if (!localStorage.getItem(ONBOARDING_KEY)) {
       setShowOnboarding(true)
     }
-  }, [fetchSubscriptionStatus])
+  }, [fetchSubscriptionStatus, fetchPlans])
 
   const handleCloseOnboarding = () => {
     localStorage.setItem(ONBOARDING_KEY, 'true')

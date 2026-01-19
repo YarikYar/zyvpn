@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { api } from '../api/client'
 
-type Tab = 'stats' | 'users' | 'bans' | 'promo' | 'plans'
+type Tab = 'stats' | 'users' | 'bans' | 'promo' | 'plans' | 'settings'
 
 interface Stats {
   total_users: number
@@ -68,6 +68,8 @@ export default function AdminPage() {
   const [bans, setBans] = useState<BanItem[]>([])
   const [promos, setPromos] = useState<PromoItem[]>([])
   const [plans, setPlans] = useState<PlanItem[]>([])
+  const [topupBonus, setTopupBonus] = useState(0)
+  const [referralBonus, setReferralBonus] = useState(0.1)
   const [search, setSearch] = useState('')
   const [selectedUser, setSelectedUser] = useState<UserItem | null>(null)
   const [selectedPlan, setSelectedPlan] = useState<PlanItem | null>(null)
@@ -122,6 +124,13 @@ export default function AdminPage() {
       } else if (tab === 'plans') {
         const data = await api.admin.listPlans()
         setPlans(data.plans || [])
+      } else if (tab === 'settings') {
+        const [topupData, referralData] = await Promise.all([
+          api.admin.getTopupBonus(),
+          api.admin.getReferralBonus()
+        ])
+        setTopupBonus(topupData.topup_bonus_percent || 0)
+        setReferralBonus(referralData.referral_bonus_ton || 0.1)
       }
     } catch (e) {
       setError((e as Error).message)
@@ -342,7 +351,7 @@ export default function AdminPage() {
 
       {/* Tabs */}
       <div className="flex gap-2 mb-4 overflow-x-auto">
-        {(['stats', 'users', 'bans', 'promo', 'plans'] as Tab[]).map((t) => (
+        {(['stats', 'users', 'bans', 'promo', 'plans', 'settings'] as Tab[]).map((t) => (
           <button
             key={t}
             onClick={() => setTab(t)}
@@ -355,6 +364,7 @@ export default function AdminPage() {
             {t === 'bans' && 'Bans'}
             {t === 'promo' && 'Promo'}
             {t === 'plans' && 'Plans'}
+            {t === 'settings' && '⚙️'}
           </button>
         ))}
       </div>
@@ -629,6 +639,77 @@ export default function AdminPage() {
                 </div>
               </div>
             ))}
+          </div>
+        </div>
+      )}
+
+      {/* Settings Tab */}
+      {tab === 'settings' && !loading && (
+        <div className="space-y-6">
+          {/* Topup Bonus */}
+          <div className="card">
+            <h3 className="font-semibold mb-2">Бонус при пополнении TON</h3>
+            <p className="text-hint text-sm mb-4">
+              Процент бонуса при пополнении баланса через TON
+            </p>
+            <div className="flex items-center gap-4">
+              <input
+                type="range"
+                min="0"
+                max="10"
+                step="0.1"
+                value={topupBonus}
+                onChange={(e) => setTopupBonus(parseFloat(e.target.value))}
+                className="flex-1 h-2 bg-tg-secondary-bg rounded-lg appearance-none cursor-pointer"
+              />
+              <span className="font-bold w-16 text-right">{topupBonus.toFixed(1)}%</span>
+            </div>
+            <button
+              onClick={async () => {
+                try {
+                  await api.admin.setTopupBonus(topupBonus)
+                  alert('Сохранено!')
+                } catch (e) {
+                  alert((e as Error).message)
+                }
+              }}
+              className="btn-primary w-full mt-4"
+            >
+              Сохранить
+            </button>
+          </div>
+
+          {/* Referral Bonus */}
+          <div className="card">
+            <h3 className="font-semibold mb-2">Реферальный бонус</h3>
+            <p className="text-hint text-sm mb-4">
+              TON бонус реферреру при первой оплате приглашённого
+            </p>
+            <div className="flex items-center gap-4">
+              <input
+                type="range"
+                min="0"
+                max="1"
+                step="0.01"
+                value={referralBonus}
+                onChange={(e) => setReferralBonus(parseFloat(e.target.value))}
+                className="flex-1 h-2 bg-tg-secondary-bg rounded-lg appearance-none cursor-pointer"
+              />
+              <span className="font-bold w-20 text-right">{referralBonus.toFixed(2)} TON</span>
+            </div>
+            <button
+              onClick={async () => {
+                try {
+                  await api.admin.setReferralBonus(referralBonus)
+                  alert('Сохранено!')
+                } catch (e) {
+                  alert((e as Error).message)
+                }
+              }}
+              className="btn-primary w-full mt-4"
+            >
+              Сохранить
+            </button>
           </div>
         </div>
       )}

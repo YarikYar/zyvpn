@@ -622,3 +622,91 @@ func (h *AdminHandler) DeletePlan(c *fiber.Ctx) error {
 
 	return c.JSON(fiber.Map{"success": true})
 }
+
+// --- Settings Management ---
+
+// GetSettings returns all admin settings
+func (h *AdminHandler) GetSettings(c *fiber.Ctx) error {
+	adminID := middleware.GetAdminID(c)
+
+	settings, err := h.adminSvc.GetSettings(c.Context(), adminID)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": err.Error(),
+		})
+	}
+
+	return c.JSON(fiber.Map{"settings": settings})
+}
+
+// GetTopupBonus returns current topup bonus percentage
+func (h *AdminHandler) GetTopupBonus(c *fiber.Ctx) error {
+	percent, err := h.adminSvc.GetTopupBonusPercent(c.Context())
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": err.Error(),
+		})
+	}
+
+	return c.JSON(fiber.Map{"topup_bonus_percent": percent})
+}
+
+type SetTopupBonusRequest struct {
+	Percent float64 `json:"percent"`
+}
+
+// SetTopupBonus sets topup bonus percentage
+func (h *AdminHandler) SetTopupBonus(c *fiber.Ctx) error {
+	adminID := middleware.GetAdminID(c)
+
+	var req SetTopupBonusRequest
+	if err := c.BodyParser(&req); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "Неверный формат запроса",
+		})
+	}
+
+	if err := h.adminSvc.SetTopupBonusPercent(c.Context(), adminID, req.Percent); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": err.Error(),
+		})
+	}
+
+	return c.JSON(fiber.Map{"success": true, "topup_bonus_percent": req.Percent})
+}
+
+// GetReferralBonus returns current referral bonus in TON
+func (h *AdminHandler) GetReferralBonus(c *fiber.Ctx) error {
+	amount, err := h.adminSvc.GetReferralBonusTON(c.Context())
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": err.Error(),
+		})
+	}
+
+	return c.JSON(fiber.Map{"referral_bonus_ton": amount})
+}
+
+type SetReferralBonusRequest struct {
+	Amount float64 `json:"amount"`
+}
+
+// SetReferralBonus sets referral bonus in TON
+func (h *AdminHandler) SetReferralBonus(c *fiber.Ctx) error {
+	adminID := middleware.GetAdminID(c)
+
+	var req SetReferralBonusRequest
+	if err := c.BodyParser(&req); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "Неверный формат запроса",
+		})
+	}
+
+	if err := h.adminSvc.SetReferralBonusTON(c.Context(), adminID, req.Amount); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": err.Error(),
+		})
+	}
+
+	return c.JSON(fiber.Map{"success": true, "referral_bonus_ton": req.Amount})
+}

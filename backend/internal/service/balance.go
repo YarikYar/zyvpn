@@ -50,10 +50,26 @@ func (s *BalanceService) CreditManual(ctx context.Context, userID int64, amount 
 	return s.repo.UpdateBalance(ctx, userID, amount, model.TransactionTypeManual, description, nil)
 }
 
-// CreditTopUp adds balance from top-up
+// CreditTopUp adds balance from top-up with optional bonus
 func (s *BalanceService) CreditTopUp(ctx context.Context, userID int64, amount float64, paymentID uuid.UUID) (float64, error) {
-	description := fmt.Sprintf("Пополнение баланса: +%.4f TON", amount)
-	return s.repo.UpdateBalance(ctx, userID, amount, model.TransactionTypeTopUp, description, &paymentID)
+	// Get bonus percentage from settings
+	bonusPercent, err := s.repo.GetSettingFloat(ctx, "topup_bonus_percent")
+	if err != nil {
+		bonusPercent = 0 // Default to no bonus if setting not found
+	}
+
+	// Calculate total with bonus
+	bonusAmount := amount * bonusPercent / 100
+	totalAmount := amount + bonusAmount
+
+	var description string
+	if bonusAmount > 0 {
+		description = fmt.Sprintf("Пополнение баланса: +%.4f TON (+%.1f%% бонус = %.4f)", amount, bonusPercent, totalAmount)
+	} else {
+		description = fmt.Sprintf("Пополнение баланса: +%.4f TON", amount)
+	}
+
+	return s.repo.UpdateBalance(ctx, userID, totalAmount, model.TransactionTypeTopUp, description, &paymentID)
 }
 
 // CreditPromoCode adds balance from promo code
