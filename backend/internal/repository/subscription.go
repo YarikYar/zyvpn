@@ -52,14 +52,15 @@ func (r *Repository) GetUserSubscriptions(ctx context.Context, userID int64) ([]
 func (r *Repository) CreateSubscription(ctx context.Context, sub *model.Subscription) error {
 	query := `
 		INSERT INTO subscriptions (
-			user_id, plan_id, status, xui_client_id, xui_email, connection_key,
+			user_id, plan_id, server_id, status, xui_client_id, xui_email, connection_key,
 			started_at, expires_at, traffic_limit, traffic_used, max_devices
-		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
 		RETURNING id, created_at`
 
 	return r.db.QueryRowContext(ctx, query,
 		sub.UserID,
 		sub.PlanID,
+		sub.ServerID,
 		sub.Status,
 		sub.XUIClientID,
 		sub.XUIEmail,
@@ -155,4 +156,17 @@ func (r *Repository) HasUsedTrial(ctx context.Context, userID int64) (bool, erro
 		return false, err
 	}
 	return count > 0, nil
+}
+
+// UpdateSubscriptionServer updates the server for an active subscription (for region switching)
+func (r *Repository) UpdateSubscriptionServer(ctx context.Context, id uuid.UUID, serverID uuid.UUID, xuiClientID, xuiEmail, connectionKey string) error {
+	query := `
+		UPDATE subscriptions SET
+			server_id = $2,
+			xui_client_id = $3,
+			xui_email = $4,
+			connection_key = $5
+		WHERE id = $1`
+	_, err := r.db.ExecContext(ctx, query, id, serverID, xuiClientID, xuiEmail, connectionKey)
+	return err
 }

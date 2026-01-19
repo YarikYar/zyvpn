@@ -10,7 +10,7 @@ export default function PaymentPage() {
   const { planId } = useParams<{ planId: string }>()
   const navigate = useNavigate()
   const { webApp } = useTelegram()
-  const { plans, rates, user, fetchUser } = useStore()
+  const { plans, rates, user, fetchUser, selectedServerId } = useStore()
   const [tonConnectUI] = useTonConnectUI()
   const address = useTonAddress()
 
@@ -78,7 +78,7 @@ export default function PaymentPage() {
       if (selectedPayment === 'ton') {
         // Create payment
         console.log('Creating TON payment...')
-        const result = await api.buySubscription(planId, 'ton')
+        const result = await api.buySubscription(planId, 'ton', selectedServerId || undefined)
         console.log('Payment result:', result)
         const tonInfo = result.ton_info as TONPaymentInfo
         console.log('TON info:', tonInfo)
@@ -102,7 +102,7 @@ export default function PaymentPage() {
       } else {
         // Stars payment via Telegram
         console.log('Creating Stars payment...')
-        const result = await api.buySubscription(planId, 'stars')
+        const result = await api.buySubscription(planId, 'stars', selectedServerId || undefined)
         console.log('Stars payment result:', result)
         const paymentId = result.payment.id
 

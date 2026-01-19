@@ -36,6 +36,7 @@ type Payment struct {
 	UserID         int64           `json:"user_id" db:"user_id"`
 	SubscriptionID *uuid.UUID      `json:"subscription_id,omitempty" db:"subscription_id"`
 	PlanID         *uuid.UUID      `json:"plan_id,omitempty" db:"plan_id"`
+	ServerID       *uuid.UUID      `json:"server_id,omitempty" db:"server_id"`
 	PaymentType    PaymentType     `json:"payment_type" db:"payment_type"`
 	Provider       PaymentProvider `json:"provider" db:"provider"`
 	Amount         float64         `json:"amount" db:"amount"`
@@ -49,6 +50,7 @@ type Payment struct {
 
 type CreatePaymentRequest struct {
 	PlanID   uuid.UUID       `json:"plan_id" validate:"required"`
+	ServerID *uuid.UUID      `json:"server_id,omitempty"`
 	Provider PaymentProvider `json:"provider" validate:"required,oneof=ton stars"`
 }
 

@@ -1,0 +1,6 @@
+DROP INDEX IF EXISTS idx_servers_status_load;
+ALTER TABLE servers DROP COLUMN IF EXISTS last_check_at;
+ALTER TABLE servers DROP COLUMN IF EXISTS status;
+ALTER TABLE servers DROP COLUMN IF EXISTS ping_ms;
+ALTER TABLE servers DROP COLUMN IF EXISTS current_load;
+ALTER TABLE servers DROP COLUMN IF EXISTS capacity;

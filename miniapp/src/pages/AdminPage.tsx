@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { api } from '../api/client'
 
-type Tab = 'stats' | 'users' | 'bans' | 'promo' | 'plans' | 'settings'
+type Tab = 'stats' | 'users' | 'bans' | 'promo' | 'plans' | 'servers' | 'settings'
 
 interface Stats {
   total_users: number
@@ -57,6 +57,29 @@ interface PlanItem {
   sort_order: number
 }
 
+interface ServerItem {
+  id: string
+  name: string
+  country: string
+  city?: string
+  flag_emoji: string
+  xui_base_url: string
+  xui_username: string
+  xui_password: string
+  xui_inbound_id: number
+  server_address: string
+  server_port: number
+  public_key: string
+  short_id: string
+  server_name: string
+  is_active: boolean
+  sort_order: number
+  capacity: number
+  current_load: number
+  status: string
+  ping_ms?: number
+}
+
 export default function AdminPage() {
   const navigate = useNavigate()
   const [tab, setTab] = useState<Tab>('stats')
@@ -68,12 +91,14 @@ export default function AdminPage() {
   const [bans, setBans] = useState<BanItem[]>([])
   const [promos, setPromos] = useState<PromoItem[]>([])
   const [plans, setPlans] = useState<PlanItem[]>([])
+  const [servers, setServers] = useState<ServerItem[]>([])
   const [topupBonus, setTopupBonus] = useState(0)
   const [referralBonus, setReferralBonus] = useState(5)
   const [referralBonusDays, setReferralBonusDays] = useState(0)
   const [search, setSearch] = useState('')
   const [selectedUser, setSelectedUser] = useState<UserItem | null>(null)
   const [selectedPlan, setSelectedPlan] = useState<PlanItem | null>(null)
+  const [selectedServer, setSelectedServer] = useState<ServerItem | null>(null)
 
   // Modal states
   const [showBalanceModal, setShowBalanceModal] = useState(false)
@@ -101,6 +126,22 @@ export default function AdminPage() {
   const [planSortOrder, setPlanSortOrder] = useState('0')
   const [planIsActive, setPlanIsActive] = useState(true)
 
+  // Server modal states
+  const [showServerModal, setShowServerModal] = useState(false)
+  const [serverName, setServerName] = useState('')
+  const [serverCountry, setServerCountry] = useState('')
+  const [serverCity, setServerCity] = useState('')
+  const [serverFlagEmoji, setServerFlagEmoji] = useState('')
+  const [serverXuiBaseUrl, setServerXuiBaseUrl] = useState('')
+  const [serverXuiUsername, setServerXuiUsername] = useState('')
+  const [serverXuiPassword, setServerXuiPassword] = useState('')
+  const [serverXuiInboundId, setServerXuiInboundId] = useState('1')
+  const [serverAddress, setServerAddress] = useState('')
+  const [serverSortOrder, setServerSortOrder] = useState('0')
+  const [serverCapacity, setServerCapacity] = useState('100')
+  const [serverIsActive, setServerIsActive] = useState(true)
+  const [serverSaving, setServerSaving] = useState(false)
+
   useEffect(() => {
     loadData()
   }, [tab])
@@ -125,6 +166,9 @@ export default function AdminPage() {
       } else if (tab === 'plans') {
         const data = await api.admin.listPlans()
         setPlans(data.plans || [])
+      } else if (tab === 'servers') {
+        const data = await api.admin.listServers()
+        setServers(data.servers || [])
       } else if (tab === 'settings') {
         const [topupData, referralData, referralDaysData] = await Promise.all([
           api.admin.getTopupBonus(),
@@ -326,6 +370,126 @@ export default function AdminPage() {
     }
   }
 
+  // Server functions
+  const resetServerForm = () => {
+    setSelectedServer(null)
+    setServerName('')
+    setServerCountry('')
+    setServerCity('')
+    setServerFlagEmoji('')
+    setServerXuiBaseUrl('')
+    setServerXuiUsername('')
+    setServerXuiPassword('')
+    setServerXuiInboundId('1')
+    setServerAddress('')
+    setServerSortOrder('0')
+    setServerCapacity('100')
+    setServerIsActive(true)
+    setServerSaving(false)
+  }
+
+  const openServerModal = (server?: ServerItem) => {
+    if (server) {
+      setSelectedServer(server)
+      setServerName(server.name)
+      setServerCountry(server.country)
+      setServerCity(server.city || '')
+      setServerFlagEmoji(server.flag_emoji)
+      setServerXuiBaseUrl(server.xui_base_url)
+      setServerXuiUsername(server.xui_username)
+      setServerXuiPassword(server.xui_password)
+      setServerXuiInboundId(server.xui_inbound_id.toString())
+      setServerAddress(server.server_address)
+      setServerSortOrder(server.sort_order.toString())
+      setServerCapacity(server.capacity?.toString() || '100')
+      setServerIsActive(server.is_active)
+    } else {
+      resetServerForm()
+    }
+    setShowServerModal(true)
+  }
+
+  const handleSaveServer = async () => {
+    if (!serverName || !serverXuiBaseUrl || !serverAddress) {
+      alert('Заполните обязательные поля: название, XUI URL, адрес сервера')
+      return
+    }
+    setServerSaving(true)
+    try {
+      const data = {
+        name: serverName,
+        country: serverCountry,
+        city: serverCity || undefined,
+        flag_emoji: serverFlagEmoji,
+        xui_base_url: serverXuiBaseUrl,
+        xui_username: serverXuiUsername,
+        xui_password: serverXuiPassword,
+        xui_inbound_id: parseInt(serverXuiInboundId) || 1,
+        server_address: serverAddress,
+        server_port: 443, // Will be updated from XUI
+        public_key: '',
+        short_id: '',
+        server_name: 'www.google.com',
+        sort_order: parseInt(serverSortOrder) || 0,
+        capacity: parseInt(serverCapacity) || 100,
+        is_active: serverIsActive,
+      }
+
+      let serverId: string
+      if (selectedServer) {
+        await api.admin.updateServer(selectedServer.id, data)
+        serverId = selectedServer.id
+      } else {
+        const result = await api.admin.createServer(data)
+        serverId = result.id
+      }
+
+      // Auto-fetch VPN params from XUI
+      try {
+        const testResult = await api.admin.testServerConnection(serverId)
+        if (testResult.connected) {
+          await api.admin.updateServer(serverId, {
+            server_port: testResult.port,
+            public_key: testResult.public_key,
+            short_id: testResult.short_id,
+            server_name: testResult.server_name,
+          })
+        } else {
+          alert(`Сервер создан, но не удалось подключиться к XUI: ${testResult.error}`)
+        }
+      } catch (e) {
+        alert(`Сервер создан, но ошибка проверки: ${(e as Error).message}`)
+      }
+
+      setShowServerModal(false)
+      resetServerForm()
+      await loadData()
+    } catch (e) {
+      alert((e as Error).message)
+    } finally {
+      setServerSaving(false)
+    }
+  }
+
+  const handleDeleteServer = async (serverId: string) => {
+    if (!confirm('Удалить сервер?')) return
+    try {
+      await api.admin.deleteServer(serverId)
+      await loadData()
+    } catch (e) {
+      alert((e as Error).message)
+    }
+  }
+
+  const handleToggleServerActive = async (server: ServerItem) => {
+    try {
+      await api.admin.updateServer(server.id, { is_active: !server.is_active })
+      await loadData()
+    } catch (e) {
+      alert((e as Error).message)
+    }
+  }
+
   const formatDate = (dateStr?: string) => {
     if (!dateStr) return '-'
     return new Date(dateStr).toLocaleDateString('ru-RU')
@@ -354,7 +518,7 @@ export default function AdminPage() {
 
       {/* Tabs */}
       <div className="flex gap-2 mb-4 overflow-x-auto">
-        {(['stats', 'users', 'bans', 'promo', 'plans', 'settings'] as Tab[]).map((t) => (
+        {(['stats', 'users', 'bans', 'promo', 'plans', 'servers', 'settings'] as Tab[]).map((t) => (
           <button
             key={t}
             onClick={() => setTab(t)}
@@ -367,6 +531,7 @@ export default function AdminPage() {
             {t === 'bans' && 'Bans'}
             {t === 'promo' && 'Promo'}
             {t === 'plans' && 'Plans'}
+            {t === 'servers' && '🖥️'}
             {t === 'settings' && '⚙️'}
           </button>
         ))}
@@ -634,6 +799,76 @@ export default function AdminPage() {
                     </button>
                     <button
                       onClick={() => handleDeletePlan(plan.id)}
+                      className="text-xs bg-red-500 text-white px-2 py-1 rounded"
+                    >
+                      Delete
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Servers Tab */}
+      {tab === 'servers' && !loading && (
+        <div>
+          <button
+            onClick={() => openServerModal()}
+            className="btn-primary w-full mb-4"
+          >
+            + Добавить сервер
+          </button>
+          <div className="space-y-2">
+            {servers.length === 0 && <p className="text-hint">Нет серверов</p>}
+            {servers.map((server) => (
+              <div key={server.id} className={`card ${!server.is_active ? 'opacity-50' : ''}`}>
+                <div className="flex justify-between items-start">
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2">
+                      <span className="text-lg">{server.flag_emoji}</span>
+                      <p className="font-semibold">{server.name}</p>
+                      {!server.is_active && <span className="text-xs bg-red-500 text-white px-2 py-0.5 rounded">OFF</span>}
+                      <span className={`text-xs px-2 py-0.5 rounded ${
+                        server.status === 'online' ? 'bg-green-500 text-white' :
+                        server.status === 'offline' ? 'bg-red-500 text-white' :
+                        'bg-gray-400 text-white'
+                      }`}>
+                        {server.status || 'unknown'}
+                      </span>
+                    </div>
+                    <p className="text-hint text-sm">{server.country}{server.city ? `, ${server.city}` : ''}</p>
+                    <p className="text-hint text-xs mt-1">
+                      {server.server_address}:{server.server_port}
+                    </p>
+                    <p className="text-xs mt-1">
+                      <span className={`font-medium ${
+                        server.current_load / server.capacity * 100 > 80 ? 'text-red-500' :
+                        server.current_load / server.capacity * 100 > 50 ? 'text-yellow-500' :
+                        'text-green-500'
+                      }`}>
+                        {server.current_load}/{server.capacity}
+                      </span>
+                      <span className="text-hint"> клиентов</span>
+                      {server.ping_ms && <span className="text-hint ml-2">• {server.ping_ms}ms</span>}
+                    </p>
+                  </div>
+                  <div className="flex flex-col gap-1">
+                    <button
+                      onClick={() => openServerModal(server)}
+                      className="text-xs bg-tg-secondary-bg px-2 py-1 rounded"
+                    >
+                      Edit
+                    </button>
+                    <button
+                      onClick={() => handleToggleServerActive(server)}
+                      className={`text-xs px-2 py-1 rounded ${server.is_active ? 'bg-yellow-500' : 'bg-green-500'} text-white`}
+                    >
+                      {server.is_active ? 'OFF' : 'ON'}
+                    </button>
+                    <button
+                      onClick={() => handleDeleteServer(server.id)}
                       className="text-xs bg-red-500 text-white px-2 py-1 rounded"
                     >
                       Delete
@@ -1001,6 +1236,167 @@ export default function AdminPage() {
               </button>
               <button onClick={handleSavePlan} className="flex-1 btn-primary">
                 {selectedPlan ? 'Сохранить' : 'Создать'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Server Modal */}
+      {showServerModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
+          <div className="bg-tg-bg rounded-xl p-4 w-full max-w-sm max-h-[90vh] overflow-y-auto">
+            <h3 className="font-bold mb-4">{selectedServer ? 'Редактировать сервер' : 'Добавить сервер'}</h3>
+            <div className="space-y-3">
+              {/* Basic info */}
+              <div className="grid grid-cols-3 gap-2">
+                <div className="col-span-2">
+                  <label className="text-hint text-xs">Название *</label>
+                  <input
+                    type="text"
+                    value={serverName}
+                    onChange={(e) => setServerName(e.target.value)}
+                    placeholder="Нидерланды"
+                    className="input w-full"
+                  />
+                </div>
+                <div>
+                  <label className="text-hint text-xs">Флаг</label>
+                  <input
+                    type="text"
+                    value={serverFlagEmoji}
+                    onChange={(e) => setServerFlagEmoji(e.target.value)}
+                    placeholder="🇳🇱"
+                    className="input w-full"
+                  />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="text-hint text-xs">Страна</label>
+                  <input
+                    type="text"
+                    value={serverCountry}
+                    onChange={(e) => setServerCountry(e.target.value)}
+                    placeholder="Netherlands"
+                    className="input w-full"
+                  />
+                </div>
+                <div>
+                  <label className="text-hint text-xs">Город</label>
+                  <input
+                    type="text"
+                    value={serverCity}
+                    onChange={(e) => setServerCity(e.target.value)}
+                    placeholder="Amsterdam"
+                    className="input w-full"
+                  />
+                </div>
+              </div>
+
+              {/* Server address */}
+              <div>
+                <label className="text-hint text-xs">IP/Домен VPN сервера *</label>
+                <input
+                  type="text"
+                  value={serverAddress}
+                  onChange={(e) => setServerAddress(e.target.value)}
+                  placeholder="185.123.45.67 или vpn.example.com"
+                  className="input w-full"
+                />
+              </div>
+
+              {/* XUI Panel */}
+              <div className="border-t border-tg-secondary-bg pt-3">
+                <p className="text-hint text-xs mb-2">3X-UI Panel</p>
+                <input
+                  type="text"
+                  value={serverXuiBaseUrl}
+                  onChange={(e) => setServerXuiBaseUrl(e.target.value)}
+                  placeholder="https://panel.example.com:2053 *"
+                  className="input w-full mb-2"
+                />
+                <div className="grid grid-cols-2 gap-2">
+                  <input
+                    type="text"
+                    value={serverXuiUsername}
+                    onChange={(e) => setServerXuiUsername(e.target.value)}
+                    placeholder="admin"
+                    className="input w-full"
+                  />
+                  <input
+                    type="password"
+                    value={serverXuiPassword}
+                    onChange={(e) => setServerXuiPassword(e.target.value)}
+                    placeholder="password"
+                    className="input w-full"
+                  />
+                </div>
+                <div className="mt-2">
+                  <label className="text-hint text-xs">Inbound ID</label>
+                  <input
+                    type="number"
+                    value={serverXuiInboundId}
+                    onChange={(e) => setServerXuiInboundId(e.target.value)}
+                    placeholder="1"
+                    className="input w-full"
+                  />
+                </div>
+                <p className="text-hint text-xs mt-2">
+                  Порт, ключи и SNI подтянутся автоматически
+                </p>
+              </div>
+
+              {/* Capacity and sort order */}
+              <div className="grid grid-cols-2 gap-2 pt-2">
+                <div>
+                  <label className="text-hint text-xs">Capacity (макс. клиентов)</label>
+                  <input
+                    type="number"
+                    value={serverCapacity}
+                    onChange={(e) => setServerCapacity(e.target.value)}
+                    placeholder="100"
+                    className="input w-full"
+                  />
+                </div>
+                <div>
+                  <label className="text-hint text-xs">Порядок</label>
+                  <input
+                    type="number"
+                    value={serverSortOrder}
+                    onChange={(e) => setServerSortOrder(e.target.value)}
+                    placeholder="0"
+                    className="input w-full"
+                  />
+                </div>
+              </div>
+              <label className="flex items-center gap-2 cursor-pointer pt-2">
+                <input
+                  type="checkbox"
+                  checked={serverIsActive}
+                  onChange={(e) => setServerIsActive(e.target.checked)}
+                  className="w-5 h-5"
+                />
+                <span className="text-sm">Активен</span>
+              </label>
+            </div>
+            <div className="flex gap-2 mt-4">
+              <button
+                onClick={() => {
+                  setShowServerModal(false)
+                  resetServerForm()
+                }}
+                className="flex-1 bg-tg-secondary-bg py-2 rounded-lg"
+                disabled={serverSaving}
+              >
+                Отмена
+              </button>
+              <button
+                onClick={handleSaveServer}
+                className="flex-1 btn-primary"
+                disabled={serverSaving}
+              >
+                {serverSaving ? 'Сохранение...' : (selectedServer ? 'Сохранить' : 'Создать')}
               </button>
             </div>
           </div>

@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useStore } from '../store'
 import { useTelegram } from '../hooks/useTelegram'
-import { api } from '../api/client'
+import { api, ServerPublic } from '../api/client'
 import PlanCard from '../components/PlanCard'
 import SubscriptionCard from '../components/SubscriptionCard'
 
@@ -11,9 +11,10 @@ const ONBOARDING_KEY = 'zyvpn_onboarding_seen'
 export default function HomePage() {
   const navigate = useNavigate()
   const { user } = useTelegram()
-  const { plans, subscriptionStatus, fetchSubscriptionStatus, fetchPlans, user: storeUser } = useStore()
+  const { plans, subscriptionStatus, fetchSubscriptionStatus, fetchPlans, user: storeUser, selectedServerId, setSelectedServerId } = useStore()
   const [isAdmin, setIsAdmin] = useState(false)
   const [showOnboarding, setShowOnboarding] = useState(false)
+  const [servers, setServers] = useState<ServerPublic[]>([])
 
   useEffect(() => {
     fetchSubscriptionStatus()
@@ -21,11 +22,23 @@ export default function HomePage() {
     // Check if user is admin
     api.admin.checkAccess().then(setIsAdmin)
 
+    // Load servers
+    api.getServers().then(data => {
+      setServers(data.servers || [])
+      // Auto-select first online server if none selected
+      if (!selectedServerId) {
+        const onlineServer = data.servers?.find(s => s.status === 'online')
+        if (onlineServer) {
+          setSelectedServerId(onlineServer.id)
+        }
+      }
+    }).catch(() => {})
+
     // Show onboarding only on first visit
     if (!localStorage.getItem(ONBOARDING_KEY)) {
       setShowOnboarding(true)
     }
-  }, [fetchSubscriptionStatus, fetchPlans])
+  }, [fetchSubscriptionStatus, fetchPlans, selectedServerId, setSelectedServerId])
 
   const handleCloseOnboarding = () => {
     localStorage.setItem(ONBOARDING_KEY, 'true')
@@ -72,6 +85,53 @@ export default function HomePage() {
             trafficLimit={subscriptionStatus.traffic_gb.limit}
             onViewKey={() => navigate('/key')}
           />
+        </div>
+      )}
+
+      {/* Server Selection */}
+      {servers.length > 0 && (
+        <div className="mb-6">
+          <h2 className="text-lg font-semibold mb-3">Регион</h2>
+          <div className="space-y-2">
+            {servers.map((server) => (
+              <button
+                key={server.id}
+                onClick={() => setSelectedServerId(server.id)}
+                className={`w-full card flex items-center justify-between p-3 transition-all ${
+                  selectedServerId === server.id
+                    ? 'border-tg-button ring-1 ring-tg-button'
+                    : ''
+                } ${server.status !== 'online' ? 'opacity-50' : ''}`}
+                disabled={server.status !== 'online'}
+              >
+                <div className="flex items-center gap-3">
+                  <span className="text-2xl">{server.flag_emoji}</span>
+                  <div className="text-left">
+                    <p className="font-medium">{server.name}</p>
+                    <p className="text-xs text-hint">{server.country}{server.city ? `, ${server.city}` : ''}</p>
+                  </div>
+                </div>
+                <div className="text-right">
+                  {server.status === 'online' ? (
+                    <>
+                      <p className={`font-medium ${
+                        server.ping_ms && server.ping_ms < 100 ? 'text-green-500' :
+                        server.ping_ms && server.ping_ms < 200 ? 'text-yellow-500' :
+                        'text-red-500'
+                      }`}>
+                        {server.ping_ms ? `${server.ping_ms} ms` : '...'}
+                      </p>
+                      <p className="text-xs text-hint">
+                        {server.load_percent > 80 ? 'Загружен' : server.load_percent > 50 ? 'Средняя' : 'Низкая'} нагрузка
+                      </p>
+                    </>
+                  ) : (
+                    <p className="text-xs text-red-500">Оффлайн</p>
+                  )}
+                </div>
+              </button>
+            ))}
+          </div>
         </div>
       )}
 

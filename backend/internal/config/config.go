@@ -13,7 +13,6 @@ type Config struct {
 	Database DatabaseConfig
 	Redis    RedisConfig
 	Telegram TelegramConfig
-	XUI      XUIConfig
 	TON      TONConfig
 }
 
@@ -45,18 +44,6 @@ type TelegramConfig struct {
 	WebAppURL string
 }
 
-type XUIConfig struct {
-	BaseURL       string
-	Username      string
-	Password      string
-	InboundID     int
-	ServerAddress string // VPN server IP/domain
-	ServerPort    int    // VPN server port
-	PublicKey     string // Reality public key
-	ShortID       string // Reality short ID
-	ServerName    string // SNI for Reality (e.g., www.google.com)
-}
-
 type TONConfig struct {
 	Testnet       bool
 	WalletAddress string
@@ -70,8 +57,6 @@ func Load() (*Config, error) {
 	_ = godotenv.Load()
 
 	redisDB, _ := strconv.Atoi(getEnv("REDIS_DB", "0"))
-	xuiInboundID, _ := strconv.Atoi(getEnv("XUI_INBOUND_ID", "1"))
-	xuiServerPort, _ := strconv.Atoi(getEnv("XUI_SERVER_PORT", "443"))
 	tonTestnet, _ := strconv.ParseBool(getEnv("TON_TESTNET", "true"))
 
 	cfg := &Config{
@@ -98,17 +83,6 @@ func Load() (*Config, error) {
 		Telegram: TelegramConfig{
 			BotToken:  getEnv("TELEGRAM_BOT_TOKEN", ""),
 			WebAppURL: getEnv("TELEGRAM_WEBAPP_URL", ""),
-		},
-		XUI: XUIConfig{
-			BaseURL:       getEnv("XUI_BASE_URL", "http://localhost:54321"),
-			Username:      getEnv("XUI_USERNAME", "admin"),
-			Password:      getEnv("XUI_PASSWORD", "admin"),
-			InboundID:     xuiInboundID,
-			ServerAddress: getEnv("XUI_SERVER_ADDRESS", ""),
-			ServerPort:    xuiServerPort,
-			PublicKey:     getEnv("XUI_PUBLIC_KEY", ""),
-			ShortID:       getEnv("XUI_SHORT_ID", ""),
-			ServerName:    getEnv("XUI_SERVER_NAME", "www.google.com"),
 		},
 		TON: TONConfig{
 			Testnet:       tonTestnet,

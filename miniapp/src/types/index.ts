@@ -16,6 +16,7 @@ export interface Subscription {
   id: string
   user_id: number
   plan_id: string
+  server_id?: string
   status: 'active' | 'expired' | 'cancelled'
   xui_client_id: string
   xui_email: string
@@ -24,6 +25,7 @@ export interface Subscription {
   expires_at?: string
   traffic_limit: number
   traffic_used: number
+  max_devices: number
   created_at: string
 }
 

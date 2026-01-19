@@ -63,6 +63,10 @@ func (s *PaymentService) SetNotifier(notifier Notifier) {
 }
 
 func (s *PaymentService) CreatePayment(ctx context.Context, userID int64, planID uuid.UUID, provider model.PaymentProvider) (*model.Payment, error) {
+	return s.CreatePaymentWithServer(ctx, userID, planID, nil, provider)
+}
+
+func (s *PaymentService) CreatePaymentWithServer(ctx context.Context, userID int64, planID uuid.UUID, serverID *uuid.UUID, provider model.PaymentProvider) (*model.Payment, error) {
 	plan, err := s.repo.GetPlan(ctx, planID)
 	if err != nil {
 		return nil, err
@@ -85,6 +89,7 @@ func (s *PaymentService) CreatePayment(ctx context.Context, userID int64, planID
 	payment := &model.Payment{
 		UserID:      userID,
 		PlanID:      &planID,
+		ServerID:    serverID,
 		PaymentType: model.PaymentTypeSubscription,
 		Provider:    provider,
 		Amount:      amount,
@@ -204,8 +209,8 @@ func (s *PaymentService) CompletePayment(ctx context.Context, paymentID uuid.UUI
 		return err
 	}
 
-	// Create subscription
-	sub, err := s.subscriptionSvc.CreateSubscription(ctx, payment.UserID, plan)
+	// Create subscription with selected server (or auto-select if not specified)
+	sub, err := s.subscriptionSvc.CreateSubscriptionWithServer(ctx, payment.UserID, plan, payment.ServerID)
 	if err != nil {
 		return fmt.Errorf("failed to create subscription: %w", err)
 	}

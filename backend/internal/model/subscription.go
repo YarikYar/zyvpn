@@ -18,6 +18,7 @@ type Subscription struct {
 	ID            uuid.UUID          `json:"id" db:"id"`
 	UserID        int64              `json:"user_id" db:"user_id"`
 	PlanID        uuid.UUID          `json:"plan_id" db:"plan_id"`
+	ServerID      *uuid.UUID         `json:"server_id,omitempty" db:"server_id"`
 	Status        SubscriptionStatus `json:"status" db:"status"`
 	XUIClientID   string             `json:"xui_client_id" db:"xui_client_id"`
 	XUIEmail      string             `json:"xui_email" db:"xui_email"`

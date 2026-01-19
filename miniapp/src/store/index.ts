@@ -10,6 +10,7 @@ interface Store {
   referralLink: string | null
   connectionKey: string | null
   rates: ExchangeRates | null
+  selectedServerId: string | null
   loading: boolean
   error: string | null
 
@@ -20,6 +21,7 @@ interface Store {
   fetchReferralStats: () => Promise<void>
   fetchReferralLink: () => Promise<void>
   fetchRates: () => Promise<void>
+  setSelectedServerId: (id: string | null) => void
   setError: (error: string | null) => void
 }
 
@@ -31,6 +33,7 @@ export const useStore = create<Store>((set) => ({
   referralLink: null,
   connectionKey: null,
   rates: null,
+  selectedServerId: null,
   loading: false,
   error: null,
 
@@ -99,5 +102,6 @@ export const useStore = create<Store>((set) => ({
     }
   },
 
+  setSelectedServerId: (id) => set({ selectedServerId: id }),
   setError: (error) => set({ error }),
 }))

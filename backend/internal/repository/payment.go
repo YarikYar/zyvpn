@@ -50,13 +50,15 @@ func (r *Repository) GetUserPayments(ctx context.Context, userID int64) ([]model
 
 func (r *Repository) CreatePayment(ctx context.Context, payment *model.Payment) error {
 	query := `
-		INSERT INTO payments (user_id, plan_id, provider, amount, currency, status, external_id, metadata)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+		INSERT INTO payments (user_id, plan_id, server_id, payment_type, provider, amount, currency, status, external_id, metadata)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
 		RETURNING id, created_at`
 
 	return r.db.QueryRowContext(ctx, query,
 		payment.UserID,
 		payment.PlanID,
+		payment.ServerID,
+		payment.PaymentType,
 		payment.Provider,
 		payment.Amount,
 		payment.Currency,

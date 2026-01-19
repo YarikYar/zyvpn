@@ -35,15 +35,21 @@ export const api = {
   getPlans: () => request<{ plans: any[] }>('/api/plans'),
 
   // Subscription
-  buySubscription: (planId: string, provider: 'ton' | 'stars') =>
+  buySubscription: (planId: string, provider: 'ton' | 'stars', serverId?: string) =>
     request<{ payment: any; ton_info?: any }>('/api/subscription/buy', {
       method: 'POST',
-      body: JSON.stringify({ plan_id: planId, provider }),
+      body: JSON.stringify({ plan_id: planId, provider, server_id: serverId }),
     }),
 
   getSubscriptionKey: () => request<{ key: string }>('/api/subscription/key'),
 
   getSubscriptionStatus: () => request<any>('/api/subscription/status'),
+
+  switchServer: (serverId: string) =>
+    request<{ success: boolean; subscription: any; key: string }>('/api/subscription/switch-server', {
+      method: 'POST',
+      body: JSON.stringify({ server_id: serverId }),
+    }),
 
   activateTrial: () =>
     request<{ success: boolean; subscription: any; key: string }>('/api/subscription/trial', {
@@ -301,5 +307,85 @@ export const api = {
       request<{ success: boolean }>(`/api/admin/plans/${planId}`, {
         method: 'DELETE',
       }),
+
+    // Servers
+    listServers: () =>
+      request<{ servers: any[] }>('/api/admin/servers'),
+
+    getServer: (serverId: string) =>
+      request<any>(`/api/admin/servers/${serverId}`),
+
+    createServer: (data: {
+      name: string
+      country: string
+      city?: string
+      flag_emoji: string
+      xui_base_url: string
+      xui_username: string
+      xui_password: string
+      xui_inbound_id: number
+      server_address: string
+      server_port: number
+      public_key: string
+      short_id: string
+      server_name: string
+      is_active: boolean
+      sort_order: number
+      capacity: number
+    }) =>
+      request<any>('/api/admin/servers', {
+        method: 'POST',
+        body: JSON.stringify(data),
+      }),
+
+    updateServer: (serverId: string, data: {
+      name?: string
+      country?: string
+      city?: string
+      flag_emoji?: string
+      xui_base_url?: string
+      xui_username?: string
+      xui_password?: string
+      xui_inbound_id?: number
+      server_address?: string
+      server_port?: number
+      public_key?: string
+      short_id?: string
+      server_name?: string
+      is_active?: boolean
+      sort_order?: number
+      capacity?: number
+    }) =>
+      request<any>(`/api/admin/servers/${serverId}`, {
+        method: 'PUT',
+        body: JSON.stringify(data),
+      }),
+
+    deleteServer: (serverId: string) =>
+      request<{ success: boolean }>(`/api/admin/servers/${serverId}`, {
+        method: 'DELETE',
+      }),
+
+    testServerConnection: (serverId: string) =>
+      request<{ connected: boolean; error?: string; port?: number; public_key?: string; short_id?: string; server_name?: string }>(
+        `/api/admin/servers/${serverId}/test`,
+        { method: 'POST' }
+      ),
   },
+
+  // Servers (for users)
+  getServers: () =>
+    request<{ servers: ServerPublic[] }>('/api/servers'),
+}
+
+export interface ServerPublic {
+  id: string
+  name: string
+  country: string
+  city?: string
+  flag_emoji: string
+  is_active: boolean
+  ping_ms?: number
+  status: 'online' | 'offline' | 'unknown'
+  load_percent: number
 }

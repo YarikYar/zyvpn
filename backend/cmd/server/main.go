@@ -20,7 +20,6 @@ import (
 	"github.com/zyvpn/backend/internal/service"
 	"github.com/zyvpn/backend/internal/telegram"
 	"github.com/zyvpn/backend/internal/ton"
-	"github.com/zyvpn/backend/internal/xui"
 )
 
 func main() {
@@ -37,17 +36,13 @@ func main() {
 	}
 	defer repo.Close()
 
-	// Create 3x-ui client
-	xuiClient, err := xui.NewClient(cfg.XUI.BaseURL, cfg.XUI.Username, cfg.XUI.Password, cfg.XUI.InboundID)
-	if err != nil {
-		log.Fatalf("Failed to create 3x-ui client: %v", err)
-	}
-
 	// Create services
 	userService := service.NewUserService(repo)
 	planService := service.NewPlanService(repo)
 	referralSvc := service.NewReferralService(repo)
-	subscriptionSvc := service.NewSubscriptionService(repo, xuiClient, cfg)
+	serverSvc := service.NewServerService(repo)
+	subscriptionSvc := service.NewSubscriptionService(repo, serverSvc, cfg)
+	subscriptionSvc.SetServerService(serverSvc) // Link server service
 	paymentSvc := service.NewPaymentService(repo, subscriptionSvc, referralSvc, cfg)
 	ratesSvc := service.NewRatesService()
 	balanceSvc := service.NewBalanceService(repo)
@@ -86,6 +81,7 @@ func main() {
 	// Create handlers
 	h := handler.New(cfg, userService, planService, subscriptionSvc, paymentSvc, referralSvc, ratesSvc, balanceSvc, promoCodeSvc, bot)
 	adminHandler := handler.NewAdminHandler(adminSvc)
+	serverHandler := handler.NewServerHandler(serverSvc)
 
 	// Create Fiber app
 	app := fiber.New(fiber.Config{
@@ -133,6 +129,7 @@ func main() {
 	api.Get("/subscription/key", h.GetSubscriptionKey)
 	api.Get("/subscription/status", h.GetSubscriptionStatus)
 	api.Post("/subscription/trial", h.ActivateTrial)
+	api.Post("/subscription/switch-server", h.SwitchServer)
 
 	// Payments
 	api.Get("/payment/ton/init", h.InitTONPayment)
@@ -159,6 +156,9 @@ func main() {
 	// Promo codes
 	api.Post("/promo/apply", h.ApplyPromoCode)
 	api.Get("/promo/validate", h.ValidatePromoCode)
+
+	// Servers (for users)
+	api.Get("/servers", serverHandler.GetServers)
 
 	// Admin panel routes (requires Telegram auth + admin check)
 	admin := app.Group("/api/admin", middleware.TelegramAuth(cfg), middleware.AdminAuth(adminSvc))
@@ -203,6 +203,14 @@ func main() {
 	admin.Get("/settings/referral-bonus-days", adminHandler.GetReferralBonusDays)
 	admin.Post("/settings/referral-bonus-days", adminHandler.SetReferralBonusDays)
 
+	// Admin - Servers
+	admin.Get("/servers", serverHandler.GetAllServers)
+	admin.Get("/servers/:server_id", serverHandler.GetServer)
+	admin.Post("/servers", serverHandler.CreateServer)
+	admin.Put("/servers/:server_id", serverHandler.UpdateServer)
+	admin.Delete("/servers/:server_id", serverHandler.DeleteServer)
+	admin.Post("/servers/:server_id/test", serverHandler.TestServerConnection)
+
 	// Internal endpoints (for cron jobs)
 	internal := app.Group("/internal")
 	internal.Post("/cron/expire", func(c *fiber.Ctx) error {
@@ -246,6 +254,10 @@ func main() {
 
 	// Start TON transaction verification worker
 	go tonWorker.Start(ctx)
+
+	// Start server health checker
+	healthWorker := service.NewHealthWorker(repo, serverSvc)
+	go healthWorker.Start(ctx)
 
 	go runSubscriptionChecker(ctx, subscriptionSvc, bot)
 

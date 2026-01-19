@@ -11,8 +11,9 @@ import (
 )
 
 type BuySubscriptionRequest struct {
-	PlanID   string `json:"plan_id"`
-	Provider string `json:"provider"`
+	PlanID   string  `json:"plan_id"`
+	ServerID *string `json:"server_id,omitempty"`
+	Provider string  `json:"provider"`
 }
 
 func (h *Handler) BuySubscription(c *fiber.Ctx) error {
@@ -37,6 +38,18 @@ func (h *Handler) BuySubscription(c *fiber.Ctx) error {
 		})
 	}
 
+	// Parse optional server ID
+	var serverID *uuid.UUID
+	if req.ServerID != nil && *req.ServerID != "" {
+		sid, err := uuid.Parse(*req.ServerID)
+		if err != nil {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+				"error": "Неверный ID сервера",
+			})
+		}
+		serverID = &sid
+	}
+
 	var provider model.PaymentProvider
 	switch req.Provider {
 	case "ton":
@@ -49,7 +62,7 @@ func (h *Handler) BuySubscription(c *fiber.Ctx) error {
 		})
 	}
 
-	payment, err := h.paymentSvc.CreatePayment(c.Context(), userID, planID, provider)
+	payment, err := h.paymentSvc.CreatePaymentWithServer(c.Context(), userID, planID, serverID, provider)
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 			"error": "failed to create payment: " + err.Error(),
@@ -156,5 +169,51 @@ func (h *Handler) ActivateTrial(c *fiber.Ctx) error {
 		"success":      true,
 		"subscription": sub,
 		"key":          sub.ConnectionKey,
+	})
+}
+
+type SwitchServerRequest struct {
+	ServerID string `json:"server_id"`
+}
+
+// SwitchServer switches the active subscription to a different server
+func (h *Handler) SwitchServer(c *fiber.Ctx) error {
+	userID := middleware.GetUserID(c)
+	if userID == 0 {
+		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
+			"error": "Необходима авторизация",
+		})
+	}
+
+	var req SwitchServerRequest
+	if err := c.BodyParser(&req); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "Неверный формат запроса",
+		})
+	}
+
+	serverID, err := uuid.Parse(req.ServerID)
+	if err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "Неверный ID сервера",
+		})
+	}
+
+	sub, err := h.subscriptionSvc.SwitchServer(c.Context(), userID, serverID)
+	if err != nil {
+		if errors.Is(err, service.ErrSubscriptionNotActive) {
+			return c.Status(fiber.StatusConflict).JSON(fiber.Map{
+				"error": "Нет активной подписки",
+			})
+		}
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": err.Error(),
+		})
+	}
+
+	return c.JSON(fiber.Map{
+		"success": true,
+		"subscription": sub,
+		"key": sub.ConnectionKey,
 	})
 }
