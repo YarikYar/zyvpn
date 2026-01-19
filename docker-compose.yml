@@ -1,0 +1,121 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: zyvpn-postgres
+    environment:
+      POSTGRES_USER: zyvpn
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-zyvpn}
+      POSTGRES_DB: zyvpn
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U zyvpn"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+    networks:
+      - internal
+
+  redis:
+    image: redis:7-alpine
+    container_name: zyvpn-redis
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+    networks:
+      - internal
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: zyvpn-backend
+    environment:
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - DB_USER=zyvpn
+      - DB_PASSWORD=${DB_PASSWORD:-zyvpn}
+      - DB_NAME=zyvpn
+      - DB_SSLMODE=disable
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - SERVER_PORT=8080
+      - ENVIRONMENT=production
+      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
+      - TELEGRAM_WEBAPP_URL=https://vpn.zaruchevskiy.ru
+      - XUI_BASE_URL=${XUI_BASE_URL}
+      - XUI_USERNAME=${XUI_USERNAME}
+      - XUI_PASSWORD=${XUI_PASSWORD}
+      - XUI_INBOUND_ID=${XUI_INBOUND_ID:-1}
+      - XUI_SERVER_ADDRESS=${XUI_SERVER_ADDRESS}
+      - XUI_SERVER_PORT=${XUI_SERVER_PORT:-443}
+      - XUI_PUBLIC_KEY=${XUI_PUBLIC_KEY}
+      - XUI_SHORT_ID=${XUI_SHORT_ID}
+      - XUI_SERVER_NAME=${XUI_SERVER_NAME:-www.google.com}
+      - TON_TESTNET=${TON_TESTNET:-false}
+      - TON_WALLET_ADDRESS=${TON_WALLET_ADDRESS}
+      - JWT_SECRET=${JWT_SECRET}
+      - ALLOW_ORIGINS=https://vpn.zaruchevskiy.ru,https://api.zaruchevskiy.ru
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - internal
+      - traefik_default
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=traefik_default"
+      # API routes
+      - "traefik.http.routers.zyvpn-api.rule=Host(`api.zaruchevskiy.ru`) && PathPrefix(`/api`)"
+      - "traefik.http.routers.zyvpn-api.entrypoints=websecure"
+      - "traefik.http.routers.zyvpn-api.tls=true"
+      - "traefik.http.routers.zyvpn-api.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.zyvpn-api.service=zyvpn-backend"
+      # Health and webhooks
+      - "traefik.http.routers.zyvpn-health.rule=Host(`api.zaruchevskiy.ru`) && (Path(`/health`) || PathPrefix(`/webhook`) || PathPrefix(`/internal`))"
+      - "traefik.http.routers.zyvpn-health.entrypoints=websecure"
+      - "traefik.http.routers.zyvpn-health.tls=true"
+      - "traefik.http.routers.zyvpn-health.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.zyvpn-health.service=zyvpn-backend"
+      # Service
+      - "traefik.http.services.zyvpn-backend.loadbalancer.server.port=8080"
+
+  miniapp:
+    build:
+      context: ./miniapp
+      dockerfile: Dockerfile
+    container_name: zyvpn-miniapp
+    environment:
+      - VITE_API_URL=https://api.zaruchevskiy.ru
+    restart: unless-stopped
+    networks:
+      - traefik_default
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=traefik_default"
+      - "traefik.http.routers.zyvpn-miniapp.rule=Host(`vpn.zaruchevskiy.ru`)"
+      - "traefik.http.routers.zyvpn-miniapp.entrypoints=websecure"
+      - "traefik.http.routers.zyvpn-miniapp.tls=true"
+      - "traefik.http.routers.zyvpn-miniapp.tls.certresolver=letsencrypt"
+      - "traefik.http.services.zyvpn-miniapp.loadbalancer.server.port=3000"
+
+volumes:
+  postgres_data:
+  redis_data:
+
+networks:
+  internal:
+    driver: bridge
+  traefik_default:
+    external: true

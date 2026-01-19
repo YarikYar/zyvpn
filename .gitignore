@@ -1,0 +1,32 @@
+# Environment
+.env
+*.env
+
+# Node
+node_modules/
+miniapp/node_modules/
+
+# Build
+miniapp/dist/
+backend/server
+backend/migrate
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Docker
+docker-compose.override.yml
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# Temporary
+tmp/
+temp/
