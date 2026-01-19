@@ -9,8 +9,9 @@ import (
 type PromoCodeType string
 
 const (
-	PromoCodeTypeBalance PromoCodeType = "balance" // Credits TON to balance
-	PromoCodeTypeDays    PromoCodeType = "days"    // Adds days to subscription
+	PromoCodeTypeBalance      PromoCodeType = "balance"       // Credits TON to balance
+	PromoCodeTypeDays         PromoCodeType = "days"          // Adds days to subscription
+	PromoCodeTypeRegionSwitch PromoCodeType = "region_switch" // Adds free region switches
 )
 
 type PromoCode struct {

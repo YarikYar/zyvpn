@@ -95,6 +95,7 @@ export default function AdminPage() {
   const [topupBonus, setTopupBonus] = useState(0)
   const [referralBonus, setReferralBonus] = useState(5)
   const [referralBonusDays, setReferralBonusDays] = useState(0)
+  const [regionSwitchPrice, setRegionSwitchPrice] = useState(0.1)
   const [search, setSearch] = useState('')
   const [selectedUser, setSelectedUser] = useState<UserItem | null>(null)
   const [selectedPlan, setSelectedPlan] = useState<PlanItem | null>(null)
@@ -108,7 +109,7 @@ export default function AdminPage() {
   const [balanceAmount, setBalanceAmount] = useState('')
   const [banReason, setBanReason] = useState('')
   const [extendDays, setExtendDays] = useState('')
-  const [promoType, setPromoType] = useState<'balance' | 'days'>('balance')
+  const [promoType, setPromoType] = useState<'balance' | 'days' | 'region_switch'>('balance')
   const [promoValue, setPromoValue] = useState('')
   const [promoCount, setPromoCount] = useState('1')
   const [promoMaxUses, setPromoMaxUses] = useState('1')
@@ -170,14 +171,16 @@ export default function AdminPage() {
         const data = await api.admin.listServers()
         setServers(data.servers || [])
       } else if (tab === 'settings') {
-        const [topupData, referralData, referralDaysData] = await Promise.all([
+        const [topupData, referralData, referralDaysData, regionSwitchData] = await Promise.all([
           api.admin.getTopupBonus(),
           api.admin.getReferralBonus(),
-          api.admin.getReferralBonusDays()
+          api.admin.getReferralBonusDays(),
+          api.admin.getRegionSwitchPrice()
         ])
         setTopupBonus(topupData.topup_bonus_percent || 0)
         setReferralBonus(referralData.referral_bonus_percent || 5)
         setReferralBonusDays(referralDaysData.referral_bonus_days || 0)
+        setRegionSwitchPrice(regionSwitchData.region_switch_price || 0.1)
       }
     } catch (e) {
       setError((e as Error).message)
@@ -982,6 +985,39 @@ export default function AdminPage() {
               Сохранить
             </button>
           </div>
+
+          {/* Region Switch Price */}
+          <div className="card">
+            <h3 className="font-semibold mb-2">Стоимость смены региона</h3>
+            <p className="text-hint text-sm mb-4">
+              Цена в TON за смену региона (сервера) VPN
+            </p>
+            <div className="flex items-center gap-4">
+              <input
+                type="range"
+                min="0"
+                max="1"
+                step="0.01"
+                value={regionSwitchPrice}
+                onChange={(e) => setRegionSwitchPrice(parseFloat(e.target.value))}
+                className="flex-1 h-2 bg-tg-secondary-bg rounded-lg appearance-none cursor-pointer"
+              />
+              <span className="font-bold w-20 text-right">{regionSwitchPrice.toFixed(2)} TON</span>
+            </div>
+            <button
+              onClick={async () => {
+                try {
+                  await api.admin.setRegionSwitchPrice(regionSwitchPrice)
+                  alert('Сохранено!')
+                } catch (e) {
+                  alert((e as Error).message)
+                }
+              }}
+              className="btn-primary w-full mt-4"
+            >
+              Сохранить
+            </button>
+          </div>
         </div>
       )}
 
@@ -1067,18 +1103,24 @@ export default function AdminPage() {
           <div className="bg-tg-bg rounded-xl p-4 w-full max-w-sm">
             <h3 className="font-bold mb-4">Create Promo Code</h3>
             <div className="space-y-3">
-              <div className="flex gap-2">
+              <div className="flex gap-2 flex-wrap">
                 <button
                   onClick={() => setPromoType('balance')}
-                  className={`flex-1 py-2 rounded-lg ${promoType === 'balance' ? 'bg-tg-button text-white' : 'bg-tg-secondary-bg'}`}
+                  className={`flex-1 py-2 rounded-lg text-sm ${promoType === 'balance' ? 'bg-tg-button text-white' : 'bg-tg-secondary-bg'}`}
                 >
-                  Balance (TON)
+                  Баланс (TON)
                 </button>
                 <button
                   onClick={() => setPromoType('days')}
-                  className={`flex-1 py-2 rounded-lg ${promoType === 'days' ? 'bg-tg-button text-white' : 'bg-tg-secondary-bg'}`}
+                  className={`flex-1 py-2 rounded-lg text-sm ${promoType === 'days' ? 'bg-tg-button text-white' : 'bg-tg-secondary-bg'}`}
                 >
-                  Days
+                  Дни
+                </button>
+                <button
+                  onClick={() => setPromoType('region_switch')}
+                  className={`flex-1 py-2 rounded-lg text-sm ${promoType === 'region_switch' ? 'bg-tg-button text-white' : 'bg-tg-secondary-bg'}`}
+                >
+                  Регион
                 </button>
               </div>
               <input
@@ -1086,7 +1128,7 @@ export default function AdminPage() {
                 step="0.0001"
                 value={promoValue}
                 onChange={(e) => setPromoValue(e.target.value)}
-                placeholder={promoType === 'balance' ? 'TON amount' : 'Days count'}
+                placeholder={promoType === 'balance' ? 'Сумма TON' : promoType === 'days' ? 'Кол-во дней' : 'Кол-во смен региона'}
                 className="input w-full"
               />
               <input

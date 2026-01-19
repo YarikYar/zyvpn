@@ -672,3 +672,23 @@ func (s *AdminService) SetReferralBonusDays(ctx context.Context, adminID int64, 
 	}
 	return s.repo.SetSetting(ctx, "referral_bonus_days", fmt.Sprintf("%d", days))
 }
+
+// GetRegionSwitchPrice returns the price for switching regions (in TON)
+func (s *AdminService) GetRegionSwitchPrice(ctx context.Context) (float64, error) {
+	value, err := s.repo.GetSettingFloat(ctx, "region_switch_price")
+	if err != nil {
+		return 0.1, nil // Default to 0.1 TON if not set
+	}
+	return value, nil
+}
+
+// SetRegionSwitchPrice sets the price for switching regions (in TON)
+func (s *AdminService) SetRegionSwitchPrice(ctx context.Context, adminID int64, price float64) error {
+	if ok, _ := s.IsAdmin(ctx, adminID); !ok {
+		return ErrNotAdmin
+	}
+	if price < 0 || price > 10 {
+		return errors.New("цена смены региона должна быть от 0 до 10 TON")
+	}
+	return s.repo.SetSetting(ctx, "region_switch_price", fmt.Sprintf("%.4f", price))
+}

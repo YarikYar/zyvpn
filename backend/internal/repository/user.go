@@ -93,3 +93,29 @@ func (r *Repository) GetUserWithSubscription(ctx context.Context, id int64) (*mo
 
 	return result, nil
 }
+
+// AddFreeRegionSwitches adds free region switches to user
+func (r *Repository) AddFreeRegionSwitches(ctx context.Context, userID int64, count int) error {
+	_, err := r.db.ExecContext(ctx,
+		"UPDATE users SET free_region_switches = free_region_switches + $2 WHERE id = $1",
+		userID, count,
+	)
+	return err
+}
+
+// UseFreeRegionSwitch decrements free region switches by 1 if available
+// Returns true if a free switch was used, false if none available
+func (r *Repository) UseFreeRegionSwitch(ctx context.Context, userID int64) (bool, error) {
+	result, err := r.db.ExecContext(ctx,
+		"UPDATE users SET free_region_switches = free_region_switches - 1 WHERE id = $1 AND free_region_switches > 0",
+		userID,
+	)
+	if err != nil {
+		return false, err
+	}
+	rows, err := result.RowsAffected()
+	if err != nil {
+		return false, err
+	}
+	return rows > 0, nil
+}

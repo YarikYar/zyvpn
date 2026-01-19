@@ -2,12 +2,15 @@ package service
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"github.com/google/uuid"
 	"github.com/zyvpn/backend/internal/model"
 	"github.com/zyvpn/backend/internal/repository"
 )
+
+var ErrInsufficientBalance = errors.New("Недостаточно средств на балансе")
 
 type BalanceService struct {
 	repo *repository.Repository
@@ -96,4 +99,19 @@ func (s *BalanceService) CanAfford(ctx context.Context, userID int64, amount flo
 		return false, err
 	}
 	return balance >= amount, nil
+}
+
+// ChargeRegionSwitch deducts amount for region switching
+func (s *BalanceService) ChargeRegionSwitch(ctx context.Context, userID int64, amount float64) (float64, error) {
+	// Check if user can afford
+	canAfford, err := s.CanAfford(ctx, userID, amount)
+	if err != nil {
+		return 0, err
+	}
+	if !canAfford {
+		return 0, ErrInsufficientBalance
+	}
+
+	description := fmt.Sprintf("Смена региона: -%.4f TON", amount)
+	return s.repo.UpdateBalance(ctx, userID, -amount, model.TransactionTypeRegionSwitch, description, nil)
 }

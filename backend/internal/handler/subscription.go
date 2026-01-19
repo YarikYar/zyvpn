@@ -176,6 +176,35 @@ type SwitchServerRequest struct {
 	ServerID string `json:"server_id"`
 }
 
+// GetSwitchServerInfo returns info about region switching (price and free switches)
+func (h *Handler) GetSwitchServerInfo(c *fiber.Ctx) error {
+	userID := middleware.GetUserID(c)
+	if userID == 0 {
+		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
+			"error": "Необходима авторизация",
+		})
+	}
+
+	// Get user for free switches count
+	user, err := h.userService.GetUser(c.Context(), userID)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": "Не удалось получить данные пользователя",
+		})
+	}
+
+	// Get region switch price
+	price, err := h.adminSvc.GetRegionSwitchPrice(c.Context())
+	if err != nil {
+		price = 0.1 // Default fallback
+	}
+
+	return c.JSON(fiber.Map{
+		"price":         price,
+		"free_switches": user.FreeRegionSwitches,
+	})
+}
+
 // SwitchServer switches the active subscription to a different server
 func (h *Handler) SwitchServer(c *fiber.Ctx) error {
 	userID := middleware.GetUserID(c)
@@ -199,6 +228,38 @@ func (h *Handler) SwitchServer(c *fiber.Ctx) error {
 		})
 	}
 
+	// Check if user has free switches
+	usedFree, err := h.userService.UseFreeRegionSwitch(c.Context(), userID)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": "Ошибка при проверке бесплатных переключений",
+		})
+	}
+
+	// If no free switch available, charge from balance
+	if !usedFree {
+		// Get price
+		price, err := h.adminSvc.GetRegionSwitchPrice(c.Context())
+		if err != nil {
+			price = 0.1
+		}
+
+		// Try to charge from balance
+		_, err = h.balanceSvc.ChargeRegionSwitch(c.Context(), userID, price)
+		if err != nil {
+			if errors.Is(err, service.ErrInsufficientBalance) {
+				return c.Status(fiber.StatusPaymentRequired).JSON(fiber.Map{
+					"error":          "Недостаточно средств на балансе",
+					"price":          price,
+					"need_more":      true,
+				})
+			}
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+				"error": err.Error(),
+			})
+		}
+	}
+
 	sub, err := h.subscriptionSvc.SwitchServer(c.Context(), userID, serverID)
 	if err != nil {
 		if errors.Is(err, service.ErrSubscriptionNotActive) {
@@ -212,8 +273,9 @@ func (h *Handler) SwitchServer(c *fiber.Ctx) error {
 	}
 
 	return c.JSON(fiber.Map{
-		"success": true,
+		"success":      true,
 		"subscription": sub,
-		"key": sub.ConnectionKey,
+		"key":          sub.ConnectionKey,
+		"used_free":    usedFree,
 	})
 }

@@ -8,35 +8,60 @@ import { api, ServerPublic } from '../api/client'
 export default function KeyPage() {
   const navigate = useNavigate()
   const { webApp } = useTelegram()
-  const { connectionKey, fetchConnectionKey, subscriptionStatus, fetchSubscriptionStatus } = useStore()
+  const { connectionKey, fetchConnectionKey, subscriptionStatus, fetchSubscriptionStatus, balance, fetchBalance } = useStore()
   const [copied, setCopied] = useState(false)
   const [servers, setServers] = useState<ServerPublic[]>([])
   const [switching, setSwitching] = useState(false)
   const [showServerPicker, setShowServerPicker] = useState(false)
+  const [switchPrice, setSwitchPrice] = useState(0.1)
+  const [freeSwitches, setFreeSwitches] = useState(0)
 
   useEffect(() => {
     fetchConnectionKey()
     fetchSubscriptionStatus()
+    fetchBalance()
     // Load servers for switching
     api.getServers().then(data => {
       setServers(data.servers || [])
     }).catch(() => {})
-  }, [fetchConnectionKey, fetchSubscriptionStatus])
+    // Load switch server info
+    api.getSwitchServerInfo().then(data => {
+      setSwitchPrice(data.price || 0.1)
+      setFreeSwitches(data.free_switches || 0)
+    }).catch(() => {})
+  }, [fetchConnectionKey, fetchSubscriptionStatus, fetchBalance])
 
   const handleSwitchServer = async (serverId: string) => {
+    // Check if user can afford if no free switches
+    if (freeSwitches === 0 && balance < switchPrice) {
+      webApp?.HapticFeedback.notificationOccurred('error')
+      webApp?.showAlert(`Недостаточно средств на балансе. Стоимость смены региона: ${switchPrice.toFixed(2)} TON, ваш баланс: ${balance.toFixed(4)} TON`)
+      return
+    }
+
     setSwitching(true)
     try {
       const result = await api.switchServer(serverId)
       if (result.success) {
         webApp?.HapticFeedback.notificationOccurred('success')
-        // Refresh subscription status and key
+        // Update free switches count
+        if (result.used_free) {
+          setFreeSwitches(prev => Math.max(0, prev - 1))
+        }
+        // Refresh subscription status, key and balance
         await fetchSubscriptionStatus()
         await fetchConnectionKey()
+        await fetchBalance()
         setShowServerPicker(false)
       }
-    } catch (err) {
+    } catch (err: any) {
       webApp?.HapticFeedback.notificationOccurred('error')
-      webApp?.showAlert((err as Error).message || 'Не удалось сменить сервер')
+      // Check if it's insufficient balance error
+      if (err.message?.includes('Недостаточно средств')) {
+        webApp?.showAlert(`Недостаточно средств. Пополните баланс на ${switchPrice.toFixed(2)} TON`)
+      } else {
+        webApp?.showAlert(err.message || 'Не удалось сменить сервер')
+      }
     } finally {
       setSwitching(false)
     }
@@ -120,7 +145,16 @@ export default function KeyPage() {
               className="bg-tg-secondary-bg px-3 py-2 rounded-xl text-sm font-medium hover:opacity-80 transition-opacity"
               disabled={switching}
             >
-              {switching ? 'Переключение...' : 'Сменить регион'}
+              {switching ? 'Переключение...' : (
+                <span className="flex items-center gap-1">
+                  Сменить
+                  {freeSwitches > 0 ? (
+                    <span className="text-green-500 text-xs">({freeSwitches} бесп.)</span>
+                  ) : switchPrice > 0 && (
+                    <span className="text-hint text-xs">({switchPrice.toFixed(2)} TON)</span>
+                  )}
+                </span>
+              )}
             </button>
           </div>
         </div>
@@ -180,6 +214,20 @@ export default function KeyPage() {
               >
                 ×
               </button>
+            </div>
+            {/* Pricing Info */}
+            <div className="bg-tg-secondary-bg rounded-xl p-3 mb-4">
+              {freeSwitches > 0 ? (
+                <div className="flex items-center gap-2">
+                  <span className="text-green-500">✓</span>
+                  <span className="text-sm">У вас есть <b>{freeSwitches}</b> бесплатных смен региона</span>
+                </div>
+              ) : (
+                <div className="flex items-center justify-between">
+                  <span className="text-sm">Стоимость смены: <b>{switchPrice.toFixed(2)} TON</b></span>
+                  <span className="text-xs text-hint">Баланс: {balance.toFixed(4)} TON</span>
+                </div>
+              )}
             </div>
             <p className="text-hint text-sm mb-4">
               После смены региона ваш ключ подключения изменится. Не забудьте обновить его в VPN приложении.

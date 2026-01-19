@@ -16,6 +16,7 @@ const (
 	TransactionTypeManual              TransactionType = "manual"
 	TransactionTypeTopUp               TransactionType = "top_up"
 	TransactionTypePromoCode           TransactionType = "promo_code"
+	TransactionTypeRegionSwitch        TransactionType = "region_switch"
 )
 
 type BalanceTransaction struct {

@@ -17,6 +17,7 @@ type Handler struct {
 	ratesSvc        *service.RatesService
 	balanceSvc      *service.BalanceService
 	promoCodeSvc    *service.PromoCodeService
+	adminSvc        *service.AdminService
 	bot             *telegram.Bot
 }
 
@@ -30,6 +31,7 @@ func New(
 	ratesSvc *service.RatesService,
 	balanceSvc *service.BalanceService,
 	promoCodeSvc *service.PromoCodeService,
+	adminSvc *service.AdminService,
 	bot *telegram.Bot,
 ) *Handler {
 	return &Handler{
@@ -42,6 +44,7 @@ func New(
 		ratesSvc:        ratesSvc,
 		balanceSvc:      balanceSvc,
 		promoCodeSvc:    promoCodeSvc,
+		adminSvc:        adminSvc,
 		bot:             bot,
 	}
 }

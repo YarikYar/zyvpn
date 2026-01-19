@@ -45,8 +45,11 @@ export const api = {
 
   getSubscriptionStatus: () => request<any>('/api/subscription/status'),
 
+  getSwitchServerInfo: () =>
+    request<{ price: number; free_switches: number }>('/api/subscription/switch-server/info'),
+
   switchServer: (serverId: string) =>
-    request<{ success: boolean; subscription: any; key: string }>('/api/subscription/switch-server', {
+    request<{ success: boolean; subscription: any; key: string; used_free: boolean }>('/api/subscription/switch-server', {
       method: 'POST',
       body: JSON.stringify({ server_id: serverId }),
     }),
@@ -214,13 +217,13 @@ export const api = {
     listPromoCodes: (limit = 50, offset = 0) =>
       request<{ promo_codes: any[] }>(`/api/admin/promo?limit=${limit}&offset=${offset}`),
 
-    createPromoCode: (type: 'balance' | 'days', value: number, maxUses?: number, expiresAt?: string, description?: string) =>
+    createPromoCode: (type: 'balance' | 'days' | 'region_switch', value: number, maxUses?: number, expiresAt?: string, description?: string) =>
       request<any>('/api/admin/promo', {
         method: 'POST',
         body: JSON.stringify({ type, value, max_uses: maxUses, expires_at: expiresAt, description }),
       }),
 
-    createBulkPromoCodes: (count: number, type: 'balance' | 'days', value: number, maxUses?: number, expiresAt?: string, prefix?: string) =>
+    createBulkPromoCodes: (count: number, type: 'balance' | 'days' | 'region_switch', value: number, maxUses?: number, expiresAt?: string, prefix?: string) =>
       request<{ codes: string[]; count: number }>('/api/admin/promo/bulk', {
         method: 'POST',
         body: JSON.stringify({ count, type, value, max_uses: maxUses, expires_at: expiresAt, prefix }),
@@ -264,6 +267,15 @@ export const api = {
       request<{ success: boolean; referral_bonus_days: number }>('/api/admin/settings/referral-bonus-days', {
         method: 'POST',
         body: JSON.stringify({ days }),
+      }),
+
+    getRegionSwitchPrice: () =>
+      request<{ region_switch_price: number }>('/api/admin/settings/region-switch-price'),
+
+    setRegionSwitchPrice: (price: number) =>
+      request<{ success: boolean; region_switch_price: number }>('/api/admin/settings/region-switch-price', {
+        method: 'POST',
+        body: JSON.stringify({ price }),
       }),
 
     // Plans

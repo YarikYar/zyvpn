@@ -11,6 +11,7 @@ interface Store {
   connectionKey: string | null
   rates: ExchangeRates | null
   selectedServerId: string | null
+  balance: number
   loading: boolean
   error: string | null
 
@@ -21,6 +22,7 @@ interface Store {
   fetchReferralStats: () => Promise<void>
   fetchReferralLink: () => Promise<void>
   fetchRates: () => Promise<void>
+  fetchBalance: () => Promise<void>
   setSelectedServerId: (id: string | null) => void
   setError: (error: string | null) => void
 }
@@ -34,6 +36,7 @@ export const useStore = create<Store>((set) => ({
   connectionKey: null,
   rates: null,
   selectedServerId: null,
+  balance: 0,
   loading: false,
   error: null,
 
@@ -99,6 +102,15 @@ export const useStore = create<Store>((set) => ({
     } catch (error) {
       // Fallback rates
       set({ rates: { ton_usd: 5.0, usd_rub: 95.0, ton_rub: 475.0 } })
+    }
+  },
+
+  fetchBalance: async () => {
+    try {
+      const data = await api.getBalance()
+      set({ balance: data.balance || 0 })
+    } catch (error) {
+      set({ balance: 0 })
     }
   },
 

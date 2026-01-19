@@ -746,3 +746,39 @@ func (h *AdminHandler) SetReferralBonusDays(c *fiber.Ctx) error {
 
 	return c.JSON(fiber.Map{"success": true, "referral_bonus_days": req.Days})
 }
+
+// GetRegionSwitchPrice returns current region switch price
+func (h *AdminHandler) GetRegionSwitchPrice(c *fiber.Ctx) error {
+	price, err := h.adminSvc.GetRegionSwitchPrice(c.Context())
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": err.Error(),
+		})
+	}
+
+	return c.JSON(fiber.Map{"region_switch_price": price})
+}
+
+type SetRegionSwitchPriceRequest struct {
+	Price float64 `json:"price"`
+}
+
+// SetRegionSwitchPrice sets region switch price in TON
+func (h *AdminHandler) SetRegionSwitchPrice(c *fiber.Ctx) error {
+	adminID := middleware.GetAdminID(c)
+
+	var req SetRegionSwitchPriceRequest
+	if err := c.BodyParser(&req); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "Неверный формат запроса",
+		})
+	}
+
+	if err := h.adminSvc.SetRegionSwitchPrice(c.Context(), adminID, req.Price); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": err.Error(),
+		})
+	}
+
+	return c.JSON(fiber.Map{"success": true, "region_switch_price": req.Price})
+}

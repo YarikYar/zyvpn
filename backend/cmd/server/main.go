@@ -79,7 +79,7 @@ func main() {
 	}
 
 	// Create handlers
-	h := handler.New(cfg, userService, planService, subscriptionSvc, paymentSvc, referralSvc, ratesSvc, balanceSvc, promoCodeSvc, bot)
+	h := handler.New(cfg, userService, planService, subscriptionSvc, paymentSvc, referralSvc, ratesSvc, balanceSvc, promoCodeSvc, adminSvc, bot)
 	adminHandler := handler.NewAdminHandler(adminSvc)
 	serverHandler := handler.NewServerHandler(serverSvc)
 
@@ -129,6 +129,7 @@ func main() {
 	api.Get("/subscription/key", h.GetSubscriptionKey)
 	api.Get("/subscription/status", h.GetSubscriptionStatus)
 	api.Post("/subscription/trial", h.ActivateTrial)
+	api.Get("/subscription/switch-server/info", h.GetSwitchServerInfo)
 	api.Post("/subscription/switch-server", h.SwitchServer)
 
 	// Payments
@@ -202,6 +203,8 @@ func main() {
 	admin.Post("/settings/referral-bonus", adminHandler.SetReferralBonus)
 	admin.Get("/settings/referral-bonus-days", adminHandler.GetReferralBonusDays)
 	admin.Post("/settings/referral-bonus-days", adminHandler.SetReferralBonusDays)
+	admin.Get("/settings/region-switch-price", adminHandler.GetRegionSwitchPrice)
+	admin.Post("/settings/region-switch-price", adminHandler.SetRegionSwitchPrice)
 
 	// Admin - Servers
 	admin.Get("/servers", serverHandler.GetAllServers)

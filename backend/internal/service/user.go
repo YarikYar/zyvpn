@@ -71,6 +71,11 @@ func (s *UserService) GetUserByReferralCode(ctx context.Context, code string) (*
 	return s.repo.GetUserByReferralCode(ctx, code)
 }
 
+// UseFreeRegionSwitch attempts to use a free region switch if available
+func (s *UserService) UseFreeRegionSwitch(ctx context.Context, userID int64) (bool, error) {
+	return s.repo.UseFreeRegionSwitch(ctx, userID)
+}
+
 type TelegramUser struct {
 	ID           int64
 	Username     *string
