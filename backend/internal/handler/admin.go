@@ -363,9 +363,9 @@ func (h *AdminHandler) CreatePromoCode(c *fiber.Ctx) error {
 		})
 	}
 
-	if req.Type != model.PromoCodeTypeBalance && req.Type != model.PromoCodeTypeDays {
+	if req.Type != model.PromoCodeTypeBalance && req.Type != model.PromoCodeTypeDays && req.Type != model.PromoCodeTypeRegionSwitch {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-			"error": "invalid promo code type, must be 'balance' or 'days'",
+			"error": "invalid promo code type, must be 'balance', 'days' or 'region_switch'",
 		})
 	}
 
@@ -411,7 +411,7 @@ func (h *AdminHandler) CreateBulkPromoCodes(c *fiber.Ctx) error {
 		})
 	}
 
-	if req.Type != model.PromoCodeTypeBalance && req.Type != model.PromoCodeTypeDays {
+	if req.Type != model.PromoCodeTypeBalance && req.Type != model.PromoCodeTypeDays && req.Type != model.PromoCodeTypeRegionSwitch {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
 			"error": "invalid promo code type",
 		})
