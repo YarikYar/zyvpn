@@ -40,7 +40,7 @@ export default function ReferralPage() {
 
   const shareLink = () => {
     if (referralLink && webApp) {
-      const text = 'Присоединяйся к ZyVPN! Быстрый и безопасный VPN. Получи +7 дней бесплатно!'
+      const text = 'Присоединяйся к ZyVPN! Быстрый и безопасный VPN.'
       webApp.openTelegramLink(`https://t.me/share/url?url=${encodeURIComponent(referralLink)}&text=${encodeURIComponent(text)}`)
     }
   }
@@ -49,7 +49,7 @@ export default function ReferralPage() {
     <div className="p-4">
       <h1 className="text-2xl font-bold mb-2">Реферальная программа</h1>
       <p className="text-hint mb-6">
-        Приглашай друзей и получай бонусные дни!
+        Приглашай друзей и получай % от их платежей!
       </p>
 
       {/* How it works */}
@@ -66,7 +66,7 @@ export default function ReferralPage() {
           </div>
           <div className="flex items-start gap-3">
             <span className="text-xl">3️⃣</span>
-            <p className="text-sm">Вы оба получаете +7 дней к подписке!</p>
+            <p className="text-sm">Ты получаешь % от каждого платежа друга на баланс!</p>
           </div>
         </div>
       </div>

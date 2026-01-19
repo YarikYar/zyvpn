@@ -69,7 +69,8 @@ export default function AdminPage() {
   const [promos, setPromos] = useState<PromoItem[]>([])
   const [plans, setPlans] = useState<PlanItem[]>([])
   const [topupBonus, setTopupBonus] = useState(0)
-  const [referralBonus, setReferralBonus] = useState(0.1)
+  const [referralBonus, setReferralBonus] = useState(5)
+  const [referralBonusDays, setReferralBonusDays] = useState(0)
   const [search, setSearch] = useState('')
   const [selectedUser, setSelectedUser] = useState<UserItem | null>(null)
   const [selectedPlan, setSelectedPlan] = useState<PlanItem | null>(null)
@@ -125,12 +126,14 @@ export default function AdminPage() {
         const data = await api.admin.listPlans()
         setPlans(data.plans || [])
       } else if (tab === 'settings') {
-        const [topupData, referralData] = await Promise.all([
+        const [topupData, referralData, referralDaysData] = await Promise.all([
           api.admin.getTopupBonus(),
-          api.admin.getReferralBonus()
+          api.admin.getReferralBonus(),
+          api.admin.getReferralBonusDays()
         ])
         setTopupBonus(topupData.topup_bonus_percent || 0)
-        setReferralBonus(referralData.referral_bonus_ton || 0.1)
+        setReferralBonus(referralData.referral_bonus_percent || 5)
+        setReferralBonusDays(referralDaysData.referral_bonus_days || 0)
       }
     } catch (e) {
       setError((e as Error).message)
@@ -679,28 +682,61 @@ export default function AdminPage() {
             </button>
           </div>
 
-          {/* Referral Bonus */}
+          {/* Referral Bonus % */}
           <div className="card">
-            <h3 className="font-semibold mb-2">Реферальный бонус</h3>
+            <h3 className="font-semibold mb-2">Реферальный бонус %</h3>
             <p className="text-hint text-sm mb-4">
-              TON бонус реферреру при первой оплате приглашённого
+              Процент от каждого платежа приглашённого пользователя
             </p>
             <div className="flex items-center gap-4">
               <input
                 type="range"
                 min="0"
-                max="1"
-                step="0.01"
+                max="20"
+                step="0.5"
                 value={referralBonus}
                 onChange={(e) => setReferralBonus(parseFloat(e.target.value))}
                 className="flex-1 h-2 bg-tg-secondary-bg rounded-lg appearance-none cursor-pointer"
               />
-              <span className="font-bold w-20 text-right">{referralBonus.toFixed(2)} TON</span>
+              <span className="font-bold w-16 text-right">{referralBonus.toFixed(1)}%</span>
             </div>
             <button
               onClick={async () => {
                 try {
                   await api.admin.setReferralBonus(referralBonus)
+                  alert('Сохранено!')
+                } catch (e) {
+                  alert((e as Error).message)
+                }
+              }}
+              className="btn-primary w-full mt-4"
+            >
+              Сохранить
+            </button>
+          </div>
+
+          {/* Referral Bonus Days */}
+          <div className="card">
+            <h3 className="font-semibold mb-2">Бонусные дни рефереру</h3>
+            <p className="text-hint text-sm mb-4">
+              Дни подписки рефереру при первой оплате приглашённого
+            </p>
+            <div className="flex items-center gap-4">
+              <input
+                type="range"
+                min="0"
+                max="30"
+                step="1"
+                value={referralBonusDays}
+                onChange={(e) => setReferralBonusDays(parseInt(e.target.value))}
+                className="flex-1 h-2 bg-tg-secondary-bg rounded-lg appearance-none cursor-pointer"
+              />
+              <span className="font-bold w-20 text-right">{referralBonusDays} дн.</span>
+            </div>
+            <button
+              onClick={async () => {
+                try {
+                  await api.admin.setReferralBonusDays(referralBonusDays)
                   alert('Сохранено!')
                 } catch (e) {
                   alert((e as Error).message)

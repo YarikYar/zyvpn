@@ -78,6 +78,7 @@ func main() {
 			log.Printf("Warning: Failed to create Telegram bot: %v", err)
 		} else {
 			bot.SetPaymentService(paymentSvc)
+			paymentSvc.SetNotifier(bot)
 			log.Printf("Telegram bot @%s initialized", bot.GetBotUsername())
 		}
 	}
@@ -199,6 +200,8 @@ func main() {
 	admin.Post("/settings/topup-bonus", adminHandler.SetTopupBonus)
 	admin.Get("/settings/referral-bonus", adminHandler.GetReferralBonus)
 	admin.Post("/settings/referral-bonus", adminHandler.SetReferralBonus)
+	admin.Get("/settings/referral-bonus-days", adminHandler.GetReferralBonusDays)
+	admin.Post("/settings/referral-bonus-days", adminHandler.SetReferralBonusDays)
 
 	// Internal endpoints (for cron jobs)
 	internal := app.Group("/internal")

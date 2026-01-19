@@ -675,23 +675,23 @@ func (h *AdminHandler) SetTopupBonus(c *fiber.Ctx) error {
 	return c.JSON(fiber.Map{"success": true, "topup_bonus_percent": req.Percent})
 }
 
-// GetReferralBonus returns current referral bonus in TON
+// GetReferralBonus returns current referral bonus percentage
 func (h *AdminHandler) GetReferralBonus(c *fiber.Ctx) error {
-	amount, err := h.adminSvc.GetReferralBonusTON(c.Context())
+	percent, err := h.adminSvc.GetReferralBonusPercent(c.Context())
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 			"error": err.Error(),
 		})
 	}
 
-	return c.JSON(fiber.Map{"referral_bonus_ton": amount})
+	return c.JSON(fiber.Map{"referral_bonus_percent": percent})
 }
 
 type SetReferralBonusRequest struct {
-	Amount float64 `json:"amount"`
+	Percent float64 `json:"percent"`
 }
 
-// SetReferralBonus sets referral bonus in TON
+// SetReferralBonus sets referral bonus percentage
 func (h *AdminHandler) SetReferralBonus(c *fiber.Ctx) error {
 	adminID := middleware.GetAdminID(c)
 
@@ -702,11 +702,47 @@ func (h *AdminHandler) SetReferralBonus(c *fiber.Ctx) error {
 		})
 	}
 
-	if err := h.adminSvc.SetReferralBonusTON(c.Context(), adminID, req.Amount); err != nil {
+	if err := h.adminSvc.SetReferralBonusPercent(c.Context(), adminID, req.Percent); err != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
 			"error": err.Error(),
 		})
 	}
 
-	return c.JSON(fiber.Map{"success": true, "referral_bonus_ton": req.Amount})
+	return c.JSON(fiber.Map{"success": true, "referral_bonus_percent": req.Percent})
+}
+
+// GetReferralBonusDays returns current referral bonus days
+func (h *AdminHandler) GetReferralBonusDays(c *fiber.Ctx) error {
+	days, err := h.adminSvc.GetReferralBonusDays(c.Context())
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": err.Error(),
+		})
+	}
+
+	return c.JSON(fiber.Map{"referral_bonus_days": days})
+}
+
+type SetReferralBonusDaysRequest struct {
+	Days int `json:"days"`
+}
+
+// SetReferralBonusDays sets referral bonus days
+func (h *AdminHandler) SetReferralBonusDays(c *fiber.Ctx) error {
+	adminID := middleware.GetAdminID(c)
+
+	var req SetReferralBonusDaysRequest
+	if err := c.BodyParser(&req); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "Неверный формат запроса",
+		})
+	}
+
+	if err := h.adminSvc.SetReferralBonusDays(c.Context(), adminID, req.Days); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": err.Error(),
+		})
+	}
+
+	return c.JSON(fiber.Map{"success": true, "referral_bonus_days": req.Days})
 }

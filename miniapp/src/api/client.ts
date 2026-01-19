@@ -243,12 +243,21 @@ export const api = {
       }),
 
     getReferralBonus: () =>
-      request<{ referral_bonus_ton: number }>('/api/admin/settings/referral-bonus'),
+      request<{ referral_bonus_percent: number }>('/api/admin/settings/referral-bonus'),
 
-    setReferralBonus: (amount: number) =>
-      request<{ success: boolean; referral_bonus_ton: number }>('/api/admin/settings/referral-bonus', {
+    setReferralBonus: (percent: number) =>
+      request<{ success: boolean; referral_bonus_percent: number }>('/api/admin/settings/referral-bonus', {
         method: 'POST',
-        body: JSON.stringify({ amount }),
+        body: JSON.stringify({ percent }),
+      }),
+
+    getReferralBonusDays: () =>
+      request<{ referral_bonus_days: number }>('/api/admin/settings/referral-bonus-days'),
+
+    setReferralBonusDays: (days: number) =>
+      request<{ success: boolean; referral_bonus_days: number }>('/api/admin/settings/referral-bonus-days', {
+        method: 'POST',
+        body: JSON.stringify({ days }),
       }),
 
     // Plans

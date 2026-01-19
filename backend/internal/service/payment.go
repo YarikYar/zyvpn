@@ -18,6 +18,12 @@ var (
 	ErrPaymentNotPending      = errors.New("Платёж не ожидает оплаты")
 )
 
+// Notifier interface for sending notifications (implemented by telegram.Bot)
+type Notifier interface {
+	SendReferralBonus(chatID int64, bonusTON float64, bonusDays int) error
+	SendBalanceTopUp(chatID int64, amount float64, newBalance float64) error
+}
+
 type PaymentService struct {
 	repo            *repository.Repository
 	subscriptionSvc *SubscriptionService
@@ -25,6 +31,7 @@ type PaymentService struct {
 	balanceSvc      *BalanceService
 	tonVerifier     *ton.Verifier
 	cfg             *config.Config
+	notifier        Notifier
 }
 
 func NewPaymentService(
@@ -48,6 +55,11 @@ func NewPaymentService(
 // SetBalanceService sets the balance service (to avoid circular dependency)
 func (s *PaymentService) SetBalanceService(balanceSvc *BalanceService) {
 	s.balanceSvc = balanceSvc
+}
+
+// SetNotifier sets the notifier for sending notifications
+func (s *PaymentService) SetNotifier(notifier Notifier) {
+	s.notifier = notifier
 }
 
 func (s *PaymentService) CreatePayment(ctx context.Context, userID int64, planID uuid.UUID, provider model.PaymentProvider) (*model.Payment, error) {
@@ -198,13 +210,6 @@ func (s *PaymentService) CompletePayment(ctx context.Context, paymentID uuid.UUI
 		return fmt.Errorf("failed to create subscription: %w", err)
 	}
 
-	// Check if this is first payment BEFORE marking as completed
-	isFirstPayment := false
-	hasCompletedPayment, err := s.repo.HasCompletedPayment(ctx, payment.UserID)
-	if err == nil && !hasCompletedPayment {
-		isFirstPayment = true
-	}
-
 	// Update payment
 	if err := s.repo.UpdatePaymentSubscription(ctx, paymentID, sub.ID); err != nil {
 		return err
@@ -214,48 +219,106 @@ func (s *PaymentService) CompletePayment(ctx context.Context, paymentID uuid.UUI
 		return err
 	}
 
-	// Process referral bonus if this was first payment
-	if isFirstPayment {
-		fmt.Printf("First payment for user %d, processing referral bonus\n", payment.UserID)
-		if err := s.creditReferralBonus(ctx, payment.UserID); err != nil {
-			// Log error but don't fail the payment
-			fmt.Printf("Failed to credit referral bonus for user %d: %v\n", payment.UserID, err)
-		}
+	// Process referral bonus (percentage of payment in TON) - for every payment
+	if err := s.creditReferralBonus(ctx, payment); err != nil {
+		// Log error but don't fail the payment
+		fmt.Printf("Failed to credit referral bonus for user %d: %v\n", payment.UserID, err)
 	}
 
 	return nil
 }
 
-// creditReferralBonus credits TON to referrer's balance when referred user makes first payment
-func (s *PaymentService) creditReferralBonus(ctx context.Context, referredUserID int64) error {
+// creditReferralBonus credits percentage of payment (converted to TON) to referrer's balance
+// and adds bonus days to referrer's subscription (only on first payment)
+func (s *PaymentService) creditReferralBonus(ctx context.Context, payment *model.Payment) error {
 	if s.balanceSvc == nil {
 		return fmt.Errorf("balance service not configured")
 	}
 
-	// Get pending referral
-	referral, err := s.referralSvc.GetPendingReferral(ctx, referredUserID)
+	// Get referral (any status - we credit on every payment)
+	referral, err := s.repo.GetReferralByReferredID(ctx, payment.UserID)
 	if err != nil {
 		if err == repository.ErrReferralNotFound {
-			return nil // No referral
+			return nil // No referral relationship
 		}
 		return err
 	}
-	if referral == nil {
-		return nil // Already credited
+
+	isFirstPayment := referral.Status == model.ReferralStatusPending
+
+	// Convert payment amount to TON equivalent
+	var paymentAmountTON float64
+	switch payment.Currency {
+	case "TON":
+		paymentAmountTON = payment.Amount
+	case "XTR": // Stars - convert to TON (100 Stars = 1 TON)
+		paymentAmountTON = payment.Amount / 100
+	default:
+		return fmt.Errorf("unsupported currency: %s", payment.Currency)
 	}
 
-	// Credit TON to referrer's balance
-	_, err = s.balanceSvc.CreditReferralBonus(ctx, referral.ReferrerID, referral.BonusTON, referral.ID)
+	// Track bonuses for notification
+	var creditedTON float64
+	var creditedDays int
+
+	// Get bonus percentage from settings
+	bonusPercent, err := s.repo.GetSettingFloat(ctx, "referral_bonus_percent")
 	if err != nil {
-		return fmt.Errorf("failed to credit balance: %w", err)
+		bonusPercent = 5 // Default 5%
 	}
 
-	// Mark referral as credited
-	if err := s.referralSvc.MarkReferralCredited(ctx, referral.ID); err != nil {
-		return fmt.Errorf("failed to mark referral as credited: %w", err)
+	// Credit TON bonus if percentage > 0
+	if bonusPercent > 0 {
+		bonusAmount := paymentAmountTON * bonusPercent / 100
+		if bonusAmount >= 0.0001 {
+			_, err = s.balanceSvc.CreditReferralBonus(ctx, referral.ReferrerID, bonusAmount, referral.ID)
+			if err != nil {
+				fmt.Printf("Failed to credit TON bonus: %v\n", err)
+			} else {
+				creditedTON = bonusAmount
+				fmt.Printf("Credited %.4f TON (%.1f%% of %.4f TON) to user %d for referral of user %d\n",
+					bonusAmount, bonusPercent, paymentAmountTON, referral.ReferrerID, payment.UserID)
+			}
+		}
 	}
 
-	fmt.Printf("Credited %.4f TON to user %d for referral of user %d\n", referral.BonusTON, referral.ReferrerID, referredUserID)
+	// Add bonus days to referrer's subscription (only on first payment from referred user)
+	if isFirstPayment {
+		bonusDays, err := s.repo.GetSettingFloat(ctx, "referral_bonus_days")
+		if err != nil {
+			bonusDays = 0
+		}
+		if bonusDays > 0 {
+			// Get referrer's active subscription
+			referrerSub, err := s.subscriptionSvc.GetActiveSubscription(ctx, referral.ReferrerID)
+			if err != nil {
+				fmt.Printf("Referrer %d has no active subscription, skipping bonus days\n", referral.ReferrerID)
+			} else {
+				// Extend referrer's subscription
+				err = s.subscriptionSvc.ExtendSubscription(ctx, referrerSub.ID, int(bonusDays))
+				if err != nil {
+					fmt.Printf("Failed to add %d bonus days to user %d: %v\n", int(bonusDays), referral.ReferrerID, err)
+				} else {
+					creditedDays = int(bonusDays)
+					fmt.Printf("Added %d bonus days to user %d for referral of user %d\n",
+						int(bonusDays), referral.ReferrerID, payment.UserID)
+				}
+			}
+		}
+	}
+
+	// Mark referral as credited if it was pending (first payment)
+	if isFirstPayment {
+		_ = s.referralSvc.MarkReferralCredited(ctx, referral.ID)
+	}
+
+	// Send notification to referrer
+	if s.notifier != nil && (creditedTON > 0 || creditedDays > 0) {
+		if err := s.notifier.SendReferralBonus(referral.ReferrerID, creditedTON, creditedDays); err != nil {
+			fmt.Printf("Failed to send referral bonus notification: %v\n", err)
+		}
+	}
+
 	return nil
 }
 

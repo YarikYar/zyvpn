@@ -176,7 +176,7 @@ func (b *Bot) handleStart(c tele.Context) error {
 Нажми кнопку ниже, чтобы выбрать тариф и оплатить подписку.`, user.FirstName)
 
 	if isNew && referredBy != nil {
-		text += "\n\n🎁 Тебя пригласил друг! При первой оплате вы оба получите +7 дней к подписке."
+		text += "\n\n🎁 Тебя пригласил друг! Твой друг получит бонус при твоей первой оплате."
 	}
 
 	keyboard := &tele.ReplyMarkup{}
@@ -501,6 +501,57 @@ func (b *Bot) SendSubscriptionActivated(chatID int64, expiresAt string) error {
 	)
 
 	_, err := b.bot.Send(&tele.User{ID: chatID}, text, keyboard, tele.ModeHTML)
+	return err
+}
+
+// SendReferralBonus notifies referrer about received bonus
+func (b *Bot) SendReferralBonus(chatID int64, bonusTON float64, bonusDays int) error {
+	var text string
+	if bonusTON > 0 && bonusDays > 0 {
+		text = fmt.Sprintf(`🎁 <b>Реферальный бонус!</b>
+
+Ваш друг оплатил подписку. Вы получили:
+💎 <b>+%.4f TON</b> на баланс
+📅 <b>+%d дней</b> к подписке
+
+Спасибо, что приглашаете друзей!`, bonusTON, bonusDays)
+	} else if bonusTON > 0 {
+		text = fmt.Sprintf(`🎁 <b>Реферальный бонус!</b>
+
+Ваш друг оплатил подписку. Вы получили:
+💎 <b>+%.4f TON</b> на баланс
+
+Спасибо, что приглашаете друзей!`, bonusTON)
+	} else if bonusDays > 0 {
+		text = fmt.Sprintf(`🎁 <b>Реферальный бонус!</b>
+
+Ваш друг оплатил подписку. Вы получили:
+📅 <b>+%d дней</b> к подписке
+
+Спасибо, что приглашаете друзей!`, bonusDays)
+	} else {
+		return nil // No bonus to notify about
+	}
+
+	keyboard := &tele.ReplyMarkup{}
+	keyboard.Inline(
+		keyboard.Row(
+			keyboard.WebApp("👥 Пригласить ещё", &tele.WebApp{URL: b.cfg.Telegram.WebAppURL + "/#/referral"}),
+		),
+	)
+
+	_, err := b.bot.Send(&tele.User{ID: chatID}, text, keyboard, tele.ModeHTML)
+	return err
+}
+
+// SendBalanceTopUp notifies user about balance top-up
+func (b *Bot) SendBalanceTopUp(chatID int64, amount float64, newBalance float64) error {
+	text := fmt.Sprintf(`💰 <b>Баланс пополнен!</b>
+
+Зачислено: <b>+%.4f TON</b>
+Текущий баланс: <b>%.4f TON</b>`, amount, newBalance)
+
+	_, err := b.bot.Send(&tele.User{ID: chatID}, text, tele.ModeHTML)
 	return err
 }
 

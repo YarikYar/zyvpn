@@ -633,22 +633,42 @@ func (s *AdminService) SetTopupBonusPercent(ctx context.Context, adminID int64, 
 	return s.repo.SetSetting(ctx, "topup_bonus_percent", fmt.Sprintf("%.1f", percent))
 }
 
-// GetReferralBonusTON returns current referral bonus in TON
-func (s *AdminService) GetReferralBonusTON(ctx context.Context) (float64, error) {
-	value, err := s.repo.GetSettingFloat(ctx, "referral_bonus_ton")
+// GetReferralBonusPercent returns current referral bonus percentage
+func (s *AdminService) GetReferralBonusPercent(ctx context.Context) (float64, error) {
+	value, err := s.repo.GetSettingFloat(ctx, "referral_bonus_percent")
 	if err != nil {
-		return 0.1, nil // Default to 0.1 TON if not set
+		return 5, nil // Default to 5% if not set
 	}
 	return value, nil
 }
 
-// SetReferralBonusTON sets referral bonus in TON (0-1)
-func (s *AdminService) SetReferralBonusTON(ctx context.Context, adminID int64, amount float64) error {
+// SetReferralBonusPercent sets referral bonus percentage (0-20)
+func (s *AdminService) SetReferralBonusPercent(ctx context.Context, adminID int64, percent float64) error {
 	if ok, _ := s.IsAdmin(ctx, adminID); !ok {
 		return ErrNotAdmin
 	}
-	if amount < 0 || amount > 1 {
-		return errors.New("бонус должен быть от 0 до 1 TON")
+	if percent < 0 || percent > 20 {
+		return errors.New("процент бонуса должен быть от 0 до 20")
 	}
-	return s.repo.SetSetting(ctx, "referral_bonus_ton", fmt.Sprintf("%.2f", amount))
+	return s.repo.SetSetting(ctx, "referral_bonus_percent", fmt.Sprintf("%.1f", percent))
+}
+
+// GetReferralBonusDays returns current referral bonus days
+func (s *AdminService) GetReferralBonusDays(ctx context.Context) (int, error) {
+	value, err := s.repo.GetSettingFloat(ctx, "referral_bonus_days")
+	if err != nil {
+		return 0, nil // Default to 0 days if not set
+	}
+	return int(value), nil
+}
+
+// SetReferralBonusDays sets referral bonus days (0-30)
+func (s *AdminService) SetReferralBonusDays(ctx context.Context, adminID int64, days int) error {
+	if ok, _ := s.IsAdmin(ctx, adminID); !ok {
+		return ErrNotAdmin
+	}
+	if days < 0 || days > 30 {
+		return errors.New("бонусные дни должны быть от 0 до 30")
+	}
+	return s.repo.SetSetting(ctx, "referral_bonus_days", fmt.Sprintf("%d", days))
 }
