@@ -179,11 +179,20 @@ func (b *Bot) handleStart(c tele.Context) error {
 		text += "\n\n🎁 Тебя пригласил друг! Твой друг получит бонус при твоей первой оплате."
 	}
 
+	// Check if user has used trial
+	hasUsedTrial, _ := b.subscriptionSvc.HasUsedTrial(context.Background(), user.ID)
+
 	keyboard := &tele.ReplyMarkup{}
-	keyboard.Inline(
-		keyboard.Row(
+	var rows []tele.Row
+
+	// Only show trial button if user hasn't used it yet
+	if !hasUsedTrial {
+		rows = append(rows, keyboard.Row(
 			keyboard.Data("🎁 Попробовать бесплатно (3 дня)", "trial"),
-		),
+		))
+	}
+
+	rows = append(rows,
 		keyboard.Row(
 			keyboard.WebApp("📱 Открыть магазин", &tele.WebApp{URL: b.cfg.Telegram.WebAppURL}),
 		),
@@ -192,6 +201,7 @@ func (b *Bot) handleStart(c tele.Context) error {
 			keyboard.Data("🔑 Получить ключ", "key"),
 		),
 	)
+	keyboard.Inline(rows...)
 
 	return c.Send(text, keyboard, tele.ModeHTML)
 }

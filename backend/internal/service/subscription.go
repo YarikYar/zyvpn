@@ -408,6 +408,11 @@ func (s *SubscriptionService) SwitchServer(ctx context.Context, userID int64, ne
 	return sub, nil
 }
 
+// HasUsedTrial checks if user has already used trial
+func (s *SubscriptionService) HasUsedTrial(ctx context.Context, userID int64) (bool, error) {
+	return s.repo.HasUsedTrial(ctx, userID)
+}
+
 func (s *SubscriptionService) ActivateTrial(ctx context.Context, userID int64) (*model.Subscription, error) {
 	// Check if user already has active subscription
 	existing, err := s.repo.GetActiveSubscription(ctx, userID)
