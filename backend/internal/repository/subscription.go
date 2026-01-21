@@ -136,12 +136,13 @@ func (r *Repository) GetExpiringSubscriptions(ctx context.Context, before time.T
 	return subs, err
 }
 
-func (r *Repository) ExtendSubscription(ctx context.Context, id uuid.UUID, days int) error {
+func (r *Repository) ExtendSubscription(ctx context.Context, id uuid.UUID, days int, additionalTrafficBytes int64) error {
 	query := `
 		UPDATE subscriptions SET
-			expires_at = expires_at + interval '1 day' * $2
+			expires_at = expires_at + interval '1 day' * $2,
+			traffic_limit = traffic_limit + $3
 		WHERE id = $1`
-	_, err := r.db.ExecContext(ctx, query, id, days)
+	_, err := r.db.ExecContext(ctx, query, id, days, additionalTrafficBytes)
 	return err
 }
 

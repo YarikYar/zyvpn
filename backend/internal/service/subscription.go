@@ -78,9 +78,9 @@ func (s *SubscriptionService) CreateSubscriptionWithServer(ctx context.Context, 
 	// Check for existing active subscription - extend it instead of creating new
 	existing, err := s.repo.GetActiveSubscription(ctx, userID)
 	if err == nil && existing.IsActive() {
-		// Extend existing subscription
-		log.Printf("Extending existing subscription %s for user %d by %d days", existing.ID, userID, plan.DurationDays)
-		if err := s.ExtendSubscription(ctx, existing.ID, plan.DurationDays); err != nil {
+		// Extend existing subscription with new plan's days and traffic
+		log.Printf("Extending existing subscription %s for user %d by %d days and %d GB traffic", existing.ID, userID, plan.DurationDays, plan.TrafficGB)
+		if err := s.ExtendSubscriptionWithTraffic(ctx, existing.ID, plan.DurationDays, plan.TrafficBytes()); err != nil {
 			return nil, fmt.Errorf("failed to extend subscription: %w", err)
 		}
 		// Return updated subscription
@@ -167,6 +167,10 @@ func (s *SubscriptionService) CreateSubscriptionWithServer(ctx context.Context, 
 }
 
 func (s *SubscriptionService) ExtendSubscription(ctx context.Context, subID uuid.UUID, days int) error {
+	return s.ExtendSubscriptionWithTraffic(ctx, subID, days, 0)
+}
+
+func (s *SubscriptionService) ExtendSubscriptionWithTraffic(ctx context.Context, subID uuid.UUID, days int, additionalTrafficBytes int64) error {
 	sub, err := s.repo.GetSubscription(ctx, subID)
 	if err != nil {
 		return err
@@ -182,18 +186,21 @@ func (s *SubscriptionService) ExtendSubscription(ctx context.Context, subID uuid
 		return fmt.Errorf("failed to get XUI client: %w", err)
 	}
 
+	// Calculate new traffic limit
+	newTrafficLimit := sub.TrafficLimit + additionalTrafficBytes
+
 	// Update in 3x-ui FIRST (before database, so we can fail early)
 	newExpiry := sub.ExpiresAt.Add(time.Duration(days) * 24 * time.Hour)
 	maxDevices := sub.MaxDevices
 	if maxDevices <= 0 {
 		maxDevices = 3
 	}
-	if err := xuiClientAPI.UpdateClientTraffic(sub.XUIClientID, sub.XUIEmail, sub.TrafficLimit/(1024*1024*1024), newExpiry.UnixMilli(), maxDevices); err != nil {
+	if err := xuiClientAPI.UpdateClientTraffic(sub.XUIClientID, sub.XUIEmail, newTrafficLimit/(1024*1024*1024), newExpiry.UnixMilli(), maxDevices); err != nil {
 		return fmt.Errorf("failed to update VPN client: %w", err)
 	}
 
 	// Only extend in database after 3x-ui succeeded
-	if err := s.repo.ExtendSubscription(ctx, subID, days); err != nil {
+	if err := s.repo.ExtendSubscription(ctx, subID, days, additionalTrafficBytes); err != nil {
 		return err
 	}
 
