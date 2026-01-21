@@ -438,3 +438,25 @@ func (s *SubscriptionService) ActivateTrial(ctx context.Context, userID int64) (
 	// Create subscription
 	return s.CreateSubscription(ctx, userID, plan)
 }
+
+// ActivateTrialWithDays creates a subscription with custom days (for promo codes)
+func (s *SubscriptionService) ActivateTrialWithDays(ctx context.Context, userID int64, days int) (*model.Subscription, error) {
+	// Check if user already has active subscription
+	existing, err := s.repo.GetActiveSubscription(ctx, userID)
+	if err == nil && existing.IsActive() {
+		return nil, ErrSubscriptionActive
+	}
+
+	// Get trial plan as base
+	plan, err := s.repo.GetTrialPlan(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("trial plan not found: %w", err)
+	}
+
+	// Override duration with custom days
+	customPlan := *plan
+	customPlan.DurationDays = days
+
+	// Create subscription
+	return s.CreateSubscription(ctx, userID, &customPlan)
+}

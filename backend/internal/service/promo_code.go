@@ -109,17 +109,25 @@ func (s *PromoCodeService) ApplyPromoCode(ctx context.Context, code string, user
 		}
 		// Get active subscription
 		sub, err := s.subscriptionSvc.GetActiveSubscription(ctx, userID)
-		if err != nil {
-			return nil, err
+		if err == nil && sub != nil {
+			// Extend existing subscription
+			if err := s.subscriptionSvc.ExtendSubscription(ctx, sub.ID, int(promo.Value)); err != nil {
+				return nil, fmt.Errorf("failed to extend subscription: %w", err)
+			}
+			result.Message = fmt.Sprintf("Ваша подписка продлена на %d дней", int(promo.Value))
+		} else {
+			// No active subscription - create new one with trial plan + promo days
+			days := int(promo.Value)
+			if days < 1 {
+				days = 1
+			}
+			sub, err := s.subscriptionSvc.ActivateTrialWithDays(ctx, userID, days)
+			if err != nil {
+				return nil, fmt.Errorf("failed to activate subscription: %w", err)
+			}
+			_ = sub
+			result.Message = fmt.Sprintf("Вам активирована подписка на %d дней", days)
 		}
-		if sub == nil {
-			return nil, ErrNoActiveSubscription
-		}
-		// Extend subscription
-		if err := s.subscriptionSvc.ExtendSubscription(ctx, sub.ID, int(promo.Value)); err != nil {
-			return nil, fmt.Errorf("failed to extend subscription: %w", err)
-		}
-		result.Message = fmt.Sprintf("Ваша подписка продлена на %d дней", int(promo.Value))
 
 	case model.PromoCodeTypeRegionSwitch:
 		// Add free region switches to user

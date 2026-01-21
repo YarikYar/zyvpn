@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"net/http/cookiejar"
 	"strings"
@@ -172,15 +173,27 @@ func (c *Client) AddClient(email string, trafficLimitGB int64, expiryDays int, m
 		return nil, err
 	}
 
+	log.Printf("[XUI] AddClient URL: %s", c.baseURL+"/panel/api/inbounds/addClient")
+	log.Printf("[XUI] AddClient Body: %s", string(body))
+
 	resp, err := c.client.Post(c.baseURL+"/panel/api/inbounds/addClient", "application/json", bytes.NewReader(body))
 	if err != nil {
 		return nil, fmt.Errorf("add client request failed: %w", err)
 	}
 	defer resp.Body.Close()
 
+	// Read response body for logging
+	bodyBytes, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read response body: %w", err)
+	}
+
+	log.Printf("[XUI] AddClient Response Status: %d", resp.StatusCode)
+	log.Printf("[XUI] AddClient Response: %s", string(bodyBytes))
+
 	var result Response
-	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
-		return nil, fmt.Errorf("failed to decode response: %w", err)
+	if err := json.Unmarshal(bodyBytes, &result); err != nil {
+		return nil, fmt.Errorf("failed to decode response (status=%d, body=%s): %w", resp.StatusCode, string(bodyBytes), err)
 	}
 
 	if !result.Success {
