@@ -75,12 +75,57 @@ redis-shell: ## Open Redis CLI
 	docker-compose exec redis redis-cli
 
 # Testing
-test: ## Run all tests
-	cd backend && go test -v ./...
+test: test-unit ## Run unit tests (default — no external deps)
 
-test-coverage: ## Run tests with coverage
-	cd backend && go test -v -coverprofile=coverage.out ./...
+test-unit: ## Run unit tests only (no postgres / no live XUI)
+	cd backend && go test -count=1 -v ./...
+
+test-coverage: ## Run unit tests with coverage report
+	cd backend && go test -count=1 -v -coverprofile=coverage.out ./...
 	cd backend && go tool cover -html=coverage.out -o coverage.html
+
+# --- Integration tests (require external services) ---
+#
+# Subscription/DB integration: requires a postgres instance.
+#   TEST_DATABASE_URL — full DSN. Example:
+#     postgres://zyvpn:zyvpn@localhost:55434/zyvpn_test?sslmode=disable
+# The test will run migrations and TRUNCATE tables between tests, so point
+# it at a throwaway database.
+test-integration-db: ## Run subscription/DB integration tests (needs TEST_DATABASE_URL)
+	@if [ -z "$$TEST_DATABASE_URL" ]; then \
+		echo "TEST_DATABASE_URL not set. Example:"; \
+		echo "  TEST_DATABASE_URL=postgres://zyvpn:zyvpn@localhost:55434/zyvpn_test?sslmode=disable make test-integration-db"; \
+		exit 1; \
+	fi
+	cd backend && go test -tags=integration -count=1 -v ./internal/service/...
+
+# Helpers to spin a throwaway postgres for integration tests.
+test-pg-up: ## Start a throwaway postgres on :55434 for integration tests
+	docker run -d --rm --name zyvpn-pg-test \
+		-e POSTGRES_USER=zyvpn -e POSTGRES_PASSWORD=zyvpn -e POSTGRES_DB=zyvpn_test \
+		-p 55434:5432 postgres:16-alpine
+	@echo "Waiting for postgres..."
+	@until docker exec zyvpn-pg-test pg_isready -U zyvpn >/dev/null 2>&1; do sleep 1; done
+	@echo "Ready. Export:"
+	@echo "  export TEST_DATABASE_URL=postgres://zyvpn:zyvpn@localhost:55434/zyvpn_test?sslmode=disable"
+
+test-pg-down: ## Stop the throwaway postgres
+	-docker stop zyvpn-pg-test
+
+# Live XUI integration: requires real 3x-ui panel credentials. Use a
+# non-prod inbound — the tests create and delete a test client.
+#   XUI_TEST_BASE_URL
+#   XUI_TEST_USERNAME
+#   XUI_TEST_PASSWORD
+#   XUI_TEST_INBOUND_ID
+test-integration-xui: ## Run XUI live integration tests (needs XUI_TEST_* env)
+	@if [ -z "$$XUI_TEST_BASE_URL" ]; then \
+		echo "XUI_TEST_BASE_URL/USERNAME/PASSWORD/INBOUND_ID not set."; \
+		exit 1; \
+	fi
+	cd backend && go test -tags=integration -count=1 -v ./internal/xui/...
+
+test-integration: test-integration-db test-integration-xui ## Run all integration tests
 
 # Linting
 lint: ## Run linters

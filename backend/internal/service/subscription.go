@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"math"
 	"time"
 
 	"github.com/google/uuid"
@@ -53,13 +54,6 @@ func (s *SubscriptionService) getXUIClientForSubscription(ctx context.Context, s
 
 	// Fall back to default server for old subscriptions without server_id
 	return s.serverSvc.GetXUIClientForDefault(ctx)
-}
-
-func min(a, b int) int {
-	if a < b {
-		return a
-	}
-	return b
 }
 
 func (s *SubscriptionService) GetActiveSubscription(ctx context.Context, userID int64) (*model.Subscription, error) {
@@ -187,23 +181,38 @@ func (s *SubscriptionService) ExtendSubscriptionWithTraffic(ctx context.Context,
 	}
 
 	// Calculate new traffic limit
+	oldTrafficLimitGB := float64(sub.TrafficLimit) / (1024 * 1024 * 1024)
+	additionalTrafficGB := float64(additionalTrafficBytes) / (1024 * 1024 * 1024)
 	newTrafficLimit := sub.TrafficLimit + additionalTrafficBytes
+	newTrafficLimitGB := float64(newTrafficLimit) / (1024 * 1024 * 1024)
 
-	// Update in 3x-ui FIRST (before database, so we can fail early)
-	newExpiry := sub.ExpiresAt.Add(time.Duration(days) * 24 * time.Hour)
+	log.Printf("ExtendSubscriptionWithTraffic: subID=%s, oldLimit=%.2f GB, adding=%.2f GB, newLimit=%.2f GB, days=%d",
+		subID, oldTrafficLimitGB, additionalTrafficGB, newTrafficLimitGB, days)
+
+	// Compute new expiry from the later of now / current expiry — protects
+	// against extending from a past timestamp if the expiry-checker hasn't
+	// run yet.
+	now := time.Now()
+	base := now
+	if sub.ExpiresAt != nil && sub.ExpiresAt.After(now) {
+		base = *sub.ExpiresAt
+	}
+	newExpiry := base.Add(time.Duration(days) * 24 * time.Hour)
+
 	maxDevices := sub.MaxDevices
 	if maxDevices <= 0 {
 		maxDevices = 3
 	}
-	if err := xuiClientAPI.UpdateClientTraffic(sub.XUIClientID, sub.XUIEmail, newTrafficLimit/(1024*1024*1024), newExpiry.UnixMilli(), maxDevices); err != nil {
+	if err := xuiClientAPI.UpdateClientTraffic(sub.XUIClientID, sub.XUIEmail, newTrafficLimit, newExpiry.UnixMilli(), maxDevices); err != nil {
 		return fmt.Errorf("failed to update VPN client: %w", err)
 	}
 
-	// Only extend in database after 3x-ui succeeded
-	if err := s.repo.ExtendSubscription(ctx, subID, days, additionalTrafficBytes); err != nil {
+	// Only extend in database after 3x-ui succeeded.
+	if err := s.repo.SetSubscriptionExpiryAndTraffic(ctx, subID, newExpiry, additionalTrafficBytes); err != nil {
 		return err
 	}
 
+	log.Printf("ExtendSubscriptionWithTraffic: subscription %s updated successfully", subID)
 	return nil
 }
 
@@ -278,6 +287,12 @@ func (s *SubscriptionService) SyncTraffic(ctx context.Context, subID uuid.UUID) 
 	traffic, err := xuiClientAPI.GetClientTraffic(sub.XUIEmail)
 	if err != nil {
 		return fmt.Errorf("failed to get traffic: %w", err)
+	}
+
+	if traffic == nil {
+		// Client doesn't exist on XUI panel anymore — keep DB value, don't crash.
+		log.Printf("SyncTraffic: client %s not found on panel for subscription %s", sub.XUIEmail, subID)
+		return nil
 	}
 
 	totalUsed := traffic.Up + traffic.Down
@@ -363,12 +378,17 @@ func (s *SubscriptionService) SwitchServer(ctx context.Context, userID int64, ne
 		}
 	}
 
-	// Calculate remaining time and traffic
-	remainingDays := int(time.Until(*sub.ExpiresAt).Hours() / 24)
+	// Calculate remaining time and traffic, rounding up so the user doesn't
+	// lose a partial day or partial gigabyte during the switch.
+	remainingDays := int(math.Ceil(time.Until(*sub.ExpiresAt).Hours() / 24))
 	if remainingDays < 1 {
 		remainingDays = 1
 	}
-	remainingTrafficGB := int((sub.TrafficLimit - sub.TrafficUsed) / (1024 * 1024 * 1024))
+	remainingBytes := sub.TrafficLimit - sub.TrafficUsed
+	if remainingBytes < 0 {
+		remainingBytes = 0
+	}
+	remainingTrafficGB := int(math.Ceil(float64(remainingBytes) / float64(1024*1024*1024)))
 	if remainingTrafficGB < 1 {
 		remainingTrafficGB = 1
 	}

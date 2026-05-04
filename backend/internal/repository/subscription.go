@@ -146,6 +146,20 @@ func (r *Repository) ExtendSubscription(ctx context.Context, id uuid.UUID, days 
 	return err
 }
 
+// SetSubscriptionExpiryAndTraffic sets an absolute expiry timestamp and adds
+// to the traffic limit. Used when the caller needs to extend from a base
+// other than the current expires_at (e.g. extending an already-expired sub
+// from `now` instead of from a past timestamp).
+func (r *Repository) SetSubscriptionExpiryAndTraffic(ctx context.Context, id uuid.UUID, expiresAt time.Time, additionalTrafficBytes int64) error {
+	query := `
+		UPDATE subscriptions SET
+			expires_at = $2,
+			traffic_limit = traffic_limit + $3
+		WHERE id = $1`
+	_, err := r.db.ExecContext(ctx, query, id, expiresAt, additionalTrafficBytes)
+	return err
+}
+
 func (r *Repository) HasUsedTrial(ctx context.Context, userID int64) (bool, error) {
 	var count int
 	query := `

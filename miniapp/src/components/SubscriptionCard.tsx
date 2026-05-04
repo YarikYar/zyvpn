@@ -73,7 +73,7 @@ export default function SubscriptionCard({
         <div className="flex justify-between text-sm mb-1">
           <span className="text-hint">Трафик</span>
           <span>
-            {trafficUsed.toFixed(1)} {isUnlimited ? 'ГБ' : `/ ${trafficLimit} ГБ`}
+            {trafficUsed.toFixed(1)} {isUnlimited ? 'ГБ' : `/ ${trafficLimit.toFixed(0)} ГБ`}
           </span>
         </div>
         {!isUnlimited && (

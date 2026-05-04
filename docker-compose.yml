@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   postgres:
     image: postgres:16-alpine
@@ -16,8 +14,6 @@ services:
       timeout: 5s
       retries: 5
     restart: unless-stopped
-    networks:
-      - internal
 
   redis:
     image: redis:7-alpine
@@ -30,8 +26,6 @@ services:
       timeout: 5s
       retries: 5
     restart: unless-stopped
-    networks:
-      - internal
 
   backend:
     build:
@@ -50,63 +44,32 @@ services:
       - SERVER_PORT=8080
       - ENVIRONMENT=production
       - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
-      - TELEGRAM_WEBAPP_URL=https://vpn.zaruchevskiy.ru
+      - TELEGRAM_WEBAPP_URL=${TELEGRAM_WEBAPP_URL:-https://vpn.zaruchevskiy.ru}
       - TON_TESTNET=${TON_TESTNET:-false}
       - TON_WALLET_ADDRESS=${TON_WALLET_ADDRESS}
       - JWT_SECRET=${JWT_SECRET}
-      - ALLOW_ORIGINS=https://vpn.zaruchevskiy.ru,https://api.zaruchevskiy.ru
+      - ALLOW_ORIGINS=${ALLOW_ORIGINS:-https://vpn.zaruchevskiy.ru,https://api.zaruchevskiy.ru}
+    ports:
+      # Exposed for the file-routing Traefik on 192.168.1.150.
+      - "${BACKEND_PORT:-8094}:8080"
     depends_on:
       postgres:
         condition: service_healthy
       redis:
         condition: service_healthy
     restart: unless-stopped
-    networks:
-      - internal
-      - traefik_default
-    labels:
-      - "traefik.enable=true"
-      - "traefik.docker.network=traefik_default"
-      # API routes
-      - "traefik.http.routers.zyvpn-api.rule=Host(`api.zaruchevskiy.ru`) && PathPrefix(`/api`)"
-      - "traefik.http.routers.zyvpn-api.entrypoints=websecure"
-      - "traefik.http.routers.zyvpn-api.tls=true"
-      - "traefik.http.routers.zyvpn-api.tls.certresolver=letsencrypt"
-      - "traefik.http.routers.zyvpn-api.service=zyvpn-backend"
-      # Health and webhooks
-      - "traefik.http.routers.zyvpn-health.rule=Host(`api.zaruchevskiy.ru`) && (Path(`/health`) || PathPrefix(`/webhook`) || PathPrefix(`/internal`))"
-      - "traefik.http.routers.zyvpn-health.entrypoints=websecure"
-      - "traefik.http.routers.zyvpn-health.tls=true"
-      - "traefik.http.routers.zyvpn-health.tls.certresolver=letsencrypt"
-      - "traefik.http.routers.zyvpn-health.service=zyvpn-backend"
-      # Service
-      - "traefik.http.services.zyvpn-backend.loadbalancer.server.port=8080"
 
   miniapp:
     build:
       context: ./miniapp
       dockerfile: Dockerfile
+      args:
+        VITE_API_URL: ${VITE_API_URL:-https://api.zaruchevskiy.ru}
     container_name: zyvpn-miniapp
-    environment:
-      - VITE_API_URL=https://api.zaruchevskiy.ru
+    ports:
+      - "${MINIAPP_PORT:-8095}:3000"
     restart: unless-stopped
-    networks:
-      - traefik_default
-    labels:
-      - "traefik.enable=true"
-      - "traefik.docker.network=traefik_default"
-      - "traefik.http.routers.zyvpn-miniapp.rule=Host(`vpn.zaruchevskiy.ru`)"
-      - "traefik.http.routers.zyvpn-miniapp.entrypoints=websecure"
-      - "traefik.http.routers.zyvpn-miniapp.tls=true"
-      - "traefik.http.routers.zyvpn-miniapp.tls.certresolver=letsencrypt"
-      - "traefik.http.services.zyvpn-miniapp.loadbalancer.server.port=3000"
 
 volumes:
   postgres_data:
   redis_data:
-
-networks:
-  internal:
-    driver: bridge
-  traefik_default:
-    external: true
