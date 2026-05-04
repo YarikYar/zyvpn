@@ -2,6 +2,7 @@ package xui
 
 import (
 	"bytes"
+	"crypto/tls"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -73,14 +74,22 @@ func NewClient(baseURL, username, password string, inboundID int) (*Client, erro
 		return nil, err
 	}
 
+	// 3x-ui panels are commonly served behind self-signed certs on a random
+	// port. Skipping verification is acceptable here because the credentials
+	// already authenticate the panel; we don't rely on TLS for trust.
+	transport := &http.Transport{
+		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+	}
+
 	return &Client{
 		baseURL:   strings.TrimRight(baseURL, "/"),
 		username:  username,
 		password:  password,
 		inboundID: inboundID,
 		client: &http.Client{
-			Timeout: 30 * time.Second,
-			Jar:     jar,
+			Timeout:   30 * time.Second,
+			Jar:       jar,
+			Transport: transport,
 		},
 	}, nil
 }

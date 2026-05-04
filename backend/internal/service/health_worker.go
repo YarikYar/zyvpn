@@ -2,19 +2,17 @@ package service
 
 import (
 	"context"
-	"fmt"
 	"log"
-	"net"
 	"sync"
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/zyvpn/backend/internal/model"
 	"github.com/zyvpn/backend/internal/repository"
 )
 
 const (
-	HealthCheckInterval = 10 * time.Second
-	PingTimeout         = 5 * time.Second
+	HealthCheckInterval = 30 * time.Second
 )
 
 type HealthWorker struct {
@@ -32,10 +30,8 @@ func NewHealthWorker(repo *repository.Repository, serverSvc *ServerService) *Hea
 func (w *HealthWorker) Start(ctx context.Context) {
 	log.Printf("[Health Worker] Started, checking every %v", HealthCheckInterval)
 
-	// Initial check
 	w.checkAllServers(ctx)
 
-	// Sync server loads on startup
 	if err := w.repo.SyncAllServerLoads(ctx); err != nil {
 		log.Printf("[Health Worker] Failed to sync server loads: %v", err)
 	}
@@ -66,43 +62,46 @@ func (w *HealthWorker) checkAllServers(ctx context.Context) {
 	}
 
 	var wg sync.WaitGroup
-	for _, server := range servers {
-		if !server.IsActive {
+	for i := range servers {
+		srv := servers[i]
+		if !srv.IsActive {
 			continue
 		}
-
 		wg.Add(1)
-		go func(serverID, address string, port int) {
+		go func(s model.Server) {
 			defer wg.Done()
-			w.checkServer(ctx, serverID, address, port)
-		}(server.ID.String(), server.ServerAddress, server.ServerPort)
+			w.checkServer(ctx, s)
+		}(srv)
 	}
 	wg.Wait()
 }
 
-func (w *HealthWorker) checkServer(ctx context.Context, serverID, address string, port int) {
-	id, err := uuid.Parse(serverID)
-	if err != nil {
-		log.Printf("[Health Worker] Invalid server ID %s: %v", serverID, err)
+// checkServer probes a server through its 3x-ui panel rather than TCP-pinging
+// the VPN port. The VPN port often refuses bare TCP probes (Reality, IP
+// allowlists, anti-scan firewalls), so the panel reachability is a more
+// reliable proxy for "this server can issue keys / serve users".
+func (w *HealthWorker) checkServer(ctx context.Context, srv model.Server) {
+	id := srv.ID
+	if id == uuid.Nil {
 		return
 	}
 
-	// Measure TCP connection time as ping
+	xuiClient, _, err := w.serverSvc.GetXUIClient(ctx, id)
+	if err != nil {
+		log.Printf("[Health Worker] %s: get XUI client failed: %v", srv.Name, err)
+		_ = w.repo.UpdateServerHealth(ctx, id, nil, "offline")
+		return
+	}
+
 	start := time.Now()
-	conn, err := net.DialTimeout("tcp", fmt.Sprintf("%s:%d", address, port), PingTimeout)
+	if _, err := xuiClient.GetInboundInfo(); err != nil {
+		log.Printf("[Health Worker] %s: panel probe failed: %v", srv.Name, err)
+		_ = w.repo.UpdateServerHealth(ctx, id, nil, "offline")
+		return
+	}
 	pingMs := int(time.Since(start).Milliseconds())
 
-	if err != nil {
-		// Server is offline
-		if updateErr := w.repo.UpdateServerHealth(ctx, id, nil, "offline"); updateErr != nil {
-			log.Printf("[Health Worker] Failed to update server %s health: %v", serverID, updateErr)
-		}
-		return
-	}
-	conn.Close()
-
-	// Server is online
-	if updateErr := w.repo.UpdateServerHealth(ctx, id, &pingMs, "online"); updateErr != nil {
-		log.Printf("[Health Worker] Failed to update server %s health: %v", serverID, updateErr)
+	if err := w.repo.UpdateServerHealth(ctx, id, &pingMs, "online"); err != nil {
+		log.Printf("[Health Worker] %s: update health failed: %v", srv.Name, err)
 	}
 }
