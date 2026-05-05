@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { api } from '../api/client'
+import { useStore } from '../store'
 
 type Tab = 'stats' | 'users' | 'bans' | 'promo' | 'cash' | 'plans' | 'servers' | 'settings'
 
@@ -83,6 +84,7 @@ interface ServerItem {
 
 export default function AdminPage() {
   const navigate = useNavigate()
+  const { rates, fetchRates } = useStore()
   const [tab, setTab] = useState<Tab>('stats')
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -158,6 +160,11 @@ export default function AdminPage() {
   useEffect(() => {
     loadData()
   }, [tab])
+
+  // Курсы нужны для подсказок «≈ X ₽» в форме редактирования плана.
+  useEffect(() => {
+    if (!rates) fetchRates()
+  }, [rates, fetchRates])
 
   const loadData = async () => {
     setLoading(true)
@@ -1408,36 +1415,57 @@ export default function AdminPage() {
                 <div>
                   <label className="text-hint text-xs">TON</label>
                   <input
-                    type="number"
-                    step="0.01"
+                    type="text"
+                    inputMode="decimal"
                     value={planPriceTon}
-                    onChange={(e) => setPlanPriceTon(e.target.value)}
+                    onChange={(e) => setPlanPriceTon(e.target.value.replace(/[^0-9.]/g, ''))}
                     placeholder="1.5"
                     className="input w-full"
                   />
+                  <p className="text-hint text-[10px] mt-0.5 h-3">
+                    {rates && parseFloat(planPriceTon) > 0
+                      ? `≈ ${Math.round(parseFloat(planPriceTon) * rates.ton_rub)} ₽`
+                      : ''}
+                  </p>
                 </div>
                 <div>
                   <label className="text-hint text-xs">Stars</label>
                   <input
-                    type="number"
+                    type="text"
+                    inputMode="numeric"
                     value={planPriceStars}
-                    onChange={(e) => setPlanPriceStars(e.target.value)}
+                    onChange={(e) => setPlanPriceStars(e.target.value.replace(/[^0-9]/g, ''))}
                     placeholder="100"
                     className="input w-full"
                   />
+                  <p className="text-hint text-[10px] mt-0.5 h-3">
+                    {rates && parseFloat(planPriceStars) > 0
+                      ? `≈ ${Math.round(parseFloat(planPriceStars) * rates.usd_rub / 50)} ₽`
+                      : ''}
+                  </p>
                 </div>
                 <div>
                   <label className="text-hint text-xs">USD</label>
                   <input
-                    type="number"
-                    step="0.01"
+                    type="text"
+                    inputMode="decimal"
                     value={planPriceUsd}
-                    onChange={(e) => setPlanPriceUsd(e.target.value)}
+                    onChange={(e) => setPlanPriceUsd(e.target.value.replace(/[^0-9.]/g, ''))}
                     placeholder="3.99"
                     className="input w-full"
                   />
+                  <p className="text-hint text-[10px] mt-0.5 h-3">
+                    {rates && parseFloat(planPriceUsd) > 0
+                      ? `≈ ${Math.round(parseFloat(planPriceUsd) * rates.usd_rub)} ₽`
+                      : ''}
+                  </p>
                 </div>
               </div>
+              {rates && (
+                <p className="text-hint text-xs">
+                  Курсы: 1 TON ≈ {rates.ton_rub.toFixed(0)} ₽ • 1 USD ≈ {rates.usd_rub.toFixed(1)} ₽ • 50 ⭐ ≈ {rates.usd_rub.toFixed(0)} ₽
+                </p>
+              )}
               <div className="flex items-center gap-4">
                 <div className="flex-1">
                   <label className="text-hint text-xs">Порядок</label>
