@@ -72,9 +72,14 @@ func (h *Handler) BuySubscription(c *fiber.Ctx) error {
 				"error": "Тариф не найден",
 			})
 		}
-		// Default RUB amount = plan.PriceUSD (which is already a RUB-style
-		// number per current pricing model).
-		payment, err := h.paymentSvc.CreateCashPaymentWithAmount(c.Context(), userID, planID, serverID, plan.PriceUSD)
+		rates, err := h.ratesSvc.GetRates()
+		if err != nil || rates.USDRUB <= 0 {
+			return c.Status(fiber.StatusServiceUnavailable).JSON(fiber.Map{
+				"error": "Не удалось получить курс USD/RUB, попробуйте позже",
+			})
+		}
+		amountRUB := plan.PriceUSD * rates.USDRUB
+		payment, err := h.paymentSvc.CreateCashPaymentWithAmount(c.Context(), userID, planID, serverID, amountRUB)
 		if err != nil {
 			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 				"error": "failed to create payment: " + err.Error(),
@@ -82,7 +87,7 @@ func (h *Handler) BuySubscription(c *fiber.Ctx) error {
 		}
 		return c.JSON(fiber.Map{
 			"payment":     payment,
-			"cash_amount": plan.PriceUSD,
+			"cash_amount": amountRUB,
 			"currency":    "RUB",
 			"message":     "Свяжитесь с представителем для оплаты наличными. Подписка активируется после подтверждения.",
 		})
