@@ -24,8 +24,9 @@ type Notifier interface {
 	SendBalanceTopUp(chatID int64, amount float64, newBalance float64) error
 	// NotifyAdminsCashPayment is called when a user creates a pending cash
 	// payment. Bot sends an alert to all admins with inline approve/reject
-	// buttons.
-	NotifyAdminsCashPayment(payment *model.Payment, plan *model.Plan, user *model.User) error
+	// buttons. amountRUB is the original cash amount in roubles (the
+	// payment row stores amount in TON for accounting consistency).
+	NotifyAdminsCashPayment(payment *model.Payment, plan *model.Plan, user *model.User, amountRUB float64) error
 	// NotifyCashApproved/Rejected goes back to the buyer once the admin
 	// makes a decision.
 	NotifyCashApproved(chatID int64, plan *model.Plan) error
@@ -40,6 +41,7 @@ type PaymentService struct {
 	tonVerifier     *ton.Verifier
 	cfg             *config.Config
 	notifier        Notifier
+	ratesSvc        *RatesService
 }
 
 func NewPaymentService(
@@ -68,6 +70,13 @@ func (s *PaymentService) SetBalanceService(balanceSvc *BalanceService) {
 // SetNotifier sets the notifier for sending notifications
 func (s *PaymentService) SetNotifier(notifier Notifier) {
 	s.notifier = notifier
+}
+
+// SetRatesService wires the rates service so cash-RUB payments can be
+// converted to a TON-equivalent amount at creation time. Without rates the
+// cash provider will refuse to create the payment.
+func (s *PaymentService) SetRatesService(rs *RatesService) {
+	s.ratesSvc = rs
 }
 
 func (s *PaymentService) CreatePayment(ctx context.Context, userID int64, planID uuid.UUID, provider model.PaymentProvider) (*model.Payment, error) {
@@ -345,16 +354,36 @@ func (s *PaymentService) FailPayment(ctx context.Context, paymentID uuid.UUID) e
 	return s.repo.UpdatePaymentStatus(ctx, paymentID, model.PaymentStatusFailed)
 }
 
-// CreateCashPaymentWithAmount creates a pending cash payment for `plan` at
-// the given RUB price. Used both by the regular cash flow (price=plan price
-// in RUB) and the cash_plan promo flow (price=discounted promo amount). It
-// fires a Telegram notification to all admins so they can approve from the
-// chat without opening the admin panel.
+// CreateCashPaymentWithAmount creates a pending cash payment for `plan`. The
+// admin specifies amountRUB; we convert it to a TON-equivalent at the
+// current rate so referral bonuses and accounting stay consistent across
+// providers (everything ends up in TON internally). The original RUB amount
+// and the rate used are stored in the payment metadata for the audit trail.
+//
+// Stores currency='TON' and amount=<TON value> so existing creditReferralBonus
+// logic (and any future payment analytics) can treat the row as a TON payment
+// without provider-specific handling.
 func (s *PaymentService) CreateCashPaymentWithAmount(ctx context.Context, userID int64, planID uuid.UUID, serverID *uuid.UUID, amountRUB float64) (*model.Payment, error) {
-	plan, err := s.repo.GetPlan(ctx, planID)
+	if amountRUB <= 0 {
+		return nil, errors.New("amount_rub must be positive")
+	}
+	if s.ratesSvc == nil {
+		return nil, errors.New("rates service not configured for cash payments")
+	}
+	rates, err := s.ratesSvc.GetRates()
 	if err != nil {
+		return nil, fmt.Errorf("failed to fetch exchange rates: %w", err)
+	}
+	if rates.TONRUB <= 0 {
+		return nil, errors.New("TON/RUB rate is unavailable")
+	}
+
+	if _, err := s.repo.GetPlan(ctx, planID); err != nil {
 		return nil, err
 	}
+
+	amountTON := amountRUB / rates.TONRUB
+	metadata := fmt.Sprintf(`{"amount_rub":%.2f,"ton_rub_rate":%.4f}`, amountRUB, rates.TONRUB)
 
 	payment := &model.Payment{
 		UserID:      userID,
@@ -362,12 +391,18 @@ func (s *PaymentService) CreateCashPaymentWithAmount(ctx context.Context, userID
 		ServerID:    serverID,
 		PaymentType: model.PaymentTypeSubscription,
 		Provider:    model.PaymentProviderCash,
-		Amount:      amountRUB,
-		Currency:    "RUB",
+		Amount:      amountTON,
+		Currency:    "TON",
 		Status:      model.PaymentStatusPending,
+		Metadata:    &metadata,
 	}
 
 	if err := s.repo.CreatePayment(ctx, payment); err != nil {
+		return nil, err
+	}
+
+	plan, err := s.repo.GetPlan(ctx, planID)
+	if err != nil {
 		return nil, err
 	}
 
@@ -375,7 +410,7 @@ func (s *PaymentService) CreateCashPaymentWithAmount(ctx context.Context, userID
 	// here doesn't fail the user-facing call.
 	if s.notifier != nil {
 		user, _ := s.repo.GetUser(ctx, userID)
-		if err := s.notifier.NotifyAdminsCashPayment(payment, plan, user); err != nil {
+		if err := s.notifier.NotifyAdminsCashPayment(payment, plan, user, amountRUB); err != nil {
 			fmt.Printf("[cash] admin notify failed: %v\n", err)
 		}
 	}

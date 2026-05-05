@@ -823,6 +823,51 @@ func (h *AdminHandler) SetRegionSwitchPrice(c *fiber.Ctx) error {
 	return c.JSON(fiber.Map{"success": true, "region_switch_price": req.Price})
 }
 
+// --- Cash payments admin actions ---
+
+type CreateCashPaymentRequest struct {
+	PlanID    string  `json:"plan_id"`
+	AmountRUB float64 `json:"amount_rub"`
+	ServerID  *string `json:"server_id,omitempty"`
+}
+
+// CreateCashPayment lets the admin proactively create a pending cash payment
+// for a specific user at a custom RUB amount. The user gets an inline-button
+// notification in Telegram and can pay the admin in person; the admin then
+// taps «Подтвердил» to provision the subscription.
+func (h *AdminHandler) CreateCashPayment(c *fiber.Ctx) error {
+	targetUserID, err := strconv.ParseInt(c.Params("user_id"), 10, 64)
+	if err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "invalid user_id"})
+	}
+
+	var req CreateCashPaymentRequest
+	if err := c.BodyParser(&req); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "invalid request body"})
+	}
+	planID, err := uuid.Parse(req.PlanID)
+	if err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "invalid plan_id"})
+	}
+	if req.AmountRUB <= 0 {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "amount_rub must be positive"})
+	}
+	var serverID *uuid.UUID
+	if req.ServerID != nil && *req.ServerID != "" {
+		sid, err := uuid.Parse(*req.ServerID)
+		if err != nil {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "invalid server_id"})
+		}
+		serverID = &sid
+	}
+
+	payment, err := h.paymentSvc.CreateCashPaymentWithAmount(c.Context(), targetUserID, planID, serverID, req.AmountRUB)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
+	}
+	return c.JSON(fiber.Map{"payment": payment})
+}
+
 // --- Cash payments approval flow ---
 
 // ListPendingCashPayments returns pending cash payments awaiting admin

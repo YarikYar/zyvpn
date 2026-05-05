@@ -188,6 +188,12 @@ export const api = {
         method: 'POST',
       }),
 
+    createCashPayment: (userId: number, planId: string, amountRub: number) =>
+      request<{ payment: any }>(`/api/admin/users/${userId}/cash-payment`, {
+        method: 'POST',
+        body: JSON.stringify({ plan_id: planId, amount_rub: amountRub }),
+      }),
+
     banUser: (userId: number, reason: string, expiresAt?: string) =>
       request<{ success: boolean }>(`/api/admin/users/${userId}/ban`, {
         method: 'POST',

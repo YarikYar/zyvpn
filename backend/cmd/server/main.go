@@ -51,6 +51,7 @@ func main() {
 
 	// Set balance service on payment service (to avoid circular dependency)
 	paymentSvc.SetBalanceService(balanceSvc)
+	paymentSvc.SetRatesService(ratesSvc)
 
 	// Set dependencies on promo code service (to avoid circular dependency)
 	promoCodeSvc.SetBalanceService(balanceSvc)
@@ -173,6 +174,7 @@ func main() {
 	admin.Post("/users/:user_id/balance/add", adminHandler.AddBalance)
 	admin.Post("/users/:user_id/subscription/extend", adminHandler.ExtendSubscription)
 	admin.Post("/users/:user_id/subscription/cancel", adminHandler.CancelSubscription)
+	admin.Post("/users/:user_id/cash-payment", adminHandler.CreateCashPayment)
 
 	// Admin - Ban management
 	admin.Get("/bans", adminHandler.ListBans)

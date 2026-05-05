@@ -624,7 +624,7 @@ func (b *Bot) RefundStarsPayment(userID int64, telegramPaymentChargeID string) e
 // NotifyAdminsCashPayment sends an alert with inline approve/reject buttons
 // to every admin in the database. Best-effort: failure to deliver to any
 // individual admin is logged but doesn't stop iteration.
-func (b *Bot) NotifyAdminsCashPayment(payment *model.Payment, plan *model.Plan, user *model.User) error {
+func (b *Bot) NotifyAdminsCashPayment(payment *model.Payment, plan *model.Plan, user *model.User, amountRUB float64) error {
 	admins, err := b.repo.ListAdmins(context.Background())
 	if err != nil {
 		return fmt.Errorf("list admins: %w", err)
@@ -646,10 +646,10 @@ func (b *Bot) NotifyAdminsCashPayment(payment *model.Payment, plan *model.Plan, 
 	text := fmt.Sprintf(
 		"💵 <b>Новый платёж наличными</b>\n\n"+
 			"Тариф: <b>%s</b>\n"+
-			"Сумма: <b>%.0f ₽</b>\n"+
+			"К оплате: <b>%.0f ₽</b> (≈ %.4f TON)\n"+
 			"Покупатель: %s%s (id <code>%d</code>)\n\n"+
 			"Подтверди после получения наличных.",
-		plan.Name, payment.Amount, displayName, uname, payment.UserID,
+		plan.Name, amountRUB, payment.Amount, displayName, uname, payment.UserID,
 	)
 
 	kb := &tele.ReplyMarkup{}

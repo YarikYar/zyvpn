@@ -119,6 +119,11 @@ export default function AdminPage() {
   // Pending cash payments (for the new cash provider flow)
   const [cashPayments, setCashPayments] = useState<any[]>([])
 
+  // Cash payment creation modal state
+  const [showCashModal, setShowCashModal] = useState(false)
+  const [cashPlanId, setCashPlanId] = useState('')
+  const [cashAmountRub, setCashAmountRub] = useState('')
+
   // Plan modal states
   const [showPlanModal, setShowPlanModal] = useState(false)
   const [planName, setPlanName] = useState('')
@@ -294,6 +299,19 @@ export default function AdminPage() {
       setPromoPlanId('')
       setPromoCashAmount('')
       loadData()
+    } catch (e) {
+      alert((e as Error).message)
+    }
+  }
+
+  const handleCreateCashPayment = async () => {
+    if (!selectedUser || !cashPlanId || !cashAmountRub) return
+    try {
+      await api.admin.createCashPayment(selectedUser.id, cashPlanId, parseFloat(cashAmountRub))
+      setShowCashModal(false)
+      setCashPlanId('')
+      setCashAmountRub('')
+      alert('Платёж создан. Юзеру отправлено уведомление в ТГ.')
     } catch (e) {
       alert((e as Error).message)
     }
@@ -651,6 +669,22 @@ export default function AdminPage() {
                       className="text-xs bg-tg-secondary-bg px-2 py-1 rounded"
                     >
                       + Balance
+                    </button>
+                    <button
+                      onClick={async () => {
+                        setSelectedUser(user)
+                        // make sure plans are loaded for the dropdown
+                        if (plans.length === 0) {
+                          try {
+                            const data = await api.admin.listPlans()
+                            setPlans(data.plans || [])
+                          } catch {}
+                        }
+                        setShowCashModal(true)
+                      }}
+                      className="text-xs bg-tg-secondary-bg px-2 py-1 rounded"
+                    >
+                      💵 Cash
                     </button>
                     {user.subscription && (
                       <>
@@ -1156,6 +1190,51 @@ export default function AdminPage() {
         </div>
       )}
 
+      {/* Cash Payment Modal — create pending cash payment for a specific user */}
+      {showCashModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
+          <div className="bg-tg-bg rounded-xl p-4 w-full max-w-sm">
+            <h3 className="font-bold mb-2">💵 Cash платёж</h3>
+            <p className="text-hint text-sm mb-3">
+              Юзер: {selectedUser?.first_name || selectedUser?.id}
+            </p>
+            <div className="space-y-3">
+              <select
+                value={cashPlanId}
+                onChange={(e) => setCashPlanId(e.target.value)}
+                className="input w-full"
+              >
+                <option value="">Выбери тариф</option>
+                {plans.map((p: any) => (
+                  <option key={p.id} value={p.id}>
+                    {p.name} ({p.duration_days} дн / {p.traffic_gb || '∞'} ГБ)
+                  </option>
+                ))}
+              </select>
+              <input
+                type="number"
+                step="1"
+                value={cashAmountRub}
+                onChange={(e) => setCashAmountRub(e.target.value)}
+                placeholder="Сумма наличными, ₽"
+                className="input w-full"
+              />
+              <p className="text-hint text-xs">
+                Юзер получит уведомление в ТГ. Жми «Подтвердил» в чате после получения нала — подписка активируется.
+              </p>
+            </div>
+            <div className="flex gap-2 mt-4">
+              <button onClick={() => setShowCashModal(false)} className="flex-1 bg-tg-secondary-bg py-2 rounded-lg">
+                Отмена
+              </button>
+              <button onClick={handleCreateCashPayment} className="flex-1 btn-primary">
+                Создать
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Extend Modal */}
       {showExtendModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
@@ -1195,7 +1274,6 @@ export default function AdminPage() {
                 <option value="balance">💰 Баланс (TON)</option>
                 <option value="days">📅 Дни подписки</option>
                 <option value="region_switch">🌍 Смены региона</option>
-                <option value="cash_plan">💵 План за наличные</option>
               </select>
               {promoType === 'cash_plan' ? (
                 <>
