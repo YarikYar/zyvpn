@@ -14,7 +14,7 @@ export default function PaymentPage() {
   const [tonConnectUI] = useTonConnectUI()
   const address = useTonAddress()
 
-  const [selectedPayment, setSelectedPayment] = useState<'ton' | 'stars' | 'balance'>('ton')
+  const [selectedPayment, setSelectedPayment] = useState<'ton' | 'stars' | 'balance' | 'cash'>('ton')
   const [loading, setLoading] = useState(false)
   const [paymentInfo, setPaymentInfo] = useState<TONPaymentInfo | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -72,6 +72,16 @@ export default function PaymentPage() {
           fetchUser() // Refresh balance
           navigate('/key')
         }
+        return
+      }
+
+      if (selectedPayment === 'cash') {
+        const result = await api.buySubscription(planId, 'cash', selectedServerId || undefined)
+        webApp?.HapticFeedback.notificationOccurred('success')
+        const msg = (result as { message?: string }).message ||
+          'Свяжитесь с представителем для оплаты наличными. Подписка активируется после подтверждения.'
+        webApp?.showAlert(msg)
+        navigate('/')
         return
       }
 
@@ -228,6 +238,13 @@ export default function PaymentPage() {
           selected={selectedPayment === 'stars'}
           onSelect={() => setSelectedPayment('stars')}
         />
+        <PaymentMethodCard
+          icon="💵"
+          title="Наличными представителю"
+          subtitle={`≈${Math.round(plan.price_usd * usdRub)} ₽ — активация после подтверждения`}
+          selected={selectedPayment === 'cash'}
+          onSelect={() => setSelectedPayment('cash')}
+        />
       </div>
 
       {/* Error */}
@@ -252,8 +269,10 @@ export default function PaymentPage() {
           `Оплатить с баланса (${plan.price_ton} TON)`
         ) : selectedPayment === 'ton' ? (
           `Оплатить ${plan.price_ton} TON`
-        ) : (
+        ) : selectedPayment === 'stars' ? (
           `Оплатить ${plan.price_stars} Stars`
+        ) : (
+          `Запросить оплату ≈${Math.round(plan.price_usd * usdRub)} ₽`
         )}
       </button>
 

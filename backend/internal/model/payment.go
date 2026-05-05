@@ -12,6 +12,10 @@ const (
 	PaymentProviderTON     PaymentProvider = "ton"
 	PaymentProviderStars   PaymentProvider = "stars"
 	PaymentProviderBalance PaymentProvider = "balance"
+	// PaymentProviderCash represents an out-of-band cash payment to a
+	// representative. Status stays "pending" until an admin manually
+	// approves via bot or admin panel.
+	PaymentProviderCash PaymentProvider = "cash"
 )
 
 type PaymentStatus string
@@ -51,7 +55,7 @@ type Payment struct {
 type CreatePaymentRequest struct {
 	PlanID   uuid.UUID       `json:"plan_id" validate:"required"`
 	ServerID *uuid.UUID      `json:"server_id,omitempty"`
-	Provider PaymentProvider `json:"provider" validate:"required,oneof=ton stars"`
+	Provider PaymentProvider `json:"provider" validate:"required,oneof=ton stars cash"`
 }
 
 type TONPaymentInfo struct {

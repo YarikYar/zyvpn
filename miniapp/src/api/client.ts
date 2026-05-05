@@ -35,8 +35,8 @@ export const api = {
   getPlans: () => request<{ plans: any[] }>('/api/plans'),
 
   // Subscription
-  buySubscription: (planId: string, provider: 'ton' | 'stars', serverId?: string) =>
-    request<{ payment: any; ton_info?: any }>('/api/subscription/buy', {
+  buySubscription: (planId: string, provider: 'ton' | 'stars' | 'cash', serverId?: string) =>
+    request<{ payment: any; ton_info?: any; cash_amount?: number; currency?: string; message?: string }>('/api/subscription/buy', {
       method: 'POST',
       body: JSON.stringify({ plan_id: planId, provider, server_id: serverId }),
     }),
@@ -217,16 +217,65 @@ export const api = {
     listPromoCodes: (limit = 50, offset = 0) =>
       request<{ promo_codes: any[] }>(`/api/admin/promo?limit=${limit}&offset=${offset}`),
 
-    createPromoCode: (type: 'balance' | 'days' | 'region_switch', value: number, maxUses?: number, expiresAt?: string, description?: string) =>
+    createPromoCode: (
+      type: 'balance' | 'days' | 'region_switch' | 'cash_plan',
+      value: number,
+      maxUses?: number,
+      expiresAt?: string,
+      description?: string,
+      planId?: string,
+      cashAmountRub?: number,
+    ) =>
       request<any>('/api/admin/promo', {
         method: 'POST',
-        body: JSON.stringify({ type, value, max_uses: maxUses, expires_at: expiresAt, description }),
+        body: JSON.stringify({
+          type,
+          value,
+          max_uses: maxUses,
+          expires_at: expiresAt,
+          description,
+          plan_id: planId,
+          cash_amount_rub: cashAmountRub,
+        }),
       }),
 
-    createBulkPromoCodes: (count: number, type: 'balance' | 'days' | 'region_switch', value: number, maxUses?: number, expiresAt?: string, prefix?: string) =>
+    createBulkPromoCodes: (
+      count: number,
+      type: 'balance' | 'days' | 'region_switch' | 'cash_plan',
+      value: number,
+      maxUses?: number,
+      expiresAt?: string,
+      prefix?: string,
+      planId?: string,
+      cashAmountRub?: number,
+    ) =>
       request<{ codes: string[]; count: number }>('/api/admin/promo/bulk', {
         method: 'POST',
-        body: JSON.stringify({ count, type, value, max_uses: maxUses, expires_at: expiresAt, prefix }),
+        body: JSON.stringify({
+          count,
+          type,
+          value,
+          max_uses: maxUses,
+          expires_at: expiresAt,
+          prefix,
+          plan_id: planId,
+          cash_amount_rub: cashAmountRub,
+        }),
+      }),
+
+    // Cash payments management
+    listPendingCashPayments: (limit = 50) =>
+      request<{ payments: any[] }>(`/api/admin/payments/cash/pending?limit=${limit}`),
+
+    approveCashPayment: (paymentId: string) =>
+      request<{ success: boolean }>(`/api/admin/payments/cash/${paymentId}/approve`, {
+        method: 'POST',
+      }),
+
+    rejectCashPayment: (paymentId: string, reason?: string) =>
+      request<{ success: boolean }>(`/api/admin/payments/cash/${paymentId}/reject`, {
+        method: 'POST',
+        body: JSON.stringify({ reason: reason || '' }),
       }),
 
     deactivatePromoCode: (code: string) =>

@@ -56,9 +56,35 @@ func (h *Handler) BuySubscription(c *fiber.Ctx) error {
 		provider = model.PaymentProviderTON
 	case "stars":
 		provider = model.PaymentProviderStars
+	case "cash":
+		provider = model.PaymentProviderCash
 	default:
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-			"error": "Неверный способ оплаты, выберите 'ton' или 'stars'",
+			"error": "Неверный способ оплаты, выберите 'ton', 'stars' или 'cash'",
+		})
+	}
+
+	// Cash goes through a dedicated path that emits an admin notification.
+	if provider == model.PaymentProviderCash {
+		plan, err := h.planService.GetPlan(c.Context(), planID)
+		if err != nil {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+				"error": "Тариф не найден",
+			})
+		}
+		// Default RUB amount = plan.PriceUSD (which is already a RUB-style
+		// number per current pricing model).
+		payment, err := h.paymentSvc.CreateCashPaymentWithAmount(c.Context(), userID, planID, serverID, plan.PriceUSD)
+		if err != nil {
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+				"error": "failed to create payment: " + err.Error(),
+			})
+		}
+		return c.JSON(fiber.Map{
+			"payment":     payment,
+			"cash_amount": plan.PriceUSD,
+			"currency":    "RUB",
+			"message":     "Свяжитесь с представителем для оплаты наличными. Подписка активируется после подтверждения.",
 		})
 	}
 

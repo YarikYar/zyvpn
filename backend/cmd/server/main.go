@@ -55,6 +55,7 @@ func main() {
 	// Set dependencies on promo code service (to avoid circular dependency)
 	promoCodeSvc.SetBalanceService(balanceSvc)
 	promoCodeSvc.SetSubscriptionService(subscriptionSvc)
+	promoCodeSvc.SetPaymentService(paymentSvc)
 
 	// Set dependencies on admin service (to avoid circular dependency)
 	adminSvc.SetBalanceService(balanceSvc)
@@ -68,7 +69,7 @@ func main() {
 	// Create Telegram bot
 	var bot *telegram.Bot
 	if cfg.Telegram.BotToken != "" {
-		bot, err = telegram.NewBot(cfg, userService, subscriptionSvc, referralSvc)
+		bot, err = telegram.NewBot(cfg, repo, userService, subscriptionSvc, referralSvc)
 		if err != nil {
 			log.Printf("Warning: Failed to create Telegram bot: %v", err)
 		} else {
@@ -80,7 +81,7 @@ func main() {
 
 	// Create handlers
 	h := handler.New(cfg, userService, planService, subscriptionSvc, paymentSvc, referralSvc, ratesSvc, balanceSvc, promoCodeSvc, adminSvc, bot)
-	adminHandler := handler.NewAdminHandler(adminSvc)
+	adminHandler := handler.NewAdminHandler(adminSvc, paymentSvc)
 	serverHandler := handler.NewServerHandler(serverSvc)
 
 	// Create Fiber app
@@ -194,6 +195,11 @@ func main() {
 
 	// Admin - Logs
 	admin.Get("/logs", adminHandler.GetLogs)
+
+	// Admin - Cash payments approval
+	admin.Get("/payments/cash/pending", adminHandler.ListPendingCashPayments)
+	admin.Post("/payments/cash/:payment_id/approve", adminHandler.ApproveCashPayment)
+	admin.Post("/payments/cash/:payment_id/reject", adminHandler.RejectCashPayment)
 
 	// Admin - Settings
 	admin.Get("/settings", adminHandler.GetSettings)

@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { api } from '../api/client'
 
-type Tab = 'stats' | 'users' | 'bans' | 'promo' | 'plans' | 'servers' | 'settings'
+type Tab = 'stats' | 'users' | 'bans' | 'promo' | 'cash' | 'plans' | 'servers' | 'settings'
 
 interface Stats {
   total_users: number
@@ -109,10 +109,15 @@ export default function AdminPage() {
   const [balanceAmount, setBalanceAmount] = useState('')
   const [banReason, setBanReason] = useState('')
   const [extendDays, setExtendDays] = useState('')
-  const [promoType, setPromoType] = useState<'balance' | 'days' | 'region_switch'>('balance')
+  const [promoType, setPromoType] = useState<'balance' | 'days' | 'region_switch' | 'cash_plan'>('balance')
   const [promoValue, setPromoValue] = useState('')
   const [promoCount, setPromoCount] = useState('1')
   const [promoMaxUses, setPromoMaxUses] = useState('1')
+  const [promoPlanId, setPromoPlanId] = useState('')
+  const [promoCashAmount, setPromoCashAmount] = useState('')
+
+  // Pending cash payments (for the new cash provider flow)
+  const [cashPayments, setCashPayments] = useState<any[]>([])
 
   // Plan modal states
   const [showPlanModal, setShowPlanModal] = useState(false)
@@ -164,6 +169,12 @@ export default function AdminPage() {
       } else if (tab === 'promo') {
         const data = await api.admin.listPromoCodes()
         setPromos(data.promo_codes || [])
+        // Plans needed for the cash_plan promo creation form.
+        const plansData = await api.admin.listPlans()
+        setPlans(plansData.plans || [])
+      } else if (tab === 'cash') {
+        const data = await api.admin.listPendingCashPayments()
+        setCashPayments(data.payments || [])
       } else if (tab === 'plans') {
         const data = await api.admin.listPlans()
         setPlans(data.plans || [])
@@ -258,20 +269,49 @@ export default function AdminPage() {
   }
 
   const handleCreatePromo = async () => {
-    if (!promoValue) return
+    const isCashPlan = promoType === 'cash_plan'
+    if (!isCashPlan && !promoValue) return
+    if (isCashPlan && (!promoPlanId || !promoCashAmount)) {
+      alert('Для cash_plan нужен план и сумма в рублях')
+      return
+    }
     try {
       const count = parseInt(promoCount) || 1
       const maxUses = promoMaxUses ? parseInt(promoMaxUses) : undefined
+      const value = isCashPlan ? 1 : parseFloat(promoValue)
+      const planId = isCashPlan ? promoPlanId : undefined
+      const cashAmount = isCashPlan ? parseFloat(promoCashAmount) : undefined
       if (count > 1) {
-        const result = await api.admin.createBulkPromoCodes(count, promoType, parseFloat(promoValue), maxUses)
+        const result = await api.admin.createBulkPromoCodes(count, promoType, value, maxUses, undefined, undefined, planId, cashAmount)
         alert(`Created ${result.count} codes:\n${result.codes.join('\n')}`)
       } else {
-        const result = await api.admin.createPromoCode(promoType, parseFloat(promoValue), maxUses)
+        const result = await api.admin.createPromoCode(promoType, value, maxUses, undefined, undefined, planId, cashAmount)
         alert(`Created code: ${result.code}`)
       }
       setShowPromoModal(false)
       setPromoValue('')
       setPromoCount('1')
+      setPromoPlanId('')
+      setPromoCashAmount('')
+      loadData()
+    } catch (e) {
+      alert((e as Error).message)
+    }
+  }
+
+  const handleApproveCash = async (paymentId: string) => {
+    try {
+      await api.admin.approveCashPayment(paymentId)
+      loadData()
+    } catch (e) {
+      alert((e as Error).message)
+    }
+  }
+
+  const handleRejectCash = async (paymentId: string) => {
+    const reason = prompt('Причина отказа (опционально)') || ''
+    try {
+      await api.admin.rejectCashPayment(paymentId, reason)
       loadData()
     } catch (e) {
       alert((e as Error).message)
@@ -521,7 +561,7 @@ export default function AdminPage() {
 
       {/* Tabs */}
       <div className="flex gap-2 mb-4 overflow-x-auto">
-        {(['stats', 'users', 'bans', 'promo', 'plans', 'servers', 'settings'] as Tab[]).map((t) => (
+        {(['stats', 'users', 'bans', 'promo', 'cash', 'plans', 'servers', 'settings'] as Tab[]).map((t) => (
           <button
             key={t}
             onClick={() => setTab(t)}
@@ -533,6 +573,7 @@ export default function AdminPage() {
             {t === 'users' && 'Users'}
             {t === 'bans' && 'Bans'}
             {t === 'promo' && 'Promo'}
+            {t === 'cash' && '💵'}
             {t === 'plans' && 'Plans'}
             {t === 'servers' && '🖥️'}
             {t === 'settings' && '⚙️'}
@@ -752,6 +793,49 @@ export default function AdminPage() {
                         ✕
                       </button>
                     )}
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* Cash payments Tab */}
+      {tab === 'cash' && !loading && (
+        <div>
+          <p className="text-hint text-sm mb-3">
+            Ожидают подтверждения админом. Подтверди — подписка активируется.
+          </p>
+          <div className="space-y-2">
+            {cashPayments.length === 0 && <p className="text-hint">Нет ожидающих платежей</p>}
+            {cashPayments.map((p: any) => {
+              const planName = plans.find(pl => pl.id === p.plan_id)?.name || p.plan_id
+              return (
+                <div key={p.id} className="card">
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <p className="font-semibold">{planName}</p>
+                      <p className="text-sm text-hint">user_id: {p.user_id}</p>
+                      <p className="text-sm">{p.amount} ₽</p>
+                      <p className="text-xs text-hint">
+                        {new Date(p.created_at).toLocaleString('ru-RU')}
+                      </p>
+                    </div>
+                    <div className="flex flex-col gap-2 ml-2">
+                      <button
+                        onClick={() => handleApproveCash(p.id)}
+                        className="btn-primary text-sm"
+                      >
+                        ✓ Получил
+                      </button>
+                      <button
+                        onClick={() => handleRejectCash(p.id)}
+                        className="bg-red-500 text-white text-sm py-2 px-4 rounded-lg"
+                      >
+                        Отклонить
+                      </button>
+                    </div>
                   </div>
                 </div>
               )
@@ -1122,15 +1206,46 @@ export default function AdminPage() {
                 >
                   Регион
                 </button>
+                <button
+                  onClick={() => setPromoType('cash_plan')}
+                  className={`flex-1 py-2 rounded-lg text-sm ${promoType === 'cash_plan' ? 'bg-tg-button text-white' : 'bg-tg-secondary-bg'}`}
+                >
+                  💵 План за нал
+                </button>
               </div>
-              <input
-                type="number"
-                step="0.0001"
-                value={promoValue}
-                onChange={(e) => setPromoValue(e.target.value)}
-                placeholder={promoType === 'balance' ? 'Сумма TON' : promoType === 'days' ? 'Кол-во дней' : 'Кол-во смен региона'}
-                className="input w-full"
-              />
+              {promoType === 'cash_plan' ? (
+                <>
+                  <select
+                    value={promoPlanId}
+                    onChange={(e) => setPromoPlanId(e.target.value)}
+                    className="input w-full"
+                  >
+                    <option value="">Выберите тариф</option>
+                    {plans.map((p: any) => (
+                      <option key={p.id} value={p.id}>
+                        {p.name} ({p.duration_days} дн / {p.traffic_gb || '∞'} ГБ)
+                      </option>
+                    ))}
+                  </select>
+                  <input
+                    type="number"
+                    step="1"
+                    value={promoCashAmount}
+                    onChange={(e) => setPromoCashAmount(e.target.value)}
+                    placeholder="Сумма налом, ₽"
+                    className="input w-full"
+                  />
+                </>
+              ) : (
+                <input
+                  type="number"
+                  step="0.0001"
+                  value={promoValue}
+                  onChange={(e) => setPromoValue(e.target.value)}
+                  placeholder={promoType === 'balance' ? 'Сумма TON' : promoType === 'days' ? 'Кол-во дней' : 'Кол-во смен региона'}
+                  className="input w-full"
+                />
+              )}
               <input
                 type="number"
                 value={promoCount}

@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/zyvpn/backend/internal/model"
 	"github.com/zyvpn/backend/internal/repository"
 )
@@ -328,22 +329,31 @@ func (s *AdminService) ListBannedUsers(ctx context.Context, adminID int64, limit
 
 // --- Promo Code Management ---
 
-// GeneratePromoCode generates a random promo code
-func (s *AdminService) GeneratePromoCode(ctx context.Context, adminID int64, promoType model.PromoCodeType, value float64, maxUses *int, expiresAt *time.Time, description string) (*model.PromoCode, error) {
+// GeneratePromoCode generates a random promo code. planID and cashAmountRUB
+// are required only for the cash_plan type and ignored otherwise.
+func (s *AdminService) GeneratePromoCode(ctx context.Context, adminID int64, promoType model.PromoCodeType, value float64, maxUses *int, expiresAt *time.Time, description string, planID *uuid.UUID, cashAmountRUB *float64) (*model.PromoCode, error) {
 	if ok, _ := s.IsAdmin(ctx, adminID); !ok {
 		return nil, ErrNotAdmin
+	}
+
+	if promoType == model.PromoCodeTypeCashPlan {
+		if planID == nil || cashAmountRUB == nil || *cashAmountRUB <= 0 {
+			return nil, errors.New("cash_plan promo requires plan_id and positive cash_amount_rub")
+		}
 	}
 
 	code := generateRandomCode(8)
 
 	promo := &model.PromoCode{
-		Code:        code,
-		Type:        promoType,
-		Value:       value,
-		MaxUses:     maxUses,
-		ExpiresAt:   expiresAt,
-		IsActive:    true,
-		Description: &description,
+		Code:          code,
+		Type:          promoType,
+		Value:         value,
+		MaxUses:       maxUses,
+		ExpiresAt:     expiresAt,
+		IsActive:      true,
+		Description:   &description,
+		PlanID:        planID,
+		CashAmountRUB: cashAmountRUB,
 	}
 
 	if err := s.repo.CreatePromoCode(ctx, promo); err != nil {
@@ -365,7 +375,7 @@ func (s *AdminService) GeneratePromoCode(ctx context.Context, adminID int64, pro
 }
 
 // GenerateBulkPromoCodes generates multiple promo codes
-func (s *AdminService) GenerateBulkPromoCodes(ctx context.Context, adminID int64, count int, promoType model.PromoCodeType, value float64, maxUses *int, expiresAt *time.Time, prefix string) ([]string, error) {
+func (s *AdminService) GenerateBulkPromoCodes(ctx context.Context, adminID int64, count int, promoType model.PromoCodeType, value float64, maxUses *int, expiresAt *time.Time, prefix string, planID *uuid.UUID, cashAmountRUB *float64) ([]string, error) {
 	if ok, _ := s.IsAdmin(ctx, adminID); !ok {
 		return nil, ErrNotAdmin
 	}
@@ -374,17 +384,25 @@ func (s *AdminService) GenerateBulkPromoCodes(ctx context.Context, adminID int64
 		return nil, errors.New("count must be between 1 and 100")
 	}
 
+	if promoType == model.PromoCodeTypeCashPlan {
+		if planID == nil || cashAmountRUB == nil || *cashAmountRUB <= 0 {
+			return nil, errors.New("cash_plan promo requires plan_id and positive cash_amount_rub")
+		}
+	}
+
 	var codes []string
 	for i := 0; i < count; i++ {
 		code := prefix + generateRandomCode(8)
 
 		promo := &model.PromoCode{
-			Code:     code,
-			Type:     promoType,
-			Value:    value,
-			MaxUses:  maxUses,
-			ExpiresAt: expiresAt,
-			IsActive: true,
+			Code:          code,
+			Type:          promoType,
+			Value:         value,
+			MaxUses:       maxUses,
+			ExpiresAt:     expiresAt,
+			IsActive:      true,
+			PlanID:        planID,
+			CashAmountRUB: cashAmountRUB,
 		}
 
 		if err := s.repo.CreatePromoCode(ctx, promo); err != nil {

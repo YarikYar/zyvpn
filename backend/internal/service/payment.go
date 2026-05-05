@@ -22,6 +22,14 @@ var (
 type Notifier interface {
 	SendReferralBonus(chatID int64, bonusTON float64, bonusDays int) error
 	SendBalanceTopUp(chatID int64, amount float64, newBalance float64) error
+	// NotifyAdminsCashPayment is called when a user creates a pending cash
+	// payment. Bot sends an alert to all admins with inline approve/reject
+	// buttons.
+	NotifyAdminsCashPayment(payment *model.Payment, plan *model.Plan, user *model.User) error
+	// NotifyCashApproved/Rejected goes back to the buyer once the admin
+	// makes a decision.
+	NotifyCashApproved(chatID int64, plan *model.Plan) error
+	NotifyCashRejected(chatID int64, plan *model.Plan, reason string) error
 }
 
 type PaymentService struct {
@@ -82,6 +90,12 @@ func (s *PaymentService) CreatePaymentWithServer(ctx context.Context, userID int
 	case model.PaymentProviderStars:
 		amount = float64(plan.PriceStars)
 		currency = "XTR" // Telegram Stars
+	case model.PaymentProviderCash:
+		// Cash payments use plan.PriceUSD as the default RUB amount the
+		// representative collects. For discounted cash purchases the caller
+		// goes through CreateCashPaymentWithAmount instead.
+		amount = plan.PriceUSD
+		currency = "RUB"
 	default:
 		return nil, ErrInvalidPaymentProvider
 	}
@@ -329,6 +343,109 @@ func (s *PaymentService) creditReferralBonus(ctx context.Context, payment *model
 
 func (s *PaymentService) FailPayment(ctx context.Context, paymentID uuid.UUID) error {
 	return s.repo.UpdatePaymentStatus(ctx, paymentID, model.PaymentStatusFailed)
+}
+
+// CreateCashPaymentWithAmount creates a pending cash payment for `plan` at
+// the given RUB price. Used both by the regular cash flow (price=plan price
+// in RUB) and the cash_plan promo flow (price=discounted promo amount). It
+// fires a Telegram notification to all admins so they can approve from the
+// chat without opening the admin panel.
+func (s *PaymentService) CreateCashPaymentWithAmount(ctx context.Context, userID int64, planID uuid.UUID, serverID *uuid.UUID, amountRUB float64) (*model.Payment, error) {
+	plan, err := s.repo.GetPlan(ctx, planID)
+	if err != nil {
+		return nil, err
+	}
+
+	payment := &model.Payment{
+		UserID:      userID,
+		PlanID:      &planID,
+		ServerID:    serverID,
+		PaymentType: model.PaymentTypeSubscription,
+		Provider:    model.PaymentProviderCash,
+		Amount:      amountRUB,
+		Currency:    "RUB",
+		Status:      model.PaymentStatusPending,
+	}
+
+	if err := s.repo.CreatePayment(ctx, payment); err != nil {
+		return nil, err
+	}
+
+	// Best-effort admin notification — payment is already in DB so failure
+	// here doesn't fail the user-facing call.
+	if s.notifier != nil {
+		user, _ := s.repo.GetUser(ctx, userID)
+		if err := s.notifier.NotifyAdminsCashPayment(payment, plan, user); err != nil {
+			fmt.Printf("[cash] admin notify failed: %v\n", err)
+		}
+	}
+
+	return payment, nil
+}
+
+// ApproveCashPayment marks a pending cash payment as completed and runs the
+// regular subscription provisioning. Idempotent: re-approving a completed
+// payment returns ErrPaymentAlreadyComplete.
+func (s *PaymentService) ApproveCashPayment(ctx context.Context, paymentID uuid.UUID) error {
+	payment, err := s.repo.GetPayment(ctx, paymentID)
+	if err != nil {
+		return err
+	}
+	if payment.Provider != model.PaymentProviderCash {
+		return errors.New("payment is not a cash payment")
+	}
+	if payment.Status == model.PaymentStatusCompleted {
+		return ErrPaymentAlreadyComplete
+	}
+	if payment.Status != model.PaymentStatusPending {
+		return ErrPaymentNotPending
+	}
+
+	if err := s.CompletePayment(ctx, paymentID); err != nil {
+		return err
+	}
+
+	if s.notifier != nil && payment.PlanID != nil {
+		plan, perr := s.repo.GetPlan(ctx, *payment.PlanID)
+		if perr == nil {
+			_ = s.notifier.NotifyCashApproved(payment.UserID, plan)
+		}
+	}
+	return nil
+}
+
+// RejectCashPayment marks a pending cash payment as failed and notifies the
+// buyer. Reason is optional and shown to the user.
+func (s *PaymentService) RejectCashPayment(ctx context.Context, paymentID uuid.UUID, reason string) error {
+	payment, err := s.repo.GetPayment(ctx, paymentID)
+	if err != nil {
+		return err
+	}
+	if payment.Provider != model.PaymentProviderCash {
+		return errors.New("payment is not a cash payment")
+	}
+	if payment.Status != model.PaymentStatusPending {
+		return ErrPaymentNotPending
+	}
+	if err := s.repo.UpdatePaymentStatus(ctx, paymentID, model.PaymentStatusFailed); err != nil {
+		return err
+	}
+	if s.notifier != nil && payment.PlanID != nil {
+		plan, perr := s.repo.GetPlan(ctx, *payment.PlanID)
+		if perr == nil {
+			_ = s.notifier.NotifyCashRejected(payment.UserID, plan, reason)
+		}
+	}
+	return nil
+}
+
+// ListPendingCashPayments returns up to limit pending cash payments for the
+// admin panel (sorted newest first).
+func (s *PaymentService) ListPendingCashPayments(ctx context.Context, limit int) ([]model.Payment, error) {
+	if limit <= 0 || limit > 200 {
+		limit = 50
+	}
+	return s.repo.GetPendingCashPayments(ctx, limit)
 }
 
 func (s *PaymentService) GetUserPayments(ctx context.Context, userID int64) ([]model.Payment, error) {

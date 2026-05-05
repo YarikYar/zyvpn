@@ -19,9 +19,10 @@ var (
 )
 
 type PromoCodeService struct {
-	repo           *repository.Repository
-	balanceSvc     *BalanceService
+	repo            *repository.Repository
+	balanceSvc      *BalanceService
 	subscriptionSvc *SubscriptionService
+	paymentSvc      *PaymentService
 }
 
 func NewPromoCodeService(repo *repository.Repository) *PromoCodeService {
@@ -36,6 +37,11 @@ func (s *PromoCodeService) SetBalanceService(balanceSvc *BalanceService) {
 // SetSubscriptionService sets the subscription service (to avoid circular deps)
 func (s *PromoCodeService) SetSubscriptionService(subscriptionSvc *SubscriptionService) {
 	s.subscriptionSvc = subscriptionSvc
+}
+
+// SetPaymentService wires the payment service for cash_plan promo redemption.
+func (s *PromoCodeService) SetPaymentService(paymentSvc *PaymentService) {
+	s.paymentSvc = paymentSvc
 }
 
 // ValidatePromoCode checks if a promo code is valid for a user
@@ -128,6 +134,23 @@ func (s *PromoCodeService) ApplyPromoCode(ctx context.Context, code string, user
 			_ = sub
 			result.Message = fmt.Sprintf("Вам активирована подписка на %d дней", days)
 		}
+
+	case model.PromoCodeTypeCashPlan:
+		if s.paymentSvc == nil {
+			return nil, errors.New("payment service not configured")
+		}
+		if promo.PlanID == nil || promo.CashAmountRUB == nil {
+			return nil, errors.New("cash_plan promo missing plan_id or cash_amount_rub")
+		}
+		payment, err := s.paymentSvc.CreateCashPaymentWithAmount(ctx, userID, *promo.PlanID, nil, *promo.CashAmountRUB)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create cash payment: %w", err)
+		}
+		_ = payment
+		result.Message = fmt.Sprintf(
+			"Промокод применён. Свяжитесь с представителем и оплатите %.0f ₽ наличными — после подтверждения подписка активируется.",
+			*promo.CashAmountRUB,
+		)
 
 	case model.PromoCodeTypeRegionSwitch:
 		// Add free region switches to user
