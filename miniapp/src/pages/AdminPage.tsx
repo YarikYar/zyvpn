@@ -1187,32 +1187,16 @@ export default function AdminPage() {
           <div className="bg-tg-bg rounded-xl p-4 w-full max-w-sm">
             <h3 className="font-bold mb-4">Create Promo Code</h3>
             <div className="space-y-3">
-              <div className="flex gap-2 flex-wrap">
-                <button
-                  onClick={() => setPromoType('balance')}
-                  className={`flex-1 py-2 rounded-lg text-sm ${promoType === 'balance' ? 'bg-tg-button text-white' : 'bg-tg-secondary-bg'}`}
-                >
-                  Баланс (TON)
-                </button>
-                <button
-                  onClick={() => setPromoType('days')}
-                  className={`flex-1 py-2 rounded-lg text-sm ${promoType === 'days' ? 'bg-tg-button text-white' : 'bg-tg-secondary-bg'}`}
-                >
-                  Дни
-                </button>
-                <button
-                  onClick={() => setPromoType('region_switch')}
-                  className={`flex-1 py-2 rounded-lg text-sm ${promoType === 'region_switch' ? 'bg-tg-button text-white' : 'bg-tg-secondary-bg'}`}
-                >
-                  Регион
-                </button>
-                <button
-                  onClick={() => setPromoType('cash_plan')}
-                  className={`flex-1 py-2 rounded-lg text-sm ${promoType === 'cash_plan' ? 'bg-tg-button text-white' : 'bg-tg-secondary-bg'}`}
-                >
-                  💵 План за нал
-                </button>
-              </div>
+              <select
+                value={promoType}
+                onChange={(e) => setPromoType(e.target.value as typeof promoType)}
+                className="input w-full"
+              >
+                <option value="balance">💰 Баланс (TON)</option>
+                <option value="days">📅 Дни подписки</option>
+                <option value="region_switch">🌍 Смены региона</option>
+                <option value="cash_plan">💵 План за наличные</option>
+              </select>
               {promoType === 'cash_plan' ? (
                 <>
                   <select
