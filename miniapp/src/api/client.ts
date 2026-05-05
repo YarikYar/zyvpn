@@ -347,6 +347,7 @@ export const api = {
       price_stars: number
       price_usd: number
       sort_order: number
+      visible_to_referrer_id?: number | null
     }) =>
       request<any>('/api/admin/plans', {
         method: 'POST',
@@ -364,6 +365,8 @@ export const api = {
       price_usd?: number
       is_active?: boolean
       sort_order?: number
+      visible_to_referrer_id?: number | null
+      clear_visibility?: boolean
     }) =>
       request<any>(`/api/admin/plans/${planId}`, {
         method: 'PUT',

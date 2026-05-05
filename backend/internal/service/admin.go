@@ -524,29 +524,34 @@ func generateRandomCode(length int) string {
 
 // UpdatePlanParams holds parameters for updating a plan
 type UpdatePlanParams struct {
-	Name         *string
-	Description  *string
-	DurationDays *int
-	TrafficGB    *int
-	MaxDevices   *int
-	PriceTON     *float64
-	PriceStars   *int
-	PriceUSD     *float64
-	IsActive     *bool
-	SortOrder    *int
+	Name                *string
+	Description         *string
+	DurationDays        *int
+	TrafficGB           *int
+	MaxDevices          *int
+	PriceTON            *float64
+	PriceStars          *int
+	PriceUSD            *float64
+	IsActive            *bool
+	SortOrder           *int
+	VisibleToReferrerID *int64
+	// ClearVisibility forces visible_to_referrer_id back to NULL even when
+	// VisibleToReferrerID is nil (which would otherwise mean "leave as-is").
+	ClearVisibility bool
 }
 
 // CreatePlanParams holds parameters for creating a plan
 type CreatePlanParams struct {
-	Name         string
-	Description  string
-	DurationDays int
-	TrafficGB    int
-	MaxDevices   int
-	PriceTON     float64
-	PriceStars   int
-	PriceUSD     float64
-	SortOrder    int
+	Name                string
+	Description         string
+	DurationDays        int
+	TrafficGB           int
+	MaxDevices          int
+	PriceTON            float64
+	PriceStars          int
+	PriceUSD            float64
+	SortOrder           int
+	VisibleToReferrerID *int64
 }
 
 // ListAllPlans lists all plans including inactive
@@ -560,7 +565,7 @@ func (s *AdminService) UpdatePlan(ctx context.Context, adminID int64, planID str
 		return nil, ErrNotAdmin
 	}
 
-	plan, err := s.repo.UpdatePlan(ctx, planID, params.Name, params.Description, params.DurationDays, params.TrafficGB, params.MaxDevices, params.PriceTON, params.PriceStars, params.PriceUSD, params.IsActive, params.SortOrder)
+	plan, err := s.repo.UpdatePlan(ctx, planID, params.Name, params.Description, params.DurationDays, params.TrafficGB, params.MaxDevices, params.PriceTON, params.PriceStars, params.PriceUSD, params.IsActive, params.SortOrder, params.VisibleToReferrerID, params.ClearVisibility)
 	if err != nil {
 		return nil, err
 	}
@@ -580,7 +585,7 @@ func (s *AdminService) CreatePlan(ctx context.Context, adminID int64, params Cre
 		return nil, ErrNotAdmin
 	}
 
-	plan, err := s.repo.CreatePlan(ctx, params.Name, params.Description, params.DurationDays, params.TrafficGB, params.MaxDevices, params.PriceTON, params.PriceStars, params.PriceUSD, params.SortOrder)
+	plan, err := s.repo.CreatePlan(ctx, params.Name, params.Description, params.DurationDays, params.TrafficGB, params.MaxDevices, params.PriceTON, params.PriceStars, params.PriceUSD, params.SortOrder, params.VisibleToReferrerID)
 	if err != nil {
 		return nil, err
 	}
@@ -601,7 +606,7 @@ func (s *AdminService) DeletePlan(ctx context.Context, adminID int64, planID str
 	}
 
 	isActive := false
-	if _, err := s.repo.UpdatePlan(ctx, planID, nil, nil, nil, nil, nil, nil, nil, nil, &isActive, nil); err != nil {
+	if _, err := s.repo.UpdatePlan(ctx, planID, nil, nil, nil, nil, nil, nil, nil, nil, &isActive, nil, nil, false); err != nil {
 		return err
 	}
 

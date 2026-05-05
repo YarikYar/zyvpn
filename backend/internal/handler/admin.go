@@ -551,16 +551,20 @@ func (h *AdminHandler) ListPlans(c *fiber.Ctx) error {
 }
 
 type UpdatePlanRequest struct {
-	Name         *string  `json:"name,omitempty"`
-	Description  *string  `json:"description,omitempty"`
-	DurationDays *int     `json:"duration_days,omitempty"`
-	TrafficGB    *int     `json:"traffic_gb,omitempty"`
-	MaxDevices   *int     `json:"max_devices,omitempty"`
-	PriceTON     *float64 `json:"price_ton,omitempty"`
-	PriceStars   *int     `json:"price_stars,omitempty"`
-	PriceUSD     *float64 `json:"price_usd,omitempty"`
-	IsActive     *bool    `json:"is_active,omitempty"`
-	SortOrder    *int     `json:"sort_order,omitempty"`
+	Name                *string  `json:"name,omitempty"`
+	Description         *string  `json:"description,omitempty"`
+	DurationDays        *int     `json:"duration_days,omitempty"`
+	TrafficGB           *int     `json:"traffic_gb,omitempty"`
+	MaxDevices          *int     `json:"max_devices,omitempty"`
+	PriceTON            *float64 `json:"price_ton,omitempty"`
+	PriceStars          *int     `json:"price_stars,omitempty"`
+	PriceUSD            *float64 `json:"price_usd,omitempty"`
+	IsActive            *bool    `json:"is_active,omitempty"`
+	SortOrder           *int     `json:"sort_order,omitempty"`
+	VisibleToReferrerID *int64   `json:"visible_to_referrer_id,omitempty"`
+	// ClearVisibility=true forces plan back to public regardless of
+	// VisibleToReferrerID (which would otherwise mean "leave as-is").
+	ClearVisibility bool `json:"clear_visibility,omitempty"`
 }
 
 // UpdatePlan updates a plan
@@ -576,16 +580,18 @@ func (h *AdminHandler) UpdatePlan(c *fiber.Ctx) error {
 	}
 
 	plan, err := h.adminSvc.UpdatePlan(c.Context(), adminID, planID, service.UpdatePlanParams{
-		Name:         req.Name,
-		Description:  req.Description,
-		DurationDays: req.DurationDays,
-		TrafficGB:    req.TrafficGB,
-		MaxDevices:   req.MaxDevices,
-		PriceTON:     req.PriceTON,
-		PriceStars:   req.PriceStars,
-		PriceUSD:     req.PriceUSD,
-		IsActive:     req.IsActive,
-		SortOrder:    req.SortOrder,
+		Name:                req.Name,
+		Description:         req.Description,
+		DurationDays:        req.DurationDays,
+		TrafficGB:           req.TrafficGB,
+		MaxDevices:          req.MaxDevices,
+		PriceTON:            req.PriceTON,
+		PriceStars:          req.PriceStars,
+		PriceUSD:            req.PriceUSD,
+		IsActive:            req.IsActive,
+		SortOrder:           req.SortOrder,
+		VisibleToReferrerID: req.VisibleToReferrerID,
+		ClearVisibility:     req.ClearVisibility,
 	})
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
@@ -597,15 +603,16 @@ func (h *AdminHandler) UpdatePlan(c *fiber.Ctx) error {
 }
 
 type CreatePlanRequest struct {
-	Name         string  `json:"name"`
-	Description  string  `json:"description"`
-	DurationDays int     `json:"duration_days"`
-	TrafficGB    int     `json:"traffic_gb"`
-	MaxDevices   int     `json:"max_devices"`
-	PriceTON     float64 `json:"price_ton"`
-	PriceStars   int     `json:"price_stars"`
-	PriceUSD     float64 `json:"price_usd"`
-	SortOrder    int     `json:"sort_order"`
+	Name                string  `json:"name"`
+	Description         string  `json:"description"`
+	DurationDays        int     `json:"duration_days"`
+	TrafficGB           int     `json:"traffic_gb"`
+	MaxDevices          int     `json:"max_devices"`
+	PriceTON            float64 `json:"price_ton"`
+	PriceStars          int     `json:"price_stars"`
+	PriceUSD            float64 `json:"price_usd"`
+	SortOrder           int     `json:"sort_order"`
+	VisibleToReferrerID *int64  `json:"visible_to_referrer_id,omitempty"`
 }
 
 // CreatePlan creates a new plan
@@ -630,15 +637,16 @@ func (h *AdminHandler) CreatePlan(c *fiber.Ctx) error {
 	}
 
 	plan, err := h.adminSvc.CreatePlan(c.Context(), adminID, service.CreatePlanParams{
-		Name:         req.Name,
-		Description:  req.Description,
-		DurationDays: req.DurationDays,
-		TrafficGB:    req.TrafficGB,
-		MaxDevices:   req.MaxDevices,
-		PriceTON:     req.PriceTON,
-		PriceStars:   req.PriceStars,
-		PriceUSD:     req.PriceUSD,
-		SortOrder:    req.SortOrder,
+		Name:                req.Name,
+		Description:         req.Description,
+		DurationDays:        req.DurationDays,
+		TrafficGB:           req.TrafficGB,
+		MaxDevices:          req.MaxDevices,
+		PriceTON:            req.PriceTON,
+		PriceStars:          req.PriceStars,
+		PriceUSD:            req.PriceUSD,
+		SortOrder:           req.SortOrder,
+		VisibleToReferrerID: req.VisibleToReferrerID,
 	})
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{

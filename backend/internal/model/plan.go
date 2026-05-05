@@ -18,7 +18,10 @@ type Plan struct {
 	PriceUSD     float64   `json:"price_usd" db:"price_usd"`
 	IsActive     bool      `json:"is_active" db:"is_active"`
 	SortOrder    int       `json:"sort_order" db:"sort_order"`
-	CreatedAt    time.Time `json:"created_at" db:"created_at"`
+	// VisibleToReferrerID restricts plan visibility to users referred by
+	// this user. NULL means public to everyone.
+	VisibleToReferrerID *int64    `json:"visible_to_referrer_id,omitempty" db:"visible_to_referrer_id"`
+	CreatedAt           time.Time `json:"created_at" db:"created_at"`
 }
 
 // TrafficBytes returns traffic limit in bytes

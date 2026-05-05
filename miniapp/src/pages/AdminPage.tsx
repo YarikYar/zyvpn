@@ -55,6 +55,7 @@ interface PlanItem {
   price_usd: number
   is_active: boolean
   sort_order: number
+  visible_to_referrer_id?: number | null
 }
 
 interface ServerItem {
@@ -136,6 +137,7 @@ export default function AdminPage() {
   const [planPriceUsd, setPlanPriceUsd] = useState('')
   const [planSortOrder, setPlanSortOrder] = useState('0')
   const [planIsActive, setPlanIsActive] = useState(true)
+  const [planVisibleReferrerId, setPlanVisibleReferrerId] = useState('')
 
   // Server modal states
   const [showServerModal, setShowServerModal] = useState(false)
@@ -358,6 +360,7 @@ export default function AdminPage() {
     setPlanPriceUsd('')
     setPlanSortOrder('0')
     setPlanIsActive(true)
+    setPlanVisibleReferrerId('')
   }
 
   const openPlanModal = (plan?: PlanItem) => {
@@ -373,6 +376,7 @@ export default function AdminPage() {
       setPlanPriceUsd(plan.price_usd.toString())
       setPlanSortOrder(plan.sort_order.toString())
       setPlanIsActive(plan.is_active)
+      setPlanVisibleReferrerId(plan.visible_to_referrer_id ? plan.visible_to_referrer_id.toString() : '')
     } else {
       resetPlanForm()
     }
@@ -385,7 +389,8 @@ export default function AdminPage() {
       return
     }
     try {
-      const data = {
+      const referrerIdNum = planVisibleReferrerId.trim() ? parseInt(planVisibleReferrerId.trim()) : null
+      const data: any = {
         name: planName,
         description: planDescription,
         duration_days: parseInt(planDuration),
@@ -396,6 +401,12 @@ export default function AdminPage() {
         price_usd: parseFloat(planPriceUsd) || 0,
         sort_order: parseInt(planSortOrder) || 0,
         is_active: planIsActive,
+      }
+      if (referrerIdNum && !isNaN(referrerIdNum)) {
+        data.visible_to_referrer_id = referrerIdNum
+      } else if (selectedPlan?.visible_to_referrer_id) {
+        // Edit case: user cleared the field — explicitly clear server-side.
+        data.clear_visibility = true
       }
 
       if (selectedPlan) {
@@ -893,9 +904,14 @@ export default function AdminPage() {
               <div key={plan.id} className={`card ${!plan.is_active ? 'opacity-50' : ''}`}>
                 <div className="flex justify-between items-start">
                   <div className="flex-1">
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 flex-wrap">
                       <p className="font-semibold">{plan.name}</p>
                       {!plan.is_active && <span className="text-xs bg-red-500 text-white px-2 py-0.5 rounded">OFF</span>}
+                      {plan.visible_to_referrer_id && (
+                        <span className="text-xs bg-purple-500 text-white px-2 py-0.5 rounded">
+                          🔒 рефы #{plan.visible_to_referrer_id}
+                        </span>
+                      )}
                     </div>
                     <p className="text-hint text-sm">{plan.description}</p>
                     <div className="text-hint text-sm mt-1">
@@ -1212,10 +1228,11 @@ export default function AdminPage() {
                 ))}
               </select>
               <input
-                type="number"
-                step="1"
+                type="text"
+                inputMode="numeric"
+                pattern="[0-9]*"
                 value={cashAmountRub}
-                onChange={(e) => setCashAmountRub(e.target.value)}
+                onChange={(e) => setCashAmountRub(e.target.value.replace(/[^0-9.]/g, ''))}
                 placeholder="Сумма наличными, ₽"
                 className="input w-full"
               />
@@ -1441,6 +1458,23 @@ export default function AdminPage() {
                   />
                   <span className="text-sm">Активен</span>
                 </label>
+              </div>
+              <div>
+                <label className="text-hint text-xs">
+                  По приглашению от user_id (опционально)
+                </label>
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  pattern="[0-9]*"
+                  value={planVisibleReferrerId}
+                  onChange={(e) => setPlanVisibleReferrerId(e.target.value.replace(/[^0-9]/g, ''))}
+                  placeholder="например 336430901"
+                  className="input w-full"
+                />
+                <p className="text-hint text-xs mt-1">
+                  Если задан — план виден только тем, кто пришёл по реф-ссылке этого юзера. Пусто — план публичный.
+                </p>
               </div>
             </div>
             <div className="flex gap-2 mt-4">
