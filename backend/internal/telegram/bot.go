@@ -64,6 +64,7 @@ func (b *Bot) registerHandlers() {
 	b.bot.Handle("/support", b.handleSupport)
 	b.bot.Handle("/referral", b.handleReferral)
 	b.bot.Handle("/trial", b.handleTrial)
+	b.bot.Handle("/apps", b.handleApps)
 
 	b.bot.Handle(tele.OnCallback, b.handleCallback)
 	b.bot.Handle(tele.OnCheckout, b.handlePreCheckout)
@@ -205,6 +206,9 @@ func (b *Bot) handleStart(c tele.Context) error {
 			keyboard.Data("📊 Статус подписки", "status"),
 			keyboard.Data("🔑 Получить ключ", "key"),
 		),
+		keyboard.Row(
+			keyboard.Data("📲 Скачать приложение", "apps"),
+		),
 	)
 	keyboard.Inline(rows...)
 
@@ -307,24 +311,18 @@ func (b *Bot) handleHelp(c tele.Context) error {
 
 <b>🔧 Настройка VPN:</b>
 
-1️⃣ <b>Выберите приложение:</b>
-• iOS: Streisand, V2Box
-• Android: V2rayNG, NekoBox
-• Windows/Mac: Nekoray, V2rayN
+1️⃣ Установи приложение под свою систему — нажми /apps
 
-2️⃣ Установите приложение
+2️⃣ Получи ключ: /key или в Mini App
 
-3️⃣ Получите ключ: /key или Mini App
-
-4️⃣ Вставьте ключ в приложение
-
-5️⃣ Подключитесь!
+3️⃣ Импортируй ключ в приложение и подключись
 
 <b>🎁 Промокоды:</b>
-Откройте Mini App → Баланс → Введите промокод
+Mini App → Баланс → Введи промокод
 
 <b>📱 Команды:</b>
 /start — Главное меню
+/apps — Скачать приложение
 /status — Статус подписки
 /key — Получить ключ
 /trial — Бесплатный период
@@ -338,9 +336,49 @@ func (b *Bot) handleHelp(c tele.Context) error {
 		keyboard.Row(
 			keyboard.WebApp("📱 Открыть Mini App", &tele.WebApp{URL: b.cfg.Telegram.WebAppURL}),
 		),
+		keyboard.Row(
+			keyboard.Data("📲 Скачать приложение", "apps"),
+		),
 	)
 
 	return c.Send(text, keyboard, tele.ModeHTML)
+}
+
+// App download links per platform. Apps support VLESS Reality and import
+// vless:// keys, which is what we hand out via /key.
+const (
+	appV2rayNG = "https://github.com/2dust/v2rayNG/releases/latest"
+	appHapp    = "https://apps.apple.com/app/happ-proxy-utility/id6504287215"
+	appThrone  = "https://github.com/throneproj/Throne/releases/latest"
+)
+
+func (b *Bot) handleApps(c tele.Context) error {
+	return c.Send(appsText(), appsKeyboard(), tele.ModeHTML, tele.NoPreview)
+}
+
+func appsText() string {
+	return `📲 <b>Приложения для подключения</b>
+
+Выбери под свою платформу. Все три понимают наш VLESS Reality ключ.
+
+🤖 <b>Android — v2rayNG</b>
+Свежий APK с GitHub. Скачай, открой ключ из бота, импортируй.
+
+🍏 <b>iPhone / iPad — Happ</b>
+Из App Store. После установки вставь ключ.
+
+💻 <b>Windows / macOS / Linux — Throne</b>
+Десктоп-клиент с GitHub. Релизы под все платформы.`
+}
+
+func appsKeyboard() *tele.ReplyMarkup {
+	kb := &tele.ReplyMarkup{}
+	kb.Inline(
+		kb.Row(kb.URL("🤖 v2rayNG (Android)", appV2rayNG)),
+		kb.Row(kb.URL("🍏 Happ (iOS)", appHapp)),
+		kb.Row(kb.URL("💻 Throne (Win/Mac/Linux)", appThrone)),
+	)
+	return kb
 }
 
 func (b *Bot) handleSupport(c tele.Context) error {
@@ -416,6 +454,8 @@ func (b *Bot) handleCallback(c tele.Context) error {
 		return b.handleKey(c)
 	case "trial":
 		return b.handleTrial(c)
+	case "apps":
+		return b.handleApps(c)
 	default:
 		fmt.Printf("[Bot] Unknown callback data: %q\n", data)
 	}

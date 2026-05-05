@@ -164,14 +164,12 @@ func (c *Client) ensureLoggedIn() error {
 // looksLikeAuthIssue heuristically detects when 3x-ui served us the login HTML
 // instead of a JSON response (cookie session expired, restart, etc).
 //
-// 404 is treated as a legitimate "not found" — 3x-ui returns it (often with
-// an empty body) when the targeted client/inbound doesn't exist, and the
-// callers handle that semantically via isClientNotFound. Re-logging in
-// wouldn't change the outcome there.
+// 3x-ui frequently returns 404 with an empty body for protected endpoints
+// when the session cookie is invalid (instead of a 401/redirect), so we
+// treat empty-body 404 as auth issue too. Legit "not found" cases come
+// back as 200 with success=false in the body and are handled by
+// isClientNotFound on the error message.
 func looksLikeAuthIssue(status int, body []byte) bool {
-	if status == http.StatusNotFound {
-		return false
-	}
 	if status == http.StatusUnauthorized || status == http.StatusForbidden {
 		return true
 	}

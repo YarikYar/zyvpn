@@ -45,8 +45,8 @@ func TestLooksLikeAuthIssue(t *testing.T) {
 		{"valid JSON", 200, []byte(`{"success":true,"obj":null}`), false},
 		{"valid JSON array", 200, []byte(`[]`), false},
 		{"500 with json (real error, not auth)", 500, []byte(`{"success":false,"msg":"db down"}`), false},
-		{"404 not found is not auth", 404, []byte(``), false},
-		{"404 with body is not auth", 404, []byte(`{"success":false,"msg":"not found"}`), false},
+		{"404 with empty body is auth (3x-ui session expired)", 404, []byte(``), true},
+		{"404 with JSON body is legitimate not-found", 404, []byte(`{"success":false,"msg":"not found"}`), false},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
