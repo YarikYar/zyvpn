@@ -374,9 +374,19 @@ func appsText() string {
 func appsKeyboard() *tele.ReplyMarkup {
 	kb := &tele.ReplyMarkup{}
 	kb.Inline(
-		kb.Row(kb.URL("🤖 v2rayNG (Android)", appV2rayNG)),
+		kb.Row(
+			kb.URL("🤖 v2rayNG", appV2rayNG),
+			kb.Data("📥 в чат", "appfile|v2rayng_arm64"),
+		),
 		kb.Row(kb.URL("🍏 Happ (iOS)", appHapp)),
-		kb.Row(kb.URL("💻 Throne (Win/Mac/Linux)", appThrone)),
+		kb.Row(
+			kb.URL("💻 Throne", appThrone),
+			kb.Data("📥 Win", "appfile|throne_win"),
+		),
+		kb.Row(
+			kb.Data("📥 Mac (arm64)", "appfile|throne_mac"),
+			kb.Data("📥 Linux .deb", "appfile|throne_linux"),
+		),
 	)
 	return kb
 }
@@ -445,6 +455,10 @@ func (b *Bot) handleCallback(c tele.Context) error {
 	}
 	if rest, ok := strings.CutPrefix(clean, "cash_reject|"); ok {
 		return b.handleCashReject(c, rest)
+	}
+	// «Скачать в чат» buttons in /apps: "appfile|<app_key>"
+	if rest, ok := strings.CutPrefix(clean, "appfile|"); ok {
+		return b.sendAppDocument(context.Background(), c, rest)
 	}
 
 	switch clean {
