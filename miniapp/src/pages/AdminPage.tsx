@@ -5,6 +5,35 @@ import { useStore } from '../store'
 
 type Tab = 'stats' | 'users' | 'bans' | 'promo' | 'cash' | 'plans' | 'servers' | 'settings'
 
+// Common VPN-host countries; admin picks one in the server modal and we
+// fill in flag + display name automatically. "Custom" lets them type their
+// own values when the country isn't in the preset list.
+const COUNTRY_PRESETS: { code: string; flag: string; name: string }[] = [
+  { code: 'DE', flag: '🇩🇪', name: 'Германия' },
+  { code: 'NL', flag: '🇳🇱', name: 'Нидерланды' },
+  { code: 'FI', flag: '🇫🇮', name: 'Финляндия' },
+  { code: 'FR', flag: '🇫🇷', name: 'Франция' },
+  { code: 'GB', flag: '🇬🇧', name: 'Великобритания' },
+  { code: 'US', flag: '🇺🇸', name: 'США' },
+  { code: 'CA', flag: '🇨🇦', name: 'Канада' },
+  { code: 'JP', flag: '🇯🇵', name: 'Япония' },
+  { code: 'SG', flag: '🇸🇬', name: 'Сингапур' },
+  { code: 'HK', flag: '🇭🇰', name: 'Гонконг' },
+  { code: 'AE', flag: '🇦🇪', name: 'ОАЭ' },
+  { code: 'TR', flag: '🇹🇷', name: 'Турция' },
+  { code: 'PL', flag: '🇵🇱', name: 'Польша' },
+  { code: 'CZ', flag: '🇨🇿', name: 'Чехия' },
+  { code: 'SE', flag: '🇸🇪', name: 'Швеция' },
+  { code: 'CH', flag: '🇨🇭', name: 'Швейцария' },
+  { code: 'AT', flag: '🇦🇹', name: 'Австрия' },
+  { code: 'IT', flag: '🇮🇹', name: 'Италия' },
+  { code: 'ES', flag: '🇪🇸', name: 'Испания' },
+  { code: 'KZ', flag: '🇰🇿', name: 'Казахстан' },
+  { code: 'AM', flag: '🇦🇲', name: 'Армения' },
+  { code: 'GE', flag: '🇬🇪', name: 'Грузия' },
+  { code: 'RU', flag: '🇷🇺', name: 'Россия' },
+]
+
 interface Stats {
   total_users: number
   active_subscriptions: number
@@ -1530,6 +1559,30 @@ export default function AdminPage() {
             <h3 className="font-bold mb-4">{selectedServer ? 'Редактировать сервер' : 'Добавить сервер'}</h3>
             <div className="space-y-3">
               {/* Basic info */}
+              <div>
+                <label className="text-hint text-xs">Страна (готовые) {serverFlagEmoji && <span className="ml-1">{serverFlagEmoji}</span>}</label>
+                <select
+                  value={
+                    COUNTRY_PRESETS.find(p => p.flag === serverFlagEmoji)?.code || ''
+                  }
+                  onChange={(e) => {
+                    const preset = COUNTRY_PRESETS.find(p => p.code === e.target.value)
+                    if (preset) {
+                      setServerFlagEmoji(preset.flag)
+                      setServerCountry(preset.code)
+                      if (!serverName) setServerName(preset.name)
+                    }
+                  }}
+                  className="input w-full"
+                >
+                  <option value="">— выбери из списка —</option>
+                  {COUNTRY_PRESETS.map(p => (
+                    <option key={p.code} value={p.code}>
+                      {p.flag} {p.name} ({p.code})
+                    </option>
+                  ))}
+                </select>
+              </div>
               <div className="grid grid-cols-3 gap-2">
                 <div className="col-span-2">
                   <label className="text-hint text-xs">Название *</label>
@@ -1542,7 +1595,7 @@ export default function AdminPage() {
                   />
                 </div>
                 <div>
-                  <label className="text-hint text-xs">Флаг</label>
+                  <label className="text-hint text-xs">Флаг (вручную)</label>
                   <input
                     type="text"
                     value={serverFlagEmoji}
