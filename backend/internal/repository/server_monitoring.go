@@ -14,21 +14,23 @@ import (
 // RecordHealthEvent inserts a status row only if the latest event for this
 // server has a different status. This keeps the table compact: one row per
 // status change, not one per probe.
+//
+// Implemented as fetch-then-insert to avoid Postgres' "inconsistent types
+// deduced" complaint when the same parameter is used in two contexts.
 func (r *Repository) RecordHealthEvent(ctx context.Context, serverID uuid.UUID, status string) error {
+	var latest sql.NullString
+	if err := r.db.GetContext(ctx, &latest, `
+		SELECT status FROM server_health_events
+		WHERE server_id = $1
+		ORDER BY started_at DESC LIMIT 1`, serverID); err != nil && !errors.Is(err, sql.ErrNoRows) {
+		return err
+	}
+	if latest.Valid && latest.String == status {
+		return nil
+	}
 	_, err := r.db.ExecContext(ctx, `
-		INSERT INTO server_health_events (server_id, status)
-		SELECT $1, $2
-		WHERE NOT EXISTS (
-			SELECT 1 FROM server_health_events
-			WHERE server_id = $1
-			ORDER BY started_at DESC
-			LIMIT 1
-		) OR (
-			SELECT status FROM server_health_events
-			WHERE server_id = $1
-			ORDER BY started_at DESC
-			LIMIT 1
-		) <> $2`, serverID, status)
+		INSERT INTO server_health_events (server_id, status) VALUES ($1, $2)`,
+		serverID, status)
 	return err
 }
 
