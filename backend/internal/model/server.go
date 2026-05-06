@@ -65,9 +65,20 @@ type ServerPublic struct {
 	PingMs      *int      `json:"ping_ms,omitempty"`
 	Status      string    `json:"status"`
 	LoadPercent float64   `json:"load_percent"`
+
+	// Monitoring fields populated by ServerService.
+	// Uptime ratios are 0.0–1.0; nil = no data yet.
+	Uptime24h    *float64   `json:"uptime_24h,omitempty"`
+	Uptime7d     *float64   `json:"uptime_7d,omitempty"`
+	StatusSince  *time.Time `json:"status_since,omitempty"`
+	// Traffic since N hours ago; nil if not enough snapshots in window.
+	Traffic24hUp   *int64 `json:"traffic_24h_up,omitempty"`
+	Traffic24hDown *int64 `json:"traffic_24h_down,omitempty"`
+	TrafficAllTime *int64 `json:"traffic_all_time,omitempty"`
 }
 
-// ToPublic converts Server to ServerPublic
+// ToPublic converts Server to ServerPublic without monitoring fields.
+// Callers that want monitoring should populate the optional fields after.
 func (s *Server) ToPublic() ServerPublic {
 	return ServerPublic{
 		ID:          s.ID,

@@ -195,6 +195,7 @@ func main() {
 
 	// Servers (for users)
 	api.Get("/servers", serverHandler.GetServers)
+	api.Get("/servers/incidents", serverHandler.GetIncidents)
 
 	// Admin panel routes (requires Telegram auth + admin check)
 	admin := app.Group("/api/admin",

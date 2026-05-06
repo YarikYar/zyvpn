@@ -2438,6 +2438,47 @@
                 }
             }
         },
+        "/api/servers/incidents": {
+            "get": {
+                "security": [
+                    {
+                        "TelegramInitData": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "servers"
+                ],
+                "summary": "Recent server incidents",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "default": 168,
+                        "description": "window in hours",
+                        "name": "hours",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "default": 50,
+                        "description": "max items",
+                        "name": "limit",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                }
+            }
+        },
         "/api/subscription/buy": {
             "post": {
                 "security": [

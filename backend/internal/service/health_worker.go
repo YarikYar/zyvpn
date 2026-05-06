@@ -7,23 +7,29 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+
 	"github.com/zyvpn/backend/internal/model"
 	"github.com/zyvpn/backend/internal/repository"
 )
 
 const (
-	HealthCheckInterval = 30 * time.Second
+	HealthCheckInterval     = 30 * time.Second
+	TrafficSnapshotInterval = 5 * time.Minute
 )
 
 type HealthWorker struct {
 	repo      *repository.Repository
 	serverSvc *ServerService
+
+	lastSnapshot   map[uuid.UUID]time.Time
+	lastSnapshotMu sync.Mutex
 }
 
 func NewHealthWorker(repo *repository.Repository, serverSvc *ServerService) *HealthWorker {
 	return &HealthWorker{
-		repo:      repo,
-		serverSvc: serverSvc,
+		repo:         repo,
+		serverSvc:    serverSvc,
+		lastSnapshot: make(map[uuid.UUID]time.Time),
 	}
 }
 
@@ -76,10 +82,8 @@ func (w *HealthWorker) checkAllServers(ctx context.Context) {
 	wg.Wait()
 }
 
-// checkServer probes a server through its 3x-ui panel rather than TCP-pinging
-// the VPN port. The VPN port often refuses bare TCP probes (Reality, IP
-// allowlists, anti-scan firewalls), so the panel reachability is a more
-// reliable proxy for "this server can issue keys / serve users".
+// checkServer probes the XUI panel, updates health, records status-change
+// events for uptime calc, and periodically snapshots traffic counters.
 func (w *HealthWorker) checkServer(ctx context.Context, srv model.Server) {
 	id := srv.ID
 	if id == uuid.Nil {
@@ -89,19 +93,49 @@ func (w *HealthWorker) checkServer(ctx context.Context, srv model.Server) {
 	xuiClient, _, err := w.serverSvc.GetXUIClient(ctx, id)
 	if err != nil {
 		log.Printf("[Health Worker] %s: get XUI client failed: %v", srv.Name, err)
-		_ = w.repo.UpdateServerHealth(ctx, id, nil, "offline")
+		w.recordStatus(ctx, id, "offline", nil)
 		return
 	}
 
 	start := time.Now()
-	if _, err := xuiClient.GetInboundInfo(); err != nil {
+	inbound, err := xuiClient.GetInbound()
+	if err != nil {
 		log.Printf("[Health Worker] %s: panel probe failed: %v", srv.Name, err)
-		_ = w.repo.UpdateServerHealth(ctx, id, nil, "offline")
+		w.recordStatus(ctx, id, "offline", nil)
 		return
 	}
 	pingMs := int(time.Since(start).Milliseconds())
+	w.recordStatus(ctx, id, "online", &pingMs)
 
-	if err := w.repo.UpdateServerHealth(ctx, id, &pingMs, "online"); err != nil {
-		log.Printf("[Health Worker] %s: update health failed: %v", srv.Name, err)
+	// Traffic snapshot — rate-limit per server to TrafficSnapshotInterval to
+	// keep the table compact.
+	w.lastSnapshotMu.Lock()
+	prev, ok := w.lastSnapshot[id]
+	due := !ok || time.Since(prev) >= TrafficSnapshotInterval
+	if due {
+		w.lastSnapshot[id] = time.Now()
+	}
+	w.lastSnapshotMu.Unlock()
+	if due {
+		snap := model.ServerTrafficSnapshot{
+			ServerID:     id,
+			UpBytes:      inbound.Up,
+			DownBytes:    inbound.Down,
+			AllTimeBytes: inbound.AllTime,
+		}
+		if err := w.repo.RecordTrafficSnapshot(ctx, snap); err != nil {
+			log.Printf("[Health Worker] %s: traffic snapshot failed: %v", srv.Name, err)
+		}
+	}
+}
+
+// recordStatus persists the latest probe result to servers and appends a
+// health-event row if the status flipped.
+func (w *HealthWorker) recordStatus(ctx context.Context, id uuid.UUID, status string, pingMs *int) {
+	if err := w.repo.UpdateServerHealth(ctx, id, pingMs, status); err != nil {
+		log.Printf("[Health Worker] %s: update health failed: %v", id, err)
+	}
+	if err := w.repo.RecordHealthEvent(ctx, id, status); err != nil {
+		log.Printf("[Health Worker] %s: record event failed: %v", id, err)
 	}
 }

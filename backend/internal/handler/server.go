@@ -2,6 +2,7 @@ package handler
 
 import (
 	"log"
+	"time"
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/google/uuid"
@@ -22,7 +23,38 @@ func NewServerHandler(serverSvc *service.ServerService) *ServerHandler {
 
 // --- User Endpoints ---
 
-// GetServers returns active servers visible to end users.
+// GetIncidents returns recent offline intervals across servers.
+//
+//	@Summary	Recent server incidents
+//	@Tags		servers
+//	@Produce	json
+//	@Param		hours	query		int	false	"window in hours"	default(168)
+//	@Param		limit	query		int	false	"max items"		default(50)
+//	@Success	200		{object}	map[string]interface{}
+//	@Router		/api/servers/incidents [get]
+//	@Security	TelegramInitData
+func (h *ServerHandler) GetIncidents(c *fiber.Ctx) error {
+	hours := 168
+	if v := c.QueryInt("hours", 0); v > 0 {
+		hours = v
+	}
+	if hours > 24*30 {
+		hours = 24 * 30
+	}
+	limit := c.QueryInt("limit", 50)
+
+	since := time.Now().Add(-time.Duration(hours) * time.Hour)
+	incidents, err := h.serverSvc.ListIncidents(c.Context(), since, limit)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": "Не удалось получить инциденты",
+		})
+	}
+	return c.JSON(fiber.Map{"incidents": incidents})
+}
+
+// GetServers returns active servers visible to end users with monitoring
+// fields (uptime, traffic, status_since).
 //
 //	@Summary	List active servers
 //	@Tags		servers

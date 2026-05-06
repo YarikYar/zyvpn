@@ -2050,6 +2050,32 @@ paths:
       summary: List active servers
       tags:
       - servers
+  /api/servers/incidents:
+    get:
+      parameters:
+      - default: 168
+        description: window in hours
+        in: query
+        name: hours
+        type: integer
+      - default: 50
+        description: max items
+        in: query
+        name: limit
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - TelegramInitData: []
+      summary: Recent server incidents
+      tags:
+      - servers
   /api/subscription/buy:
     post:
       consumes:

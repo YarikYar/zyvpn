@@ -60,6 +60,12 @@ type Inbound struct {
 	StreamSettings string `json:"streamSettings"`
 	Port           int    `json:"port"`
 	Tag            string `json:"tag"`
+	// Cumulative byte counters from the panel: Up/Down — current
+	// reset-period counters, AllTime — life-of-inbound total.
+	Up      int64 `json:"up"`
+	Down    int64 `json:"down"`
+	Total   int64 `json:"total"`
+	AllTime int64 `json:"allTime"`
 }
 
 type Response struct {

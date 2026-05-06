@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useStore } from '../store'
 import { useTelegram } from '../hooks/useTelegram'
-import { api, ServerPublic } from '../api/client'
+import { api, ServerPublic, Incident } from '../api/client'
 import PlanCard from '../components/PlanCard'
 import SubscriptionCard from '../components/SubscriptionCard'
 
@@ -15,6 +15,7 @@ export default function HomePage() {
   const [isAdmin, setIsAdmin] = useState(false)
   const [showOnboarding, setShowOnboarding] = useState(false)
   const [servers, setServers] = useState<ServerPublic[]>([])
+  const [incidents, setIncidents] = useState<Incident[]>([])
 
   useEffect(() => {
     fetchSubscriptionStatus()
@@ -33,6 +34,8 @@ export default function HomePage() {
         }
       }
     }).catch(() => {})
+
+    api.getIncidents(168, 5).then(data => setIncidents(data.incidents || [])).catch(() => {})
 
     // Show onboarding only on first visit
     if (!localStorage.getItem(ONBOARDING_KEY)) {
@@ -109,6 +112,15 @@ export default function HomePage() {
                   <div className="text-left">
                     <p className="font-medium">{server.name}</p>
                     <p className="text-xs text-hint">{server.country}{server.city ? `, ${server.city}` : ''}</p>
+                    {server.uptime_24h !== undefined && (
+                      <p className={`text-[10px] ${
+                        server.uptime_24h >= 0.99 ? 'text-green-500' :
+                        server.uptime_24h >= 0.95 ? 'text-yellow-500' :
+                        'text-red-500'
+                      }`}>
+                        🟢 {(server.uptime_24h * 100).toFixed(1)}% / 24ч
+                      </p>
+                    )}
                   </div>
                 </div>
                 <div className="text-right">
@@ -126,10 +138,48 @@ export default function HomePage() {
                       </p>
                     </>
                   ) : (
-                    <p className="text-xs text-red-500">Оффлайн</p>
+                    <>
+                      <p className="text-xs text-red-500">Оффлайн</p>
+                      {server.status_since && (
+                        <p className="text-[10px] text-hint">
+                          {humanDuration(Date.now() - new Date(server.status_since).getTime())}
+                        </p>
+                      )}
+                    </>
                   )}
                 </div>
               </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Recent incidents */}
+      {incidents.length > 0 && (
+        <div className="mb-6">
+          <h2 className="text-lg font-semibold mb-3">Последние сбои</h2>
+          <div className="space-y-2">
+            {incidents.map((inc, i) => (
+              <div key={i} className="card p-3 flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <span className="text-xl">{inc.flag_emoji}</span>
+                  <div>
+                    <p className="text-sm">{inc.server_name}</p>
+                    <p className="text-[10px] text-hint">
+                      {new Date(inc.started_at).toLocaleString('ru-RU')}
+                    </p>
+                  </div>
+                </div>
+                <div className="text-right">
+                  {inc.ended_at ? (
+                    <p className="text-xs text-hint">
+                      {humanDuration(inc.duration_seconds * 1000)}
+                    </p>
+                  ) : (
+                    <p className="text-xs text-red-500">сейчас</p>
+                  )}
+                </div>
+              </div>
             ))}
           </div>
         </div>
@@ -221,4 +271,18 @@ export default function HomePage() {
       )}
     </div>
   )
+}
+
+// humanDuration formats milliseconds as a short Russian string:
+// "5 мин", "2 ч", "3 д". For very small durations falls back to seconds.
+function humanDuration(ms: number): string {
+  if (ms < 0) ms = 0
+  const sec = Math.round(ms / 1000)
+  if (sec < 60) return `${sec} с`
+  const min = Math.round(sec / 60)
+  if (min < 60) return `${min} мин`
+  const hr = Math.round(min / 60)
+  if (hr < 24) return `${hr} ч`
+  const days = Math.round(hr / 24)
+  return `${days} д`
 }

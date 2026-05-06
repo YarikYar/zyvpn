@@ -446,6 +446,11 @@ export const api = {
   // Servers (for users)
   getServers: () =>
     request<{ servers: ServerPublic[] }>('/api/servers'),
+
+  getIncidents: (hours = 168, limit = 50) =>
+    request<{ incidents: Incident[] }>(
+      `/api/servers/incidents?hours=${hours}&limit=${limit}`,
+    ),
 }
 
 export interface ServerPublic {
@@ -458,4 +463,21 @@ export interface ServerPublic {
   ping_ms?: number
   status: 'online' | 'offline' | 'unknown'
   load_percent: number
+  // Monitoring (may be absent for newly-added servers).
+  uptime_24h?: number   // 0..1
+  uptime_7d?: number
+  status_since?: string // ISO timestamp
+  traffic_24h_up?: number
+  traffic_24h_down?: number
+  traffic_all_time?: number
+}
+
+export interface Incident {
+  server_id: string
+  server_name: string
+  country: string
+  flag_emoji: string
+  started_at: string
+  ended_at?: string
+  duration_seconds: number
 }

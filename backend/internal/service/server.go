@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"sync"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/zyvpn/backend/internal/model"
@@ -24,7 +25,8 @@ func NewServerService(repo *repository.Repository) *ServerService {
 	}
 }
 
-// GetActiveServers returns all active servers for users
+// GetActiveServers returns all active servers for users with monitoring
+// fields (uptime ratios, traffic, status_since) populated.
 func (s *ServerService) GetActiveServers(ctx context.Context) ([]model.ServerPublic, error) {
 	servers, err := s.repo.GetActiveServers(ctx)
 	if err != nil {
@@ -32,10 +34,35 @@ func (s *ServerService) GetActiveServers(ctx context.Context) ([]model.ServerPub
 	}
 
 	result := make([]model.ServerPublic, len(servers))
+	now := time.Now()
 	for i, srv := range servers {
-		result[i] = srv.ToPublic()
+		pub := srv.ToPublic()
+		s.populateMonitoring(ctx, &pub, srv.ID, now)
+		result[i] = pub
 	}
 	return result, nil
+}
+
+// populateMonitoring fills uptime + traffic + status_since on a public
+// view. Errors are logged-only — monitoring is best-effort.
+func (s *ServerService) populateMonitoring(ctx context.Context, pub *model.ServerPublic, id uuid.UUID, now time.Time) {
+	if u, err := s.repo.ComputeUptime(ctx, id, now.Add(-24*time.Hour)); err == nil {
+		pub.Uptime24h = u
+	}
+	if u, err := s.repo.ComputeUptime(ctx, id, now.Add(-7*24*time.Hour)); err == nil {
+		pub.Uptime7d = u
+	}
+	if t, err := s.repo.GetCurrentStatusSince(ctx, id); err == nil {
+		pub.StatusSince = t
+	}
+	if up, down, err := s.repo.ComputeTrafficSince(ctx, id, now.Add(-24*time.Hour)); err == nil {
+		pub.Traffic24hUp = up
+		pub.Traffic24hDown = down
+	}
+	if snap, err := s.repo.GetLatestTrafficSnapshot(ctx, id); err == nil && snap != nil {
+		all := snap.AllTimeBytes
+		pub.TrafficAllTime = &all
+	}
 }
 
 // GetAllServers returns all servers for admin
@@ -55,6 +82,12 @@ func (s *ServerService) GetAllServers(ctx context.Context) ([]model.ServerAdmin,
 // GetServer returns a server by ID
 func (s *ServerService) GetServer(ctx context.Context, id uuid.UUID) (*model.Server, error) {
 	return s.repo.GetServer(ctx, id)
+}
+
+// ListIncidents returns recent offline intervals for the public incidents
+// endpoint.
+func (s *ServerService) ListIncidents(ctx context.Context, since time.Time, limit int) ([]model.Incident, error) {
+	return s.repo.ListIncidents(ctx, since, limit)
 }
 
 // GetDefaultServer returns the default server
