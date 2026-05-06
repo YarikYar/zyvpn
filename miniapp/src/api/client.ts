@@ -451,6 +451,11 @@ export const api = {
     request<{ incidents: Incident[] }>(
       `/api/servers/incidents?hours=${hours}&limit=${limit}`,
     ),
+
+  getDailyUptime: (serverId: string, days = 30) =>
+    request<{ server_id: string; days: DailyUptime[] }>(
+      `/api/servers/${serverId}/uptime/daily?days=${days}`,
+    ),
 }
 
 export interface ServerPublic {
@@ -480,4 +485,9 @@ export interface Incident {
   started_at: string
   ended_at?: string
   duration_seconds: number
+}
+
+export interface DailyUptime {
+  date: string         // YYYY-MM-DD
+  uptime: number | null // 0..1 or null when no data
 }

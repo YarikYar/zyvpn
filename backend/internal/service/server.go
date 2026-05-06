@@ -90,6 +90,41 @@ func (s *ServerService) ListIncidents(ctx context.Context, since time.Time, limi
 	return s.repo.ListIncidents(ctx, since, limit)
 }
 
+// GetDailyUptime returns per-day uptime ratios for the last `days` days
+// (UTC), oldest first. Day = [day_start, day_start+24h); the last day is
+// truncated at "now" so it represents partial-day uptime.
+func (s *ServerService) GetDailyUptime(ctx context.Context, serverID uuid.UUID, days int) ([]model.DailyUptime, error) {
+	if days <= 0 {
+		days = 30
+	}
+	if days > 90 {
+		days = 90
+	}
+
+	now := time.Now().UTC()
+	todayStart := now.Truncate(24 * time.Hour)
+	out := make([]model.DailyUptime, 0, days)
+	for i := days - 1; i >= 0; i-- {
+		dayStart := todayStart.AddDate(0, 0, -i)
+		dayEnd := dayStart.Add(24 * time.Hour)
+		if dayEnd.After(now) {
+			dayEnd = now
+		}
+		var uptime *float64
+		if dayEnd.After(dayStart) {
+			u, err := s.repo.ComputeUptimeRange(ctx, serverID, dayStart, dayEnd)
+			if err == nil {
+				uptime = u
+			}
+		}
+		out = append(out, model.DailyUptime{
+			Date:   dayStart.Format("2006-01-02"),
+			Uptime: uptime,
+		})
+	}
+	return out, nil
+}
+
 // GetDefaultServer returns the default server
 func (s *ServerService) GetDefaultServer(ctx context.Context) (*model.Server, error) {
 	return s.repo.GetDefaultServer(ctx)

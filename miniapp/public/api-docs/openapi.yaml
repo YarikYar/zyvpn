@@ -155,6 +155,15 @@ definitions:
       xui_username:
         type: string
     type: object
+  handler.DailyUptimeResponse:
+    properties:
+      days:
+        items:
+          $ref: '#/definitions/model.DailyUptime'
+        type: array
+      server_id:
+        type: string
+    type: object
   handler.ExtendSubscriptionRequest:
     properties:
       days:
@@ -296,6 +305,13 @@ definitions:
         type: string
       tx_hash:
         type: string
+    type: object
+  model.DailyUptime:
+    properties:
+      date:
+        type: string
+      uptime:
+        type: number
     type: object
   model.Incident:
     properties:
@@ -2170,6 +2186,37 @@ paths:
       security:
       - TelegramInitData: []
       summary: List active servers
+      tags:
+      - servers
+  /api/servers/{server_id}/uptime/daily:
+    get:
+      parameters:
+      - description: server uuid
+        in: path
+        name: server_id
+        required: true
+        type: string
+      - default: 30
+        description: window in days (max 90)
+        in: query
+        name: days
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handler.DailyUptimeResponse'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - TelegramInitData: []
+      summary: Daily uptime for a server
       tags:
       - servers
   /api/servers/incidents:

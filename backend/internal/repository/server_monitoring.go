@@ -50,26 +50,37 @@ func (r *Repository) GetCurrentStatusSince(ctx context.Context, serverID uuid.UU
 }
 
 // ComputeUptime returns the fraction (0..1) of online time between `since`
-// and now, based on health events. Returns nil if there's not enough data.
+// and now. Convenience wrapper around ComputeUptimeRange.
 func (r *Repository) ComputeUptime(ctx context.Context, serverID uuid.UUID, since time.Time) (*float64, error) {
+	return r.ComputeUptimeRange(ctx, serverID, since, time.Now())
+}
+
+// ComputeUptimeRange returns online ratio between [since, until) based on
+// recorded health events. Returns nil when there's no event before `until`
+// for that server (i.e. no data at all in the window).
+func (r *Repository) ComputeUptimeRange(ctx context.Context, serverID uuid.UUID, since, until time.Time) (*float64, error) {
+	if !until.After(since) {
+		return nil, nil
+	}
 	type row struct {
 		Status    string    `db:"status"`
 		StartedAt time.Time `db:"started_at"`
 	}
 	var rows []row
-	// Get the last event before `since` (to know status at window start)
-	// plus all events in the window.
+	// One event before `since` (to know status at window start) + all
+	// events in the window. We clamp the first row's started_at to `since`
+	// in Go below.
 	err := r.db.SelectContext(ctx, &rows, `
-		(SELECT status, $2::timestamptz AS started_at
+		(SELECT status, started_at
 		 FROM server_health_events
 		 WHERE server_id = $1 AND started_at < $2
 		 ORDER BY started_at DESC LIMIT 1)
 		UNION ALL
 		(SELECT status, started_at
 		 FROM server_health_events
-		 WHERE server_id = $1 AND started_at >= $2
+		 WHERE server_id = $1 AND started_at >= $2 AND started_at < $3
 		 ORDER BY started_at)
-		ORDER BY started_at`, serverID, since)
+		ORDER BY started_at`, serverID, since, until)
 	if err != nil {
 		return nil, err
 	}
@@ -77,22 +88,31 @@ func (r *Repository) ComputeUptime(ctx context.Context, serverID uuid.UUID, sinc
 		return nil, nil
 	}
 
-	now := time.Now()
-	totalSeconds := now.Sub(since).Seconds()
+	totalSeconds := until.Sub(since).Seconds()
 	if totalSeconds <= 0 {
 		return nil, nil
 	}
 
 	var onlineSeconds float64
 	for i, ev := range rows {
+		start := ev.StartedAt
+		if start.Before(since) {
+			start = since
+		}
 		var end time.Time
 		if i+1 < len(rows) {
 			end = rows[i+1].StartedAt
 		} else {
-			end = now
+			end = until
+		}
+		if end.After(until) {
+			end = until
+		}
+		if !end.After(start) {
+			continue
 		}
 		if ev.Status == "online" {
-			onlineSeconds += end.Sub(ev.StartedAt).Seconds()
+			onlineSeconds += end.Sub(start).Seconds()
 		}
 	}
 	ratio := onlineSeconds / totalSeconds

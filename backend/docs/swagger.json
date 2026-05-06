@@ -2476,6 +2476,55 @@
                 }
             }
         },
+        "/api/servers/{server_id}/uptime/daily": {
+            "get": {
+                "security": [
+                    {
+                        "TelegramInitData": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "servers"
+                ],
+                "summary": "Daily uptime for a server",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "server uuid",
+                        "name": "server_id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "default": 30,
+                        "description": "window in days (max 90)",
+                        "name": "days",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/handler.DailyUptimeResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            }
+        },
         "/api/subscription/buy": {
             "post": {
                 "security": [
@@ -3013,6 +3062,20 @@
                 }
             }
         },
+        "handler.DailyUptimeResponse": {
+            "type": "object",
+            "properties": {
+                "days": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/model.DailyUptime"
+                    }
+                },
+                "server_id": {
+                    "type": "string"
+                }
+            }
+        },
         "handler.ExtendSubscriptionRequest": {
             "type": "object",
             "properties": {
@@ -3228,6 +3291,17 @@
                 },
                 "tx_hash": {
                     "type": "string"
+                }
+            }
+        },
+        "model.DailyUptime": {
+            "type": "object",
+            "properties": {
+                "date": {
+                    "type": "string"
+                },
+                "uptime": {
+                    "type": "number"
                 }
             }
         },

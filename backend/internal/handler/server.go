@@ -27,6 +27,11 @@ type IncidentsResponse struct {
 	Incidents []model.Incident `json:"incidents"`
 }
 
+type DailyUptimeResponse struct {
+	ServerID string              `json:"server_id"`
+	Days     []model.DailyUptime `json:"days"`
+}
+
 type AdminServersResponse struct {
 	Servers []model.ServerAdmin `json:"servers"`
 }
@@ -37,6 +42,32 @@ func NewServerHandler(serverSvc *service.ServerService) *ServerHandler {
 }
 
 // --- User Endpoints ---
+
+// GetDailyUptime returns per-day uptime ratios for one server.
+//
+//	@Summary	Daily uptime for a server
+//	@Tags		servers
+//	@Produce	json
+//	@Param		server_id	path		string	true	"server uuid"
+//	@Param		days		query		int		false	"window in days (max 90)"	default(30)
+//	@Success	200			{object}	DailyUptimeResponse
+//	@Failure	400			{object}	map[string]string
+//	@Router		/api/servers/{server_id}/uptime/daily [get]
+//	@Security	TelegramInitData
+func (h *ServerHandler) GetDailyUptime(c *fiber.Ctx) error {
+	id, err := uuid.Parse(c.Params("server_id"))
+	if err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "invalid server_id"})
+	}
+	days := c.QueryInt("days", 30)
+	rows, err := h.serverSvc.GetDailyUptime(c.Context(), id, days)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": "Не удалось получить uptime",
+		})
+	}
+	return c.JSON(DailyUptimeResponse{ServerID: id.String(), Days: rows})
+}
 
 // GetIncidents returns recent offline intervals across servers.
 //

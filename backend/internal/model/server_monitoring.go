@@ -25,6 +25,13 @@ type ServerTrafficSnapshot struct {
 	AllTimeBytes  int64     `db:"all_time_bytes"`
 }
 
+// DailyUptime is one bar in the per-day uptime chart.
+// Date is in YYYY-MM-DD form (UTC). Uptime is 0..1 or nil if no data.
+type DailyUptime struct {
+	Date   string   `json:"date"`
+	Uptime *float64 `json:"uptime"`
+}
+
 // Incident describes a continuous offline period for a server. EndedAt is
 // nil for an ongoing incident.
 type Incident struct {

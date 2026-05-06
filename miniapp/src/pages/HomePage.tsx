@@ -2,9 +2,10 @@ import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useStore } from '../store'
 import { useTelegram } from '../hooks/useTelegram'
-import { api, ServerPublic, Incident } from '../api/client'
+import { api, ServerPublic, Incident, DailyUptime } from '../api/client'
 import PlanCard from '../components/PlanCard'
 import SubscriptionCard from '../components/SubscriptionCard'
+import UptimeBars from '../components/UptimeBars'
 
 const ONBOARDING_KEY = 'zyvpn_onboarding_seen'
 
@@ -16,6 +17,7 @@ export default function HomePage() {
   const [showOnboarding, setShowOnboarding] = useState(false)
   const [servers, setServers] = useState<ServerPublic[]>([])
   const [incidents, setIncidents] = useState<Incident[]>([])
+  const [dailyUptime, setDailyUptime] = useState<DailyUptime[]>([])
 
   useEffect(() => {
     fetchSubscriptionStatus()
@@ -42,6 +44,17 @@ export default function HomePage() {
       setShowOnboarding(true)
     }
   }, [fetchSubscriptionStatus, fetchPlans, selectedServerId, setSelectedServerId])
+
+  // Daily uptime chart for the currently selected server.
+  useEffect(() => {
+    if (!selectedServerId) {
+      setDailyUptime([])
+      return
+    }
+    api.getDailyUptime(selectedServerId, 30)
+      .then(data => setDailyUptime(data.days || []))
+      .catch(() => setDailyUptime([]))
+  }, [selectedServerId])
 
   const handleCloseOnboarding = () => {
     localStorage.setItem(ONBOARDING_KEY, 'true')
@@ -151,6 +164,15 @@ export default function HomePage() {
               </button>
             ))}
           </div>
+          {dailyUptime.length > 0 && (
+            <div className="mt-3 card p-3">
+              <div className="flex justify-between items-baseline mb-2">
+                <p className="text-xs text-hint">Аптайм за 30 дней</p>
+                <p className="text-[10px] text-hint">сегодня →</p>
+              </div>
+              <UptimeBars days={dailyUptime} />
+            </div>
+          )}
         </div>
       )}
 

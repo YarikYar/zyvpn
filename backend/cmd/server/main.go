@@ -196,6 +196,7 @@ func main() {
 	// Servers (for users)
 	api.Get("/servers", serverHandler.GetServers)
 	api.Get("/servers/incidents", serverHandler.GetIncidents)
+	api.Get("/servers/:server_id/uptime/daily", serverHandler.GetDailyUptime)
 
 	// Admin panel routes (requires Telegram auth + admin check)
 	admin := app.Group("/api/admin",
