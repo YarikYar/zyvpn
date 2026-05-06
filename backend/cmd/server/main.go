@@ -1,3 +1,20 @@
+// ZyVPN backend — REST API for the Telegram Mini App.
+//
+// @title           ZyVPN API
+// @version         1.0
+// @description     REST API of the ZyVPN Telegram Mini App backend. All
+// @description     /api/* routes require X-Telegram-Init-Data; /api/admin/*
+// @description     additionally requires admin role in the database.
+//
+// @host            api.zaruchevskiy.ru
+// @schemes         https
+// @BasePath        /
+//
+// @securityDefinitions.apikey TelegramInitData
+// @in              header
+// @name            X-Telegram-Init-Data
+// @description     Raw Telegram.WebApp.initData query string. HMAC-SHA256
+// @description     signed by the bot token; freshness window is 1 hour.
 package main
 
 import (

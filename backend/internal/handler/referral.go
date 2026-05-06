@@ -9,6 +9,14 @@ type ApplyReferralRequest struct {
 	Code string `json:"code"`
 }
 
+// GetReferralStats returns counters for referrals brought by current user.
+//
+//	@Summary	Referral stats
+//	@Tags		referrals
+//	@Produce	json
+//	@Success	200	{object}	map[string]interface{}
+//	@Router		/api/referral/stats [get]
+//	@Security	TelegramInitData
 func (h *Handler) GetReferralStats(c *fiber.Ctx) error {
 	userID := middleware.GetUserID(c)
 	if userID == 0 {
@@ -27,6 +35,14 @@ func (h *Handler) GetReferralStats(c *fiber.Ctx) error {
 	return c.JSON(stats)
 }
 
+// GetReferralLink returns referral link + code for current user.
+//
+//	@Summary	Referral link
+//	@Tags		referrals
+//	@Produce	json
+//	@Success	200	{object}	map[string]string
+//	@Router		/api/referral/link [get]
+//	@Security	TelegramInitData
 func (h *Handler) GetReferralLink(c *fiber.Ctx) error {
 	userID := middleware.GetUserID(c)
 	if userID == 0 {
@@ -59,6 +75,17 @@ func (h *Handler) GetReferralLink(c *fiber.Ctx) error {
 	})
 }
 
+// ApplyReferralCode attaches a referrer to current user (only once).
+//
+//	@Summary	Apply referral code
+//	@Tags		referrals
+//	@Accept		json
+//	@Produce	json
+//	@Param		body	body		ApplyReferralRequest	true	"referral code"
+//	@Success	200		{object}	map[string]interface{}
+//	@Failure	400		{object}	map[string]string
+//	@Router		/api/referral/apply [post]
+//	@Security	TelegramInitData
 func (h *Handler) ApplyReferralCode(c *fiber.Ctx) error {
 	userID := middleware.GetUserID(c)
 	if userID == 0 {
@@ -92,6 +119,14 @@ func (h *Handler) ApplyReferralCode(c *fiber.Ctx) error {
 	})
 }
 
+// GetReferredUsers lists users brought by current user.
+//
+//	@Summary	Users I referred
+//	@Tags		referrals
+//	@Produce	json
+//	@Success	200	{object}	map[string]interface{}
+//	@Router		/api/referral/users [get]
+//	@Security	TelegramInitData
 func (h *Handler) GetReferredUsers(c *fiber.Ctx) error {
 	userID := middleware.GetUserID(c)
 	if userID == 0 {

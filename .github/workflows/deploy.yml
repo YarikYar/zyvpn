@@ -26,6 +26,10 @@ jobs:
       - name: Unit tests
         run: go test -count=1 ./...
 
+      - name: OpenAPI spec drift-check
+        working-directory: ${{ github.workspace }}
+        run: make swagger-check
+
   deploy:
     needs: test
     # Self-hosted runner lives on the docker host (192.168.1.223), so it can

@@ -74,6 +74,25 @@ db-reset: ## Reset database (drop and recreate)
 redis-shell: ## Open Redis CLI
 	docker-compose exec redis redis-cli
 
+# OpenAPI
+swagger: ## Regenerate backend/docs/* from swag annotations and copy spec to miniapp
+	cd backend && go tool swag init \
+		-g cmd/server/main.go \
+		--parseInternal \
+		--parseDepth 3 \
+		-o docs \
+		--outputTypes yaml,json
+	cp backend/docs/swagger.yaml miniapp/public/api-docs/openapi.yaml
+	@echo "✓ openapi.yaml regenerated; commit changes."
+
+swagger-check: swagger ## Fail CI if generated spec drifted from committed copy
+	@if ! git diff --quiet -- backend/docs/swagger.yaml miniapp/public/api-docs/openapi.yaml; then \
+		echo "✗ OpenAPI spec is stale. Run 'make swagger' and commit the result." >&2; \
+		git --no-pager diff -- backend/docs/swagger.yaml miniapp/public/api-docs/openapi.yaml; \
+		exit 1; \
+	fi
+	@echo "✓ OpenAPI spec is up to date."
+
 # Testing
 test: test-unit ## Run unit tests (default — no external deps)
 

@@ -1,0 +1,3535 @@
+{
+    "schemes": [
+        "https"
+    ],
+    "swagger": "2.0",
+    "info": {
+        "description": "REST API of the ZyVPN Telegram Mini App backend. All\n/api/* routes require X-Telegram-Init-Data; /api/admin/*\nadditionally requires admin role in the database.",
+        "title": "ZyVPN API",
+        "contact": {},
+        "version": "1.0"
+    },
+    "host": "api.zaruchevskiy.ru",
+    "basePath": "/",
+    "paths": {
+        "/api/admin/bans": {
+            "get": {
+                "security": [
+                    {
+                        "TelegramInitData": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "admin"
+                ],
+                "summary": "List bans",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "default": 50,
+                        "description": "page size",
+                        "name": "limit",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "default": 0,
+                        "description": "offset",
+                        "name": "offset",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                }
+            }
+        },
+        "/api/admin/bans/ip": {
+            "post": {
+                "security": [
+                    {
+                        "TelegramInitData": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "admin"
+                ],
+                "summary": "Ban IP",
+                "parameters": [
+                    {
+                        "description": "ip + reason",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/handler.BanIPRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                }
+            }
+        },
+        "/api/admin/bans/ip/unban": {
+            "post": {
+                "security": [
+                    {
+                        "TelegramInitData": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "admin"
+                ],
+                "summary": "Unban IP",
+                "parameters": [
+                    {
+                        "description": "{ip}",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                }
+            }
+        },
+        "/api/admin/logs": {
+            "get": {
+                "security": [
+                    {
+                        "TelegramInitData": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "admin"
+                ],
+                "summary": "Admin audit log",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "default": 50,
+                        "description": "page size",
+                        "name": "limit",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "default": 0,
+                        "description": "offset",
+                        "name": "offset",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                }
+            }
+        },
+        "/api/admin/payments/cash/pending": {
+            "get": {
+                "security": [
+                    {
+                        "TelegramInitData": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "admin"
+                ],
+                "summary": "Pending cash payments",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "default": 50,
+                        "description": "page size",
+                        "name": "limit",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                }
+            }
+        },
+        "/api/admin/payments/cash/{payment_id}/approve": {
+            "post": {
+                "security": [
+                    {
+                        "TelegramInitData": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "admin"
+                ],
+                "summary": "Approve cash payment",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "payment uuid",
+                        "name": "payment_id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                }
+            }
+        },
+        "/api/admin/payments/cash/{payment_id}/reject": {
+            "post": {
+                "security": [
+                    {
+                        "TelegramInitData": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "admin"
+                ],
+                "summary": "Reject cash payment",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "payment uuid",
+                        "name": "payment_id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "reason",
+                        "name": "body",
+                        "in": "body",
+                        "schema": {
+                            "$ref": "#/definitions/handler.RejectCashPaymentRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                }
+            }
+        },
+        "/api/admin/plans": {
+            "get": {
+                "security": [
+                    {
+                        "TelegramInitData": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "admin"
+                ],
+                "summary": "List all plans",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/model.Plan"
+                            }
+                        }
+                    }
+                }
+            },
+            "post": {
+                "security": [
+                    {
+                        "TelegramInitData": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "admin"
+                ],
+                "summary": "Create plan",
+                "parameters": [
+                    {
+                        "description": "new plan",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/handler.CreatePlanRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/model.Plan"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/admin/plans/{plan_id}": {
+            "put": {
+                "security": [
+                    {
+                        "TelegramInitData": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "admin"
+                ],
+                "summary": "Update plan",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "plan uuid",
+                        "name": "plan_id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "updates",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/handler.UpdatePlanRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/model.Plan"
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "security": [
+                    {
+                        "TelegramInitData": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "admin"
+                ],
+                "summary": "Delete plan",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "plan uuid",
+                        "name": "plan_id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                }
+            }
+        },
+        "/api/admin/promo": {
+            "get": {
+                "security": [
+                    {
+                        "TelegramInitData": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "admin"
+                ],
+                "summary": "List promo codes",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "default": 50,
+                        "description": "page size",
+                        "name": "limit",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "default": 0,
+                        "description": "offset",
+                        "name": "offset",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                }
+            },
+            "post": {
+                "security": [
+                    {
+                        "TelegramInitData": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "admin"
+                ],
+                "summary": "Create promo code",
+                "parameters": [
+                    {
+                        "description": "promo params",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/handler.CreatePromoCodeRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/model.PromoCode"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/admin/promo/bulk": {
+            "post": {
+                "security": [
+                    {
+                        "TelegramInitData": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "admin"
+                ],
+                "summary": "Bulk-create promo codes",
+                "parameters": [
+                    {
+                        "description": "params + count",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/handler.BulkPromoCodeRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                }
+            }
+        },
+        "/api/admin/promo/deactivate": {
+            "post": {
+                "security": [
+                    {
+                        "TelegramInitData": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "admin"
+                ],
+                "summary": "Deactivate promo code",
+                "parameters": [
+                    {
+                        "description": "{code}",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                }
+            }
+        },
+        "/api/admin/servers": {
+            "get": {
+                "security": [
+                    {
+                        "TelegramInitData": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "admin"
+                ],
+                "summary": "List all servers (admin)",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                }
+            },
+            "post": {
+                "security": [
+                    {
+                        "TelegramInitData": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "admin"
+                ],
+                "summary": "Create server",
+                "parameters": [
+                    {
+                        "description": "server config",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/handler.CreateServerRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/model.Server"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/admin/servers/{server_id}": {
+            "get": {
+                "security": [
+                    {
+                        "TelegramInitData": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "admin"
+                ],
+                "summary": "Get server (admin)",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "server uuid",
+                        "name": "server_id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/model.Server"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            },
+            "put": {
+                "security": [
+                    {
+                        "TelegramInitData": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "admin"
+                ],
+                "summary": "Update server",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "server uuid",
+                        "name": "server_id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "updates",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/handler.UpdateServerRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/model.Server"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "security": [
+                    {
+                        "TelegramInitData": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "admin"
+                ],
+                "summary": "Delete server",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "server uuid",
+                        "name": "server_id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                }
+            }
+        },
+        "/api/admin/servers/{server_id}/test": {
+            "post": {
+                "security": [
+                    {
+                        "TelegramInitData": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "admin"
+                ],
+                "summary": "Test server XUI connection",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "server uuid",
+                        "name": "server_id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                }
+            }
+        },
+        "/api/admin/settings": {
+            "get": {
+                "security": [
+                    {
+                        "TelegramInitData": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "admin"
+                ],
+                "summary": "List settings",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                }
+            }
+        },
+        "/api/admin/settings/referral-bonus": {
+            "get": {
+                "security": [
+                    {
+                        "TelegramInitData": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "admin"
+                ],
+                "summary": "Get referral bonus percent",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                }
+            },
+            "post": {
+                "security": [
+                    {
+                        "TelegramInitData": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "admin"
+                ],
+                "summary": "Set referral bonus percent",
+                "parameters": [
+                    {
+                        "description": "{percent}",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "number",
+                                "format": "float64"
+                            }
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                }
+            }
+        },
+        "/api/admin/settings/referral-bonus-days": {
+            "get": {
+                "security": [
+                    {
+                        "TelegramInitData": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "admin"
+                ],
+                "summary": "Get referral bonus days",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                }
+            },
+            "post": {
+                "security": [
+                    {
+                        "TelegramInitData": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "admin"
+                ],
+                "summary": "Set referral bonus days",
+                "parameters": [
+                    {
+                        "description": "{days}",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "integer"
+                            }
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                }
+            }
+        },
+        "/api/admin/settings/region-switch-price": {
+            "get": {
+                "security": [
+                    {
+                        "TelegramInitData": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "admin"
+                ],
+                "summary": "Get region switch price",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                }
+            },
+            "post": {
+                "security": [
+                    {
+                        "TelegramInitData": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "admin"
+                ],
+                "summary": "Set region switch price",
+                "parameters": [
+                    {
+                        "description": "{price}",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/handler.SetRegionSwitchPriceRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                }
+            }
+        },
+        "/api/admin/settings/topup-bonus": {
+            "get": {
+                "security": [
+                    {
+                        "TelegramInitData": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "admin"
+                ],
+                "summary": "Get topup bonus",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                }
+            },
+            "post": {
+                "security": [
+                    {
+                        "TelegramInitData": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "admin"
+                ],
+                "summary": "Set topup bonus",
+                "parameters": [
+                    {
+                        "description": "{percent}",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "number",
+                                "format": "float64"
+                            }
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                }
+            }
+        },
+        "/api/admin/stats": {
+            "get": {
+                "security": [
+                    {
+                        "TelegramInitData": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "admin"
+                ],
+                "summary": "Admin dashboard stats",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                }
+            }
+        },
+        "/api/admin/users": {
+            "get": {
+                "security": [
+                    {
+                        "TelegramInitData": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "admin"
+                ],
+                "summary": "List users",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "default": 50,
+                        "description": "page size",
+                        "name": "limit",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "default": 0,
+                        "description": "offset",
+                        "name": "offset",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "username/name search",
+                        "name": "search",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/handler.ListUsersResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/admin/users/{user_id}": {
+            "get": {
+                "security": [
+                    {
+                        "TelegramInitData": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "admin"
+                ],
+                "summary": "Get user",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "user id (telegram)",
+                        "name": "user_id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/model.UserWithSubscription"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/admin/users/{user_id}/balance/add": {
+            "post": {
+                "security": [
+                    {
+                        "TelegramInitData": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "admin"
+                ],
+                "summary": "Add to user balance",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "user id",
+                        "name": "user_id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "delta",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/handler.AddBalanceRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                }
+            }
+        },
+        "/api/admin/users/{user_id}/balance/set": {
+            "post": {
+                "security": [
+                    {
+                        "TelegramInitData": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "admin"
+                ],
+                "summary": "Set user balance",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "user id",
+                        "name": "user_id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "new balance",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/handler.SetBalanceRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                }
+            }
+        },
+        "/api/admin/users/{user_id}/ban": {
+            "post": {
+                "security": [
+                    {
+                        "TelegramInitData": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "admin"
+                ],
+                "summary": "Ban user",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "user id",
+                        "name": "user_id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "reason + optional expiry",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/handler.BanUserRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "409": {
+                        "description": "already banned",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/admin/users/{user_id}/cash-payment": {
+            "post": {
+                "security": [
+                    {
+                        "TelegramInitData": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "admin"
+                ],
+                "summary": "Create cash payment for user",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "user id",
+                        "name": "user_id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "plan + amount in RUB",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/handler.CreateCashPaymentRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                }
+            }
+        },
+        "/api/admin/users/{user_id}/subscription/cancel": {
+            "post": {
+                "security": [
+                    {
+                        "TelegramInitData": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "admin"
+                ],
+                "summary": "Cancel subscription",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "user id",
+                        "name": "user_id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                }
+            }
+        },
+        "/api/admin/users/{user_id}/subscription/extend": {
+            "post": {
+                "security": [
+                    {
+                        "TelegramInitData": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "admin"
+                ],
+                "summary": "Extend subscription",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "user id",
+                        "name": "user_id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "days",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/handler.ExtendSubscriptionRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                }
+            }
+        },
+        "/api/admin/users/{user_id}/unban": {
+            "post": {
+                "security": [
+                    {
+                        "TelegramInitData": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "admin"
+                ],
+                "summary": "Unban user",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "user id",
+                        "name": "user_id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                }
+            }
+        },
+        "/api/balance": {
+            "get": {
+                "security": [
+                    {
+                        "TelegramInitData": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "balance"
+                ],
+                "summary": "Current balance",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                }
+            }
+        },
+        "/api/balance/pay": {
+            "post": {
+                "security": [
+                    {
+                        "TelegramInitData": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "balance"
+                ],
+                "summary": "Pay from balance",
+                "parameters": [
+                    {
+                        "description": "plan to buy",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/handler.PayFromBalanceRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "402": {
+                        "description": "insufficient balance",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/balance/topup": {
+            "post": {
+                "security": [
+                    {
+                        "TelegramInitData": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "balance"
+                ],
+                "summary": "Init balance top-up",
+                "parameters": [
+                    {
+                        "description": "amount + provider",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/handler.TopUpRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/balance/topup/stars": {
+            "get": {
+                "security": [
+                    {
+                        "TelegramInitData": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "balance"
+                ],
+                "summary": "Stars invoice for top-up",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "payment uuid",
+                        "name": "payment_id",
+                        "in": "query",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/balance/topup/ton": {
+            "get": {
+                "security": [
+                    {
+                        "TelegramInitData": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "balance"
+                ],
+                "summary": "TON deep link for top-up",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "payment uuid",
+                        "name": "payment_id",
+                        "in": "query",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/model.TONPaymentInfo"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/balance/topup/verify": {
+            "post": {
+                "security": [
+                    {
+                        "TelegramInitData": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "balance"
+                ],
+                "summary": "Verify TON top-up",
+                "parameters": [
+                    {
+                        "description": "payment id + BOC",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/handler.VerifyTopUpRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/balance/transactions": {
+            "get": {
+                "security": [
+                    {
+                        "TelegramInitData": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "balance"
+                ],
+                "summary": "Balance transactions",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "default": 20,
+                        "description": "page size",
+                        "name": "limit",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "default": 0,
+                        "description": "offset",
+                        "name": "offset",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                }
+            }
+        },
+        "/api/payment/stars/init": {
+            "get": {
+                "security": [
+                    {
+                        "TelegramInitData": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "payments"
+                ],
+                "summary": "Stars invoice link",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "payment uuid",
+                        "name": "payment_id",
+                        "in": "query",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/payment/stars/refund": {
+            "post": {
+                "security": [
+                    {
+                        "TelegramInitData": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "payments"
+                ],
+                "summary": "Refund Stars payment",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "payment uuid",
+                        "name": "payment_id",
+                        "in": "query",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "503": {
+                        "description": "Service Unavailable",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/payment/status": {
+            "get": {
+                "security": [
+                    {
+                        "TelegramInitData": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "payments"
+                ],
+                "summary": "Poll payment status",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "payment uuid",
+                        "name": "payment_id",
+                        "in": "query",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/payment/ton/check": {
+            "post": {
+                "security": [
+                    {
+                        "TelegramInitData": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "payments"
+                ],
+                "summary": "Verify TON payment",
+                "parameters": [
+                    {
+                        "description": "payment id + BOC",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/handler.VerifyTONPaymentRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/payment/ton/init": {
+            "get": {
+                "security": [
+                    {
+                        "TelegramInitData": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "payments"
+                ],
+                "summary": "TON deep link",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "payment uuid",
+                        "name": "payment_id",
+                        "in": "query",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/model.TONPaymentInfo"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/plans": {
+            "get": {
+                "security": [
+                    {
+                        "TelegramInitData": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "subscription"
+                ],
+                "summary": "Plans visible to caller",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/model.Plan"
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/promo/apply": {
+            "post": {
+                "security": [
+                    {
+                        "TelegramInitData": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "promo"
+                ],
+                "summary": "Redeem promo code",
+                "parameters": [
+                    {
+                        "description": "promo code",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/handler.ApplyPromoCodeRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/promo/validate": {
+            "get": {
+                "security": [
+                    {
+                        "TelegramInitData": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "promo"
+                ],
+                "summary": "Validate promo code",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "promo code",
+                        "name": "code",
+                        "in": "query",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/rates": {
+            "get": {
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "public"
+                ],
+                "summary": "Exchange rates",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/service.ExchangeRates"
+                        }
+                    },
+                    "503": {
+                        "description": "Service Unavailable",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/referral/apply": {
+            "post": {
+                "security": [
+                    {
+                        "TelegramInitData": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "referrals"
+                ],
+                "summary": "Apply referral code",
+                "parameters": [
+                    {
+                        "description": "referral code",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/handler.ApplyReferralRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/referral/link": {
+            "get": {
+                "security": [
+                    {
+                        "TelegramInitData": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "referrals"
+                ],
+                "summary": "Referral link",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/referral/stats": {
+            "get": {
+                "security": [
+                    {
+                        "TelegramInitData": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "referrals"
+                ],
+                "summary": "Referral stats",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                }
+            }
+        },
+        "/api/referral/users": {
+            "get": {
+                "security": [
+                    {
+                        "TelegramInitData": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "referrals"
+                ],
+                "summary": "Users I referred",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                }
+            }
+        },
+        "/api/servers": {
+            "get": {
+                "security": [
+                    {
+                        "TelegramInitData": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "servers"
+                ],
+                "summary": "List active servers",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                }
+            }
+        },
+        "/api/subscription/buy": {
+            "post": {
+                "security": [
+                    {
+                        "TelegramInitData": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "subscription"
+                ],
+                "summary": "Initiate plan purchase",
+                "parameters": [
+                    {
+                        "description": "plan and provider",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/handler.BuySubscriptionRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/subscription/key": {
+            "get": {
+                "security": [
+                    {
+                        "TelegramInitData": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "subscription"
+                ],
+                "summary": "Connection key",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/subscription/status": {
+            "get": {
+                "security": [
+                    {
+                        "TelegramInitData": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "subscription"
+                ],
+                "summary": "Subscription status",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                }
+            }
+        },
+        "/api/subscription/switch-server": {
+            "post": {
+                "security": [
+                    {
+                        "TelegramInitData": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "subscription"
+                ],
+                "summary": "Switch active subscription to another server",
+                "parameters": [
+                    {
+                        "description": "target server",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/handler.SwitchServerRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "402": {
+                        "description": "not enough balance",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/subscription/switch-server/info": {
+            "get": {
+                "security": [
+                    {
+                        "TelegramInitData": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "subscription"
+                ],
+                "summary": "Region switch info",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                }
+            }
+        },
+        "/api/subscription/trial": {
+            "post": {
+                "security": [
+                    {
+                        "TelegramInitData": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "subscription"
+                ],
+                "summary": "Activate free trial",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "409": {
+                        "description": "trial already used or active sub exists",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/user/me": {
+            "get": {
+                "security": [
+                    {
+                        "TelegramInitData": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "user"
+                ],
+                "summary": "Current authenticated user",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/model.UserWithSubscription"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/health": {
+            "get": {
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "public"
+                ],
+                "summary": "Liveness probe",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    },
+    "definitions": {
+        "handler.AddBalanceRequest": {
+            "type": "object",
+            "properties": {
+                "amount": {
+                    "type": "number"
+                }
+            }
+        },
+        "handler.ApplyPromoCodeRequest": {
+            "type": "object",
+            "properties": {
+                "code": {
+                    "type": "string"
+                }
+            }
+        },
+        "handler.ApplyReferralRequest": {
+            "type": "object",
+            "properties": {
+                "code": {
+                    "type": "string"
+                }
+            }
+        },
+        "handler.BanIPRequest": {
+            "type": "object",
+            "properties": {
+                "expires_at": {
+                    "type": "string"
+                },
+                "ip": {
+                    "type": "string"
+                },
+                "reason": {
+                    "type": "string"
+                }
+            }
+        },
+        "handler.BanUserRequest": {
+            "type": "object",
+            "properties": {
+                "expires_at": {
+                    "type": "string"
+                },
+                "reason": {
+                    "type": "string"
+                }
+            }
+        },
+        "handler.BulkPromoCodeRequest": {
+            "type": "object",
+            "properties": {
+                "cash_amount_rub": {
+                    "type": "number"
+                },
+                "count": {
+                    "type": "integer"
+                },
+                "expires_at": {
+                    "type": "string"
+                },
+                "max_uses": {
+                    "type": "integer"
+                },
+                "plan_id": {
+                    "type": "string"
+                },
+                "prefix": {
+                    "type": "string"
+                },
+                "type": {
+                    "$ref": "#/definitions/model.PromoCodeType"
+                },
+                "value": {
+                    "type": "number"
+                }
+            }
+        },
+        "handler.BuySubscriptionRequest": {
+            "type": "object",
+            "properties": {
+                "plan_id": {
+                    "type": "string",
+                    "example": "a3b1f8a2-..."
+                },
+                "provider": {
+                    "type": "string",
+                    "enum": [
+                        "ton",
+                        "stars",
+                        "cash"
+                    ]
+                },
+                "server_id": {
+                    "type": "string"
+                }
+            }
+        },
+        "handler.CreateCashPaymentRequest": {
+            "type": "object",
+            "properties": {
+                "amount_rub": {
+                    "type": "number"
+                },
+                "plan_id": {
+                    "type": "string"
+                },
+                "server_id": {
+                    "type": "string"
+                }
+            }
+        },
+        "handler.CreatePlanRequest": {
+            "type": "object",
+            "properties": {
+                "description": {
+                    "type": "string"
+                },
+                "duration_days": {
+                    "type": "integer"
+                },
+                "max_devices": {
+                    "type": "integer"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "price_stars": {
+                    "type": "integer"
+                },
+                "price_ton": {
+                    "type": "number"
+                },
+                "price_usd": {
+                    "type": "number"
+                },
+                "sort_order": {
+                    "type": "integer"
+                },
+                "traffic_gb": {
+                    "type": "integer"
+                },
+                "visible_to_referrer_id": {
+                    "type": "integer"
+                }
+            }
+        },
+        "handler.CreatePromoCodeRequest": {
+            "type": "object",
+            "properties": {
+                "cash_amount_rub": {
+                    "type": "number"
+                },
+                "description": {
+                    "type": "string"
+                },
+                "expires_at": {
+                    "type": "string"
+                },
+                "max_uses": {
+                    "type": "integer"
+                },
+                "plan_id": {
+                    "type": "string"
+                },
+                "type": {
+                    "$ref": "#/definitions/model.PromoCodeType"
+                },
+                "value": {
+                    "type": "number"
+                }
+            }
+        },
+        "handler.CreateServerRequest": {
+            "type": "object",
+            "properties": {
+                "capacity": {
+                    "type": "integer"
+                },
+                "city": {
+                    "type": "string"
+                },
+                "country": {
+                    "type": "string"
+                },
+                "flag_emoji": {
+                    "type": "string"
+                },
+                "is_active": {
+                    "type": "boolean"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "public_key": {
+                    "type": "string"
+                },
+                "server_address": {
+                    "type": "string"
+                },
+                "server_name": {
+                    "type": "string"
+                },
+                "server_port": {
+                    "type": "integer"
+                },
+                "short_id": {
+                    "type": "string"
+                },
+                "sort_order": {
+                    "type": "integer"
+                },
+                "xui_base_url": {
+                    "type": "string"
+                },
+                "xui_inbound_id": {
+                    "type": "integer"
+                },
+                "xui_password": {
+                    "type": "string"
+                },
+                "xui_username": {
+                    "type": "string"
+                }
+            }
+        },
+        "handler.ExtendSubscriptionRequest": {
+            "type": "object",
+            "properties": {
+                "days": {
+                    "type": "integer"
+                }
+            }
+        },
+        "handler.ListUsersResponse": {
+            "type": "object",
+            "properties": {
+                "total": {
+                    "type": "integer"
+                },
+                "users": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/model.User"
+                    }
+                }
+            }
+        },
+        "handler.PayFromBalanceRequest": {
+            "type": "object",
+            "properties": {
+                "plan_id": {
+                    "type": "string"
+                }
+            }
+        },
+        "handler.RejectCashPaymentRequest": {
+            "type": "object",
+            "properties": {
+                "reason": {
+                    "type": "string"
+                }
+            }
+        },
+        "handler.SetBalanceRequest": {
+            "type": "object",
+            "properties": {
+                "balance": {
+                    "type": "number"
+                }
+            }
+        },
+        "handler.SetRegionSwitchPriceRequest": {
+            "type": "object",
+            "properties": {
+                "price": {
+                    "type": "number"
+                }
+            }
+        },
+        "handler.SwitchServerRequest": {
+            "type": "object",
+            "properties": {
+                "server_id": {
+                    "type": "string"
+                }
+            }
+        },
+        "handler.TopUpRequest": {
+            "type": "object",
+            "properties": {
+                "amount": {
+                    "description": "Amount in TON",
+                    "type": "number"
+                },
+                "provider": {
+                    "description": "ton or stars",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/model.PaymentProvider"
+                        }
+                    ]
+                }
+            }
+        },
+        "handler.UpdatePlanRequest": {
+            "type": "object",
+            "properties": {
+                "clear_visibility": {
+                    "description": "ClearVisibility=true forces plan back to public regardless of\nVisibleToReferrerID (which would otherwise mean \"leave as-is\").",
+                    "type": "boolean"
+                },
+                "description": {
+                    "type": "string"
+                },
+                "duration_days": {
+                    "type": "integer"
+                },
+                "is_active": {
+                    "type": "boolean"
+                },
+                "max_devices": {
+                    "type": "integer"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "price_stars": {
+                    "type": "integer"
+                },
+                "price_ton": {
+                    "type": "number"
+                },
+                "price_usd": {
+                    "type": "number"
+                },
+                "sort_order": {
+                    "type": "integer"
+                },
+                "traffic_gb": {
+                    "type": "integer"
+                },
+                "visible_to_referrer_id": {
+                    "type": "integer"
+                }
+            }
+        },
+        "handler.UpdateServerRequest": {
+            "type": "object",
+            "properties": {
+                "capacity": {
+                    "type": "integer"
+                },
+                "city": {
+                    "type": "string"
+                },
+                "country": {
+                    "type": "string"
+                },
+                "flag_emoji": {
+                    "type": "string"
+                },
+                "is_active": {
+                    "type": "boolean"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "public_key": {
+                    "type": "string"
+                },
+                "server_address": {
+                    "type": "string"
+                },
+                "server_name": {
+                    "type": "string"
+                },
+                "server_port": {
+                    "type": "integer"
+                },
+                "short_id": {
+                    "type": "string"
+                },
+                "sort_order": {
+                    "type": "integer"
+                },
+                "xui_base_url": {
+                    "type": "string"
+                },
+                "xui_inbound_id": {
+                    "type": "integer"
+                },
+                "xui_password": {
+                    "type": "string"
+                },
+                "xui_username": {
+                    "type": "string"
+                }
+            }
+        },
+        "handler.VerifyTONPaymentRequest": {
+            "type": "object",
+            "properties": {
+                "payment_id": {
+                    "type": "string"
+                },
+                "tx_hash": {
+                    "type": "string"
+                }
+            }
+        },
+        "handler.VerifyTopUpRequest": {
+            "type": "object",
+            "properties": {
+                "payment_id": {
+                    "type": "string"
+                },
+                "tx_hash": {
+                    "type": "string"
+                }
+            }
+        },
+        "model.PaymentProvider": {
+            "type": "string",
+            "enum": [
+                "ton",
+                "stars",
+                "balance",
+                "cash"
+            ],
+            "x-enum-varnames": [
+                "PaymentProviderTON",
+                "PaymentProviderStars",
+                "PaymentProviderBalance",
+                "PaymentProviderCash"
+            ]
+        },
+        "model.Plan": {
+            "type": "object",
+            "properties": {
+                "created_at": {
+                    "type": "string"
+                },
+                "description": {
+                    "type": "string"
+                },
+                "duration_days": {
+                    "type": "integer"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "is_active": {
+                    "type": "boolean"
+                },
+                "max_devices": {
+                    "type": "integer"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "price_stars": {
+                    "type": "integer"
+                },
+                "price_ton": {
+                    "type": "number"
+                },
+                "price_usd": {
+                    "type": "number"
+                },
+                "sort_order": {
+                    "type": "integer"
+                },
+                "traffic_gb": {
+                    "type": "integer"
+                },
+                "visible_to_referrer_id": {
+                    "description": "VisibleToReferrerID restricts plan visibility to users referred by\nthis user. NULL means public to everyone.",
+                    "type": "integer"
+                }
+            }
+        },
+        "model.PromoCode": {
+            "type": "object",
+            "properties": {
+                "cash_amount_rub": {
+                    "type": "number"
+                },
+                "code": {
+                    "type": "string"
+                },
+                "created_at": {
+                    "type": "string"
+                },
+                "description": {
+                    "type": "string"
+                },
+                "expires_at": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "is_active": {
+                    "type": "boolean"
+                },
+                "max_uses": {
+                    "type": "integer"
+                },
+                "plan_id": {
+                    "description": "CashPlan-specific fields. Both NULL for non-cash_plan promos.",
+                    "type": "string"
+                },
+                "type": {
+                    "$ref": "#/definitions/model.PromoCodeType"
+                },
+                "used_count": {
+                    "type": "integer"
+                },
+                "value": {
+                    "description": "TON amount or days count",
+                    "type": "number"
+                }
+            }
+        },
+        "model.PromoCodeType": {
+            "type": "string",
+            "enum": [
+                "balance",
+                "days",
+                "region_switch",
+                "cash_plan"
+            ],
+            "x-enum-comments": {
+                "PromoCodeTypeBalance": "Credits TON to balance",
+                "PromoCodeTypeDays": "Adds days to subscription",
+                "PromoCodeTypeRegionSwitch": "Adds free region switches"
+            },
+            "x-enum-descriptions": [
+                "Credits TON to balance",
+                "Adds days to subscription",
+                "Adds free region switches",
+                ""
+            ],
+            "x-enum-varnames": [
+                "PromoCodeTypeBalance",
+                "PromoCodeTypeDays",
+                "PromoCodeTypeRegionSwitch",
+                "PromoCodeTypeCashPlan"
+            ]
+        },
+        "model.Server": {
+            "type": "object",
+            "properties": {
+                "capacity": {
+                    "description": "Capacity and health",
+                    "type": "integer"
+                },
+                "city": {
+                    "type": "string"
+                },
+                "country": {
+                    "type": "string"
+                },
+                "created_at": {
+                    "type": "string"
+                },
+                "current_load": {
+                    "type": "integer"
+                },
+                "flag_emoji": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "is_active": {
+                    "description": "Status",
+                    "type": "boolean"
+                },
+                "last_check_at": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "ping_ms": {
+                    "type": "integer"
+                },
+                "server_address": {
+                    "description": "Server connection details",
+                    "type": "string"
+                },
+                "server_port": {
+                    "type": "integer"
+                },
+                "sort_order": {
+                    "type": "integer"
+                },
+                "status": {
+                    "description": "online, offline, unknown",
+                    "type": "string"
+                },
+                "updated_at": {
+                    "type": "string"
+                }
+            }
+        },
+        "model.Subscription": {
+            "type": "object",
+            "properties": {
+                "connection_key": {
+                    "type": "string"
+                },
+                "created_at": {
+                    "type": "string"
+                },
+                "expires_at": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "max_devices": {
+                    "type": "integer"
+                },
+                "plan_id": {
+                    "type": "string"
+                },
+                "server_id": {
+                    "type": "string"
+                },
+                "started_at": {
+                    "type": "string"
+                },
+                "status": {
+                    "$ref": "#/definitions/model.SubscriptionStatus"
+                },
+                "traffic_limit": {
+                    "type": "integer"
+                },
+                "traffic_used": {
+                    "type": "integer"
+                },
+                "user_id": {
+                    "type": "integer"
+                },
+                "xui_client_id": {
+                    "type": "string"
+                },
+                "xui_email": {
+                    "type": "string"
+                }
+            }
+        },
+        "model.SubscriptionStatus": {
+            "type": "string",
+            "enum": [
+                "active",
+                "expired",
+                "cancelled"
+            ],
+            "x-enum-varnames": [
+                "SubscriptionStatusActive",
+                "SubscriptionStatusExpired",
+                "SubscriptionStatusCancelled"
+            ]
+        },
+        "model.TONPaymentInfo": {
+            "type": "object",
+            "properties": {
+                "amount": {
+                    "type": "string"
+                },
+                "comment": {
+                    "type": "string"
+                },
+                "deep_link": {
+                    "type": "string"
+                },
+                "payment_id": {
+                    "type": "string"
+                },
+                "wallet_address": {
+                    "type": "string"
+                }
+            }
+        },
+        "model.User": {
+            "type": "object",
+            "properties": {
+                "balance": {
+                    "description": "Balance in TON",
+                    "type": "number"
+                },
+                "created_at": {
+                    "type": "string"
+                },
+                "first_name": {
+                    "type": "string"
+                },
+                "free_region_switches": {
+                    "description": "Free region switches from promo codes",
+                    "type": "integer"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "language_code": {
+                    "type": "string"
+                },
+                "last_name": {
+                    "type": "string"
+                },
+                "referral_code": {
+                    "type": "string"
+                },
+                "referred_by": {
+                    "type": "integer"
+                },
+                "updated_at": {
+                    "type": "string"
+                },
+                "username": {
+                    "type": "string"
+                }
+            }
+        },
+        "model.UserWithSubscription": {
+            "type": "object",
+            "properties": {
+                "balance": {
+                    "description": "Balance in TON",
+                    "type": "number"
+                },
+                "created_at": {
+                    "type": "string"
+                },
+                "first_name": {
+                    "type": "string"
+                },
+                "free_region_switches": {
+                    "description": "Free region switches from promo codes",
+                    "type": "integer"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "language_code": {
+                    "type": "string"
+                },
+                "last_name": {
+                    "type": "string"
+                },
+                "referral_code": {
+                    "type": "string"
+                },
+                "referred_by": {
+                    "type": "integer"
+                },
+                "subscription": {
+                    "$ref": "#/definitions/model.Subscription"
+                },
+                "updated_at": {
+                    "type": "string"
+                },
+                "username": {
+                    "type": "string"
+                }
+            }
+        },
+        "service.ExchangeRates": {
+            "type": "object",
+            "properties": {
+                "ton_rub": {
+                    "type": "number"
+                },
+                "ton_usd": {
+                    "type": "number"
+                },
+                "usd_rub": {
+                    "type": "number"
+                }
+            }
+        }
+    },
+    "securityDefinitions": {
+        "TelegramInitData": {
+            "description": "Raw Telegram.WebApp.initData query string. HMAC-SHA256\nsigned by the bot token; freshness window is 1 hour.",
+            "type": "apiKey",
+            "name": "X-Telegram-Init-Data",
+            "in": "header"
+        }
+    }
+}

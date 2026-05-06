@@ -13,6 +13,16 @@ type VerifyTONPaymentRequest struct {
 	TxHash    string `json:"tx_hash"`
 }
 
+// InitTONPayment returns the TON deep link for an existing payment.
+//
+//	@Summary	TON deep link
+//	@Tags		payments
+//	@Produce	json
+//	@Param		payment_id	query		string	true	"payment uuid"
+//	@Success	200			{object}	model.TONPaymentInfo
+//	@Failure	404			{object}	map[string]string
+//	@Router		/api/payment/ton/init [get]
+//	@Security	TelegramInitData
 func (h *Handler) InitTONPayment(c *fiber.Ctx) error {
 	userID := middleware.GetUserID(c)
 	if userID == 0 {
@@ -45,6 +55,19 @@ func (h *Handler) InitTONPayment(c *fiber.Ctx) error {
 	return c.JSON(tonInfo)
 }
 
+// VerifyTONPayment submits a TON tx hash for verification.
+//
+//	@Summary	Verify TON payment
+//	@Tags		payments
+//	@Accept		json
+//	@Produce	json
+//	@Param		body	body		VerifyTONPaymentRequest	true	"payment id + BOC"
+//	@Success	200		{object}	map[string]interface{}
+//	@Failure	400		{object}	map[string]string
+//	@Failure	403		{object}	map[string]string
+//	@Failure	404		{object}	map[string]string
+//	@Router		/api/payment/ton/check [post]
+//	@Security	TelegramInitData
 func (h *Handler) VerifyTONPayment(c *fiber.Ctx) error {
 	userID := middleware.GetUserID(c)
 	if userID == 0 {
@@ -105,6 +128,18 @@ func (h *Handler) VerifyTONPayment(c *fiber.Ctx) error {
 	})
 }
 
+// RefundStarsPayment refunds a completed Telegram Stars payment.
+//
+//	@Summary	Refund Stars payment
+//	@Tags		payments
+//	@Produce	json
+//	@Param		payment_id	query		string	true	"payment uuid"
+//	@Success	200			{object}	map[string]interface{}
+//	@Failure	403			{object}	map[string]string
+//	@Failure	404			{object}	map[string]string
+//	@Failure	503			{object}	map[string]string
+//	@Router		/api/payment/stars/refund [post]
+//	@Security	TelegramInitData
 func (h *Handler) RefundStarsPayment(c *fiber.Ctx) error {
 	userID := middleware.GetUserID(c)
 	if userID == 0 {
@@ -165,7 +200,17 @@ func (h *Handler) RefundStarsPayment(c *fiber.Ctx) error {
 	})
 }
 
-// GetPaymentStatus returns current payment status for polling
+// GetPaymentStatus returns current payment status for polling.
+//
+//	@Summary	Poll payment status
+//	@Tags		payments
+//	@Produce	json
+//	@Param		payment_id	query		string	true	"payment uuid"
+//	@Success	200			{object}	map[string]interface{}
+//	@Failure	403			{object}	map[string]string
+//	@Failure	404			{object}	map[string]string
+//	@Router		/api/payment/status [get]
+//	@Security	TelegramInitData
 func (h *Handler) GetPaymentStatus(c *fiber.Ctx) error {
 	userID := middleware.GetUserID(c)
 	if userID == 0 {
@@ -224,6 +269,16 @@ func (h *Handler) GetPaymentStatus(c *fiber.Ctx) error {
 	return c.JSON(response)
 }
 
+// InitStarsPayment returns a Telegram Stars invoice link.
+//
+//	@Summary	Stars invoice link
+//	@Tags		payments
+//	@Produce	json
+//	@Param		payment_id	query		string	true	"payment uuid"
+//	@Success	200			{object}	map[string]interface{}
+//	@Failure	404			{object}	map[string]string
+//	@Router		/api/payment/stars/init [get]
+//	@Security	TelegramInitData
 func (h *Handler) InitStarsPayment(c *fiber.Ctx) error {
 	userID := middleware.GetUserID(c)
 	if userID == 0 {

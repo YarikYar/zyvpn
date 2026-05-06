@@ -22,7 +22,14 @@ func NewServerHandler(serverSvc *service.ServerService) *ServerHandler {
 
 // --- User Endpoints ---
 
-// GetServers returns list of available servers for users
+// GetServers returns active servers visible to end users.
+//
+//	@Summary	List active servers
+//	@Tags		servers
+//	@Produce	json
+//	@Success	200	{object}	map[string]interface{}
+//	@Router		/api/servers [get]
+//	@Security	TelegramInitData
 func (h *ServerHandler) GetServers(c *fiber.Ctx) error {
 	servers, err := h.serverSvc.GetActiveServers(c.Context())
 	if err != nil {
@@ -33,7 +40,14 @@ func (h *ServerHandler) GetServers(c *fiber.Ctx) error {
 
 // --- Admin Endpoints ---
 
-// GetAllServers returns all servers for admin
+// GetAllServers returns every server with private fields (XUI creds) — admin only.
+//
+//	@Summary	List all servers (admin)
+//	@Tags		admin
+//	@Produce	json
+//	@Success	200	{object}	map[string]interface{}
+//	@Router		/api/admin/servers [get]
+//	@Security	TelegramInitData
 func (h *ServerHandler) GetAllServers(c *fiber.Ctx) error {
 	_ = middleware.GetAdminID(c)
 	servers, err := h.serverSvc.GetAllServers(c.Context())
@@ -43,7 +57,16 @@ func (h *ServerHandler) GetAllServers(c *fiber.Ctx) error {
 	return c.JSON(fiber.Map{"servers": servers})
 }
 
-// GetServer returns a single server for admin
+// GetServer returns one server with private fields.
+//
+//	@Summary	Get server (admin)
+//	@Tags		admin
+//	@Produce	json
+//	@Param		server_id	path		string	true	"server uuid"
+//	@Success	200			{object}	model.Server
+//	@Failure	404			{object}	map[string]string
+//	@Router		/api/admin/servers/{server_id} [get]
+//	@Security	TelegramInitData
 func (h *ServerHandler) GetServer(c *fiber.Ctx) error {
 	_ = middleware.GetAdminID(c)
 	serverID, err := uuid.Parse(c.Params("server_id"))
@@ -82,7 +105,17 @@ type CreateServerRequest struct {
 	Capacity      int     `json:"capacity"`
 }
 
-// CreateServer creates a new server
+// CreateServer registers a new VPN server.
+//
+//	@Summary	Create server
+//	@Tags		admin
+//	@Accept		json
+//	@Produce	json
+//	@Param		body	body		CreateServerRequest	true	"server config"
+//	@Success	200		{object}	model.Server
+//	@Failure	400		{object}	map[string]string
+//	@Router		/api/admin/servers [post]
+//	@Security	TelegramInitData
 func (h *ServerHandler) CreateServer(c *fiber.Ctx) error {
 	_ = middleware.GetAdminID(c)
 
@@ -168,7 +201,18 @@ type UpdateServerRequest struct {
 	Capacity      *int    `json:"capacity,omitempty"`
 }
 
-// UpdateServer updates a server
+// UpdateServer patches a server config.
+//
+//	@Summary	Update server
+//	@Tags		admin
+//	@Accept		json
+//	@Produce	json
+//	@Param		server_id	path		string				true	"server uuid"
+//	@Param		body		body		UpdateServerRequest	true	"updates"
+//	@Success	200			{object}	model.Server
+//	@Failure	404			{object}	map[string]string
+//	@Router		/api/admin/servers/{server_id} [put]
+//	@Security	TelegramInitData
 func (h *ServerHandler) UpdateServer(c *fiber.Ctx) error {
 	_ = middleware.GetAdminID(c)
 	serverID, err := uuid.Parse(c.Params("server_id"))
@@ -249,7 +293,15 @@ func (h *ServerHandler) UpdateServer(c *fiber.Ctx) error {
 	return c.JSON(server.ToAdmin())
 }
 
-// DeleteServer deletes a server
+// DeleteServer removes a server from rotation.
+//
+//	@Summary	Delete server
+//	@Tags		admin
+//	@Produce	json
+//	@Param		server_id	path		string	true	"server uuid"
+//	@Success	200			{object}	map[string]interface{}
+//	@Router		/api/admin/servers/{server_id} [delete]
+//	@Security	TelegramInitData
 func (h *ServerHandler) DeleteServer(c *fiber.Ctx) error {
 	_ = middleware.GetAdminID(c)
 	serverID, err := uuid.Parse(c.Params("server_id"))
@@ -266,7 +318,15 @@ func (h *ServerHandler) DeleteServer(c *fiber.Ctx) error {
 	return c.JSON(fiber.Map{"success": true})
 }
 
-// TestServerConnection tests connection to a server's XUI panel
+// TestServerConnection probes XUI panel connectivity.
+//
+//	@Summary	Test server XUI connection
+//	@Tags		admin
+//	@Produce	json
+//	@Param		server_id	path		string	true	"server uuid"
+//	@Success	200			{object}	map[string]interface{}
+//	@Router		/api/admin/servers/{server_id}/test [post]
+//	@Security	TelegramInitData
 func (h *ServerHandler) TestServerConnection(c *fiber.Ctx) error {
 	_ = middleware.GetAdminID(c)
 	serverID, err := uuid.Parse(c.Params("server_id"))

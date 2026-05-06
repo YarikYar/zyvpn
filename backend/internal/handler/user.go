@@ -6,6 +6,16 @@ import (
 	"github.com/zyvpn/backend/internal/service"
 )
 
+// GetMe returns the authenticated user with their active subscription
+// embedded.
+//
+//	@Summary		Current authenticated user
+//	@Tags			user
+//	@Produce		json
+//	@Success		200	{object}	model.UserWithSubscription
+//	@Failure		401	{object}	map[string]string
+//	@Router			/api/user/me [get]
+//	@Security		TelegramInitData
 func (h *Handler) GetMe(c *fiber.Ctx) error {
 	telegramUser := middleware.GetTelegramUser(c)
 	if telegramUser == nil {

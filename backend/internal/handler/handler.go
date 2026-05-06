@@ -49,12 +49,27 @@ func New(
 	}
 }
 
+// Health returns liveness status.
+//
+//	@Summary	Liveness probe
+//	@Tags		public
+//	@Produce	json
+//	@Success	200	{object}	map[string]string
+//	@Router		/health [get]
 func (h *Handler) Health(c *fiber.Ctx) error {
 	return c.JSON(fiber.Map{
 		"status": "ok",
 	})
 }
 
+// GetRates returns current TON/USD/RUB exchange rates (cached 5 min).
+//
+//	@Summary	Exchange rates
+//	@Tags		public
+//	@Produce	json
+//	@Success	200	{object}	service.ExchangeRates
+//	@Failure	503	{object}	map[string]string
+//	@Router		/api/rates [get]
 func (h *Handler) GetRates(c *fiber.Ctx) error {
 	rates, err := h.ratesSvc.GetRates()
 	if err != nil {

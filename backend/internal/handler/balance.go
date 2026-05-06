@@ -16,7 +16,14 @@ type TopUpRequest struct {
 	Provider model.PaymentProvider `json:"provider"` // ton or stars
 }
 
-// GetBalance returns user's current balance
+// GetBalance returns current TON balance.
+//
+//	@Summary	Current balance
+//	@Tags		balance
+//	@Produce	json
+//	@Success	200	{object}	map[string]interface{}
+//	@Router		/api/balance [get]
+//	@Security	TelegramInitData
 func (h *Handler) GetBalance(c *fiber.Ctx) error {
 	userID := middleware.GetUserID(c)
 	if userID == 0 {
@@ -38,7 +45,16 @@ func (h *Handler) GetBalance(c *fiber.Ctx) error {
 	})
 }
 
-// GetBalanceTransactions returns balance history
+// GetBalanceTransactions returns paginated balance history.
+//
+//	@Summary	Balance transactions
+//	@Tags		balance
+//	@Produce	json
+//	@Param		limit	query		int	false	"page size"	default(20)
+//	@Param		offset	query		int	false	"offset"	default(0)
+//	@Success	200		{object}	map[string]interface{}
+//	@Router		/api/balance/transactions [get]
+//	@Security	TelegramInitData
 func (h *Handler) GetBalanceTransactions(c *fiber.Ctx) error {
 	userID := middleware.GetUserID(c)
 	if userID == 0 {
@@ -66,7 +82,18 @@ type PayFromBalanceRequest struct {
 	PlanID string `json:"plan_id"`
 }
 
-// PayFromBalance pays for subscription using balance
+// PayFromBalance buys a plan from existing TON balance.
+//
+//	@Summary	Pay from balance
+//	@Tags		balance
+//	@Accept		json
+//	@Produce	json
+//	@Param		body	body		PayFromBalanceRequest	true	"plan to buy"
+//	@Success	200		{object}	map[string]interface{}
+//	@Failure	400		{object}	map[string]string
+//	@Failure	402		{object}	map[string]string	"insufficient balance"
+//	@Router		/api/balance/pay [post]
+//	@Security	TelegramInitData
 func (h *Handler) PayFromBalance(c *fiber.Ctx) error {
 	userID := middleware.GetUserID(c)
 	if userID == 0 {
@@ -153,7 +180,17 @@ func (h *Handler) PayFromBalance(c *fiber.Ctx) error {
 	})
 }
 
-// InitTopUp creates a payment for balance top-up
+// InitTopUp creates a pending top-up payment for the chosen provider.
+//
+//	@Summary	Init balance top-up
+//	@Tags		balance
+//	@Accept		json
+//	@Produce	json
+//	@Param		body	body		TopUpRequest	true	"amount + provider"
+//	@Success	200		{object}	map[string]interface{}
+//	@Failure	400		{object}	map[string]string
+//	@Router		/api/balance/topup [post]
+//	@Security	TelegramInitData
 func (h *Handler) InitTopUp(c *fiber.Ctx) error {
 	userID := middleware.GetUserID(c)
 	if userID == 0 {
@@ -194,7 +231,16 @@ func (h *Handler) InitTopUp(c *fiber.Ctx) error {
 	})
 }
 
-// GetTopUpTONInfo returns TON payment info for balance top-up
+// GetTopUpTONInfo returns TON deep link for a top-up payment.
+//
+//	@Summary	TON deep link for top-up
+//	@Tags		balance
+//	@Produce	json
+//	@Param		payment_id	query		string	true	"payment uuid"
+//	@Success	200			{object}	model.TONPaymentInfo
+//	@Failure	404			{object}	map[string]string
+//	@Router		/api/balance/topup/ton [get]
+//	@Security	TelegramInitData
 func (h *Handler) GetTopUpTONInfo(c *fiber.Ctx) error {
 	userID := middleware.GetUserID(c)
 	if userID == 0 {
@@ -232,7 +278,16 @@ type VerifyTopUpRequest struct {
 	TxHash    string `json:"tx_hash"`
 }
 
-// InitTopUpStars creates a Stars invoice for balance top-up
+// InitTopUpStars creates a Stars invoice for a top-up payment.
+//
+//	@Summary	Stars invoice for top-up
+//	@Tags		balance
+//	@Produce	json
+//	@Param		payment_id	query		string	true	"payment uuid"
+//	@Success	200			{object}	map[string]interface{}
+//	@Failure	404			{object}	map[string]string
+//	@Router		/api/balance/topup/stars [get]
+//	@Security	TelegramInitData
 func (h *Handler) InitTopUpStars(c *fiber.Ctx) error {
 	userID := middleware.GetUserID(c)
 	if userID == 0 {
@@ -300,7 +355,19 @@ func (h *Handler) InitTopUpStars(c *fiber.Ctx) error {
 	})
 }
 
-// VerifyTopUp verifies TON transaction and credits balance
+// VerifyTopUp verifies a TON top-up transaction and credits balance.
+//
+//	@Summary	Verify TON top-up
+//	@Tags		balance
+//	@Accept		json
+//	@Produce	json
+//	@Param		body	body		VerifyTopUpRequest	true	"payment id + BOC"
+//	@Success	200		{object}	map[string]interface{}
+//	@Failure	400		{object}	map[string]string
+//	@Failure	403		{object}	map[string]string
+//	@Failure	404		{object}	map[string]string
+//	@Router		/api/balance/topup/verify [post]
+//	@Security	TelegramInitData
 func (h *Handler) VerifyTopUp(c *fiber.Ctx) error {
 	userID := middleware.GetUserID(c)
 	if userID == 0 {

@@ -11,11 +11,25 @@ import (
 )
 
 type BuySubscriptionRequest struct {
-	PlanID   string  `json:"plan_id"`
+	PlanID   string  `json:"plan_id" example:"a3b1f8a2-..."`
 	ServerID *string `json:"server_id,omitempty"`
-	Provider string  `json:"provider"`
+	Provider string  `json:"provider" enums:"ton,stars,cash"`
 }
 
+// BuySubscription initiates plan purchase. Provider determines response
+// shape: ton returns TON deep link; stars returns payment with id; cash
+// creates a pending payment and notifies admins.
+//
+//	@Summary	Initiate plan purchase
+//	@Tags		subscription
+//	@Accept		json
+//	@Produce	json
+//	@Param		body	body		BuySubscriptionRequest	true	"plan and provider"
+//	@Success	200		{object}	map[string]interface{}
+//	@Failure	400		{object}	map[string]string
+//	@Failure	500		{object}	map[string]string
+//	@Router		/api/subscription/buy [post]
+//	@Security	TelegramInitData
 func (h *Handler) BuySubscription(c *fiber.Ctx) error {
 	userID := middleware.GetUserID(c)
 	if userID == 0 {
@@ -116,6 +130,15 @@ func (h *Handler) BuySubscription(c *fiber.Ctx) error {
 	})
 }
 
+// GetSubscriptionKey returns the VLESS Reality URI for the active sub.
+//
+//	@Summary	Connection key
+//	@Tags		subscription
+//	@Produce	json
+//	@Success	200	{object}	map[string]string
+//	@Failure	404	{object}	map[string]string
+//	@Router		/api/subscription/key [get]
+//	@Security	TelegramInitData
 func (h *Handler) GetSubscriptionKey(c *fiber.Ctx) error {
 	userID := middleware.GetUserID(c)
 	if userID == 0 {
@@ -136,6 +159,15 @@ func (h *Handler) GetSubscriptionKey(c *fiber.Ctx) error {
 	})
 }
 
+// GetSubscriptionStatus returns active subscription status including
+// remaining days and traffic.
+//
+//	@Summary	Subscription status
+//	@Tags		subscription
+//	@Produce	json
+//	@Success	200	{object}	map[string]interface{}
+//	@Router		/api/subscription/status [get]
+//	@Security	TelegramInitData
 func (h *Handler) GetSubscriptionStatus(c *fiber.Ctx) error {
 	userID := middleware.GetUserID(c)
 	if userID == 0 {
@@ -167,6 +199,16 @@ func (h *Handler) GetSubscriptionStatus(c *fiber.Ctx) error {
 	})
 }
 
+// ActivateTrial enables the free trial subscription for the user.
+//
+//	@Summary	Activate free trial
+//	@Tags		subscription
+//	@Produce	json
+//	@Success	200	{object}	map[string]interface{}
+//	@Failure	409	{object}	map[string]string	"trial already used or active sub exists"
+//	@Failure	500	{object}	map[string]string
+//	@Router		/api/subscription/trial [post]
+//	@Security	TelegramInitData
 func (h *Handler) ActivateTrial(c *fiber.Ctx) error {
 	userID := middleware.GetUserID(c)
 	if userID == 0 {
@@ -201,7 +243,14 @@ type SwitchServerRequest struct {
 	ServerID string `json:"server_id"`
 }
 
-// GetSwitchServerInfo returns info about region switching (price and free switches)
+// GetSwitchServerInfo returns price + free-switch counter for region change.
+//
+//	@Summary	Region switch info
+//	@Tags		subscription
+//	@Produce	json
+//	@Success	200	{object}	map[string]interface{}
+//	@Router		/api/subscription/switch-server/info [get]
+//	@Security	TelegramInitData
 func (h *Handler) GetSwitchServerInfo(c *fiber.Ctx) error {
 	userID := middleware.GetUserID(c)
 	if userID == 0 {
@@ -230,7 +279,18 @@ func (h *Handler) GetSwitchServerInfo(c *fiber.Ctx) error {
 	})
 }
 
-// SwitchServer switches the active subscription to a different server
+// SwitchServer switches the active subscription to a different server.
+//
+//	@Summary	Switch active subscription to another server
+//	@Tags		subscription
+//	@Accept		json
+//	@Produce	json
+//	@Param		body	body		SwitchServerRequest	true	"target server"
+//	@Success	200		{object}	map[string]interface{}
+//	@Failure	400		{object}	map[string]string
+//	@Failure	402		{object}	map[string]string	"not enough balance"
+//	@Router		/api/subscription/switch-server [post]
+//	@Security	TelegramInitData
 func (h *Handler) SwitchServer(c *fiber.Ctx) error {
 	userID := middleware.GetUserID(c)
 	if userID == 0 {

@@ -24,7 +24,14 @@ func NewAdminHandler(adminSvc *service.AdminService, paymentSvc *service.Payment
 
 // --- Stats ---
 
-// GetStats returns admin dashboard statistics
+// GetStats returns admin dashboard counters.
+//
+//	@Summary	Admin dashboard stats
+//	@Tags		admin
+//	@Produce	json
+//	@Success	200	{object}	map[string]interface{}
+//	@Router		/api/admin/stats [get]
+//	@Security	TelegramInitData
 func (h *AdminHandler) GetStats(c *fiber.Ctx) error {
 	adminID := middleware.GetAdminID(c)
 	stats, err := h.adminSvc.GetStats(c.Context(), adminID)
@@ -41,7 +48,17 @@ type ListUsersResponse struct {
 	Total int          `json:"total"`
 }
 
-// ListUsers lists users with pagination
+// ListUsers lists users with pagination + search.
+//
+//	@Summary	List users
+//	@Tags		admin
+//	@Produce	json
+//	@Param		limit	query		int		false	"page size"	default(50)
+//	@Param		offset	query		int		false	"offset"	default(0)
+//	@Param		search	query		string	false	"username/name search"
+//	@Success	200		{object}	ListUsersResponse
+//	@Router		/api/admin/users [get]
+//	@Security	TelegramInitData
 func (h *AdminHandler) ListUsers(c *fiber.Ctx) error {
 	adminID := middleware.GetAdminID(c)
 	limit, _ := strconv.Atoi(c.Query("limit", "50"))
@@ -59,7 +76,16 @@ func (h *AdminHandler) ListUsers(c *fiber.Ctx) error {
 	})
 }
 
-// GetUser gets detailed user info
+// GetUser returns detailed user info with active subscription.
+//
+//	@Summary	Get user
+//	@Tags		admin
+//	@Produce	json
+//	@Param		user_id	path		int	true	"user id (telegram)"
+//	@Success	200		{object}	model.UserWithSubscription
+//	@Failure	404		{object}	map[string]string
+//	@Router		/api/admin/users/{user_id} [get]
+//	@Security	TelegramInitData
 func (h *AdminHandler) GetUser(c *fiber.Ctx) error {
 	adminID := middleware.GetAdminID(c)
 	targetUserID, err := strconv.ParseInt(c.Params("user_id"), 10, 64)
@@ -89,7 +115,17 @@ type SetBalanceRequest struct {
 	Balance float64 `json:"balance"`
 }
 
-// SetBalance sets user balance to a specific value
+// SetBalance sets user balance to an absolute value.
+//
+//	@Summary	Set user balance
+//	@Tags		admin
+//	@Accept		json
+//	@Produce	json
+//	@Param		user_id	path		int					true	"user id"
+//	@Param		body	body		SetBalanceRequest	true	"new balance"
+//	@Success	200		{object}	map[string]interface{}
+//	@Router		/api/admin/users/{user_id}/balance/set [post]
+//	@Security	TelegramInitData
 func (h *AdminHandler) SetBalance(c *fiber.Ctx) error {
 	adminID := middleware.GetAdminID(c)
 	targetUserID, err := strconv.ParseInt(c.Params("user_id"), 10, 64)
@@ -117,7 +153,17 @@ type AddBalanceRequest struct {
 	Amount float64 `json:"amount"`
 }
 
-// AddBalance adds amount to user balance
+// AddBalance adds delta to user balance.
+//
+//	@Summary	Add to user balance
+//	@Tags		admin
+//	@Accept		json
+//	@Produce	json
+//	@Param		user_id	path		int					true	"user id"
+//	@Param		body	body		AddBalanceRequest	true	"delta"
+//	@Success	200		{object}	map[string]interface{}
+//	@Router		/api/admin/users/{user_id}/balance/add [post]
+//	@Security	TelegramInitData
 func (h *AdminHandler) AddBalance(c *fiber.Ctx) error {
 	adminID := middleware.GetAdminID(c)
 	targetUserID, err := strconv.ParseInt(c.Params("user_id"), 10, 64)
@@ -147,7 +193,17 @@ type ExtendSubscriptionRequest struct {
 	Days int `json:"days"`
 }
 
-// ExtendSubscription extends user subscription
+// ExtendSubscription extends user subscription by N days.
+//
+//	@Summary	Extend subscription
+//	@Tags		admin
+//	@Accept		json
+//	@Produce	json
+//	@Param		user_id	path		int							true	"user id"
+//	@Param		body	body		ExtendSubscriptionRequest	true	"days"
+//	@Success	200		{object}	map[string]interface{}
+//	@Router		/api/admin/users/{user_id}/subscription/extend [post]
+//	@Security	TelegramInitData
 func (h *AdminHandler) ExtendSubscription(c *fiber.Ctx) error {
 	adminID := middleware.GetAdminID(c)
 	targetUserID, err := strconv.ParseInt(c.Params("user_id"), 10, 64)
@@ -177,7 +233,15 @@ func (h *AdminHandler) ExtendSubscription(c *fiber.Ctx) error {
 	return c.JSON(fiber.Map{"success": true})
 }
 
-// CancelSubscription cancels user subscription
+// CancelSubscription cancels user's active subscription.
+//
+//	@Summary	Cancel subscription
+//	@Tags		admin
+//	@Produce	json
+//	@Param		user_id	path		int	true	"user id"
+//	@Success	200		{object}	map[string]interface{}
+//	@Router		/api/admin/users/{user_id}/subscription/cancel [post]
+//	@Security	TelegramInitData
 func (h *AdminHandler) CancelSubscription(c *fiber.Ctx) error {
 	adminID := middleware.GetAdminID(c)
 	targetUserID, err := strconv.ParseInt(c.Params("user_id"), 10, 64)
@@ -201,7 +265,18 @@ type BanUserRequest struct {
 	ExpiresAt *time.Time `json:"expires_at,omitempty"`
 }
 
-// BanUser bans a user
+// BanUser bans a user.
+//
+//	@Summary	Ban user
+//	@Tags		admin
+//	@Accept		json
+//	@Produce	json
+//	@Param		user_id	path		int				true	"user id"
+//	@Param		body	body		BanUserRequest	true	"reason + optional expiry"
+//	@Success	200		{object}	map[string]interface{}
+//	@Failure	409		{object}	map[string]string	"already banned"
+//	@Router		/api/admin/users/{user_id}/ban [post]
+//	@Security	TelegramInitData
 func (h *AdminHandler) BanUser(c *fiber.Ctx) error {
 	adminID := middleware.GetAdminID(c)
 	targetUserID, err := strconv.ParseInt(c.Params("user_id"), 10, 64)
@@ -237,7 +312,16 @@ type BanIPRequest struct {
 	ExpiresAt *time.Time `json:"expires_at,omitempty"`
 }
 
-// BanIP bans an IP address
+// BanIP bans an IP address.
+//
+//	@Summary	Ban IP
+//	@Tags		admin
+//	@Accept		json
+//	@Produce	json
+//	@Param		body	body		BanIPRequest	true	"ip + reason"
+//	@Success	200		{object}	map[string]interface{}
+//	@Router		/api/admin/bans/ip [post]
+//	@Security	TelegramInitData
 func (h *AdminHandler) BanIP(c *fiber.Ctx) error {
 	adminID := middleware.GetAdminID(c)
 
@@ -261,7 +345,15 @@ func (h *AdminHandler) BanIP(c *fiber.Ctx) error {
 	return c.JSON(fiber.Map{"success": true})
 }
 
-// UnbanUser unbans a user
+// UnbanUser unbans a user.
+//
+//	@Summary	Unban user
+//	@Tags		admin
+//	@Produce	json
+//	@Param		user_id	path		int	true	"user id"
+//	@Success	200		{object}	map[string]interface{}
+//	@Router		/api/admin/users/{user_id}/unban [post]
+//	@Security	TelegramInitData
 func (h *AdminHandler) UnbanUser(c *fiber.Ctx) error {
 	adminID := middleware.GetAdminID(c)
 	targetUserID, err := strconv.ParseInt(c.Params("user_id"), 10, 64)
@@ -288,7 +380,16 @@ type UnbanIPRequest struct {
 	IP string `json:"ip"`
 }
 
-// UnbanIP unbans an IP address
+// UnbanIP unbans an IP.
+//
+//	@Summary	Unban IP
+//	@Tags		admin
+//	@Accept		json
+//	@Produce	json
+//	@Param		body	body		map[string]string	true	"{ip}"
+//	@Success	200		{object}	map[string]interface{}
+//	@Router		/api/admin/bans/ip/unban [post]
+//	@Security	TelegramInitData
 func (h *AdminHandler) UnbanIP(c *fiber.Ctx) error {
 	adminID := middleware.GetAdminID(c)
 
@@ -312,7 +413,16 @@ func (h *AdminHandler) UnbanIP(c *fiber.Ctx) error {
 	return c.JSON(fiber.Map{"success": true})
 }
 
-// ListBans lists all active bans
+// ListBans lists active user/IP bans.
+//
+//	@Summary	List bans
+//	@Tags		admin
+//	@Produce	json
+//	@Param		limit	query		int	false	"page size"	default(50)
+//	@Param		offset	query		int	false	"offset"	default(0)
+//	@Success	200		{object}	map[string]interface{}
+//	@Router		/api/admin/bans [get]
+//	@Security	TelegramInitData
 func (h *AdminHandler) ListBans(c *fiber.Ctx) error {
 	adminID := middleware.GetAdminID(c)
 	limit, _ := strconv.Atoi(c.Query("limit", "50"))
@@ -338,7 +448,17 @@ type CreatePromoCodeRequest struct {
 	CashAmountRUB *float64            `json:"cash_amount_rub,omitempty"`
 }
 
-// CreatePromoCode creates a new promo code
+// CreatePromoCode creates a single promo code.
+//
+//	@Summary	Create promo code
+//	@Tags		admin
+//	@Accept		json
+//	@Produce	json
+//	@Param		body	body		CreatePromoCodeRequest	true	"promo params"
+//	@Success	200		{object}	model.PromoCode
+//	@Failure	400		{object}	map[string]string
+//	@Router		/api/admin/promo [post]
+//	@Security	TelegramInitData
 func (h *AdminHandler) CreatePromoCode(c *fiber.Ctx) error {
 	adminID := middleware.GetAdminID(c)
 
@@ -398,7 +518,16 @@ type BulkPromoCodeRequest struct {
 	CashAmountRUB *float64            `json:"cash_amount_rub,omitempty"`
 }
 
-// CreateBulkPromoCodes creates multiple promo codes
+// CreateBulkPromoCodes generates N promo codes at once.
+//
+//	@Summary	Bulk-create promo codes
+//	@Tags		admin
+//	@Accept		json
+//	@Produce	json
+//	@Param		body	body		BulkPromoCodeRequest	true	"params + count"
+//	@Success	200		{object}	map[string]interface{}
+//	@Router		/api/admin/promo/bulk [post]
+//	@Security	TelegramInitData
 func (h *AdminHandler) CreateBulkPromoCodes(c *fiber.Ctx) error {
 	adminID := middleware.GetAdminID(c)
 
@@ -451,7 +580,16 @@ func (h *AdminHandler) CreateBulkPromoCodes(c *fiber.Ctx) error {
 	return c.JSON(fiber.Map{"codes": codes, "count": len(codes)})
 }
 
-// ListPromoCodes lists all promo codes
+// ListPromoCodes lists all promo codes (paginated).
+//
+//	@Summary	List promo codes
+//	@Tags		admin
+//	@Produce	json
+//	@Param		limit	query		int	false	"page size"	default(50)
+//	@Param		offset	query		int	false	"offset"	default(0)
+//	@Success	200		{object}	map[string]interface{}
+//	@Router		/api/admin/promo [get]
+//	@Security	TelegramInitData
 func (h *AdminHandler) ListPromoCodes(c *fiber.Ctx) error {
 	adminID := middleware.GetAdminID(c)
 	limit, _ := strconv.Atoi(c.Query("limit", "50"))
@@ -469,7 +607,16 @@ type DeactivatePromoCodeRequest struct {
 	Code string `json:"code"`
 }
 
-// DeactivatePromoCode deactivates a promo code
+// DeactivatePromoCode disables a promo code.
+//
+//	@Summary	Deactivate promo code
+//	@Tags		admin
+//	@Accept		json
+//	@Produce	json
+//	@Param		body	body		map[string]string	true	"{code}"
+//	@Success	200		{object}	map[string]interface{}
+//	@Router		/api/admin/promo/deactivate [post]
+//	@Security	TelegramInitData
 func (h *AdminHandler) DeactivatePromoCode(c *fiber.Ctx) error {
 	adminID := middleware.GetAdminID(c)
 
@@ -495,7 +642,16 @@ func (h *AdminHandler) DeactivatePromoCode(c *fiber.Ctx) error {
 
 // --- Admin Logs ---
 
-// GetLogs retrieves admin action logs
+// GetLogs returns admin action audit log.
+//
+//	@Summary	Admin audit log
+//	@Tags		admin
+//	@Produce	json
+//	@Param		limit	query		int	false	"page size"	default(50)
+//	@Param		offset	query		int	false	"offset"	default(0)
+//	@Success	200		{object}	map[string]interface{}
+//	@Router		/api/admin/logs [get]
+//	@Security	TelegramInitData
 func (h *AdminHandler) GetLogs(c *fiber.Ctx) error {
 	adminID := middleware.GetAdminID(c)
 	limit, _ := strconv.Atoi(c.Query("limit", "50"))
@@ -511,7 +667,14 @@ func (h *AdminHandler) GetLogs(c *fiber.Ctx) error {
 
 // --- Plan Management ---
 
-// ListPlans lists all plans (including inactive)
+// ListPlans lists all plans (incl. inactive).
+//
+//	@Summary	List all plans
+//	@Tags		admin
+//	@Produce	json
+//	@Success	200	{array}	model.Plan
+//	@Router		/api/admin/plans [get]
+//	@Security	TelegramInitData
 func (h *AdminHandler) ListPlans(c *fiber.Ctx) error {
 	plans, err := h.adminSvc.ListAllPlans(c.Context())
 	if err != nil {
@@ -537,7 +700,17 @@ type UpdatePlanRequest struct {
 	ClearVisibility bool `json:"clear_visibility,omitempty"`
 }
 
-// UpdatePlan updates a plan
+// UpdatePlan updates a plan; nil-fields are unchanged.
+//
+//	@Summary	Update plan
+//	@Tags		admin
+//	@Accept		json
+//	@Produce	json
+//	@Param		plan_id	path		string			true	"plan uuid"
+//	@Param		body	body		UpdatePlanRequest	true	"updates"
+//	@Success	200		{object}	model.Plan
+//	@Router		/api/admin/plans/{plan_id} [put]
+//	@Security	TelegramInitData
 func (h *AdminHandler) UpdatePlan(c *fiber.Ctx) error {
 	adminID := middleware.GetAdminID(c)
 	planID := c.Params("plan_id")
@@ -583,7 +756,16 @@ type CreatePlanRequest struct {
 	VisibleToReferrerID *int64  `json:"visible_to_referrer_id,omitempty"`
 }
 
-// CreatePlan creates a new plan
+// CreatePlan creates a new plan.
+//
+//	@Summary	Create plan
+//	@Tags		admin
+//	@Accept		json
+//	@Produce	json
+//	@Param		body	body		CreatePlanRequest	true	"new plan"
+//	@Success	200		{object}	model.Plan
+//	@Router		/api/admin/plans [post]
+//	@Security	TelegramInitData
 func (h *AdminHandler) CreatePlan(c *fiber.Ctx) error {
 	adminID := middleware.GetAdminID(c)
 
@@ -623,7 +805,15 @@ func (h *AdminHandler) CreatePlan(c *fiber.Ctx) error {
 	return c.JSON(plan)
 }
 
-// DeletePlan deactivates a plan (soft delete)
+// DeletePlan soft-deletes a plan (sets is_active=false).
+//
+//	@Summary	Delete plan
+//	@Tags		admin
+//	@Produce	json
+//	@Param		plan_id	path		string	true	"plan uuid"
+//	@Success	200		{object}	map[string]interface{}
+//	@Router		/api/admin/plans/{plan_id} [delete]
+//	@Security	TelegramInitData
 func (h *AdminHandler) DeletePlan(c *fiber.Ctx) error {
 	adminID := middleware.GetAdminID(c)
 	planID := c.Params("plan_id")
@@ -637,7 +827,14 @@ func (h *AdminHandler) DeletePlan(c *fiber.Ctx) error {
 
 // --- Settings Management ---
 
-// GetSettings returns all admin settings
+// GetSettings returns all dynamic settings.
+//
+//	@Summary	List settings
+//	@Tags		admin
+//	@Produce	json
+//	@Success	200	{object}	map[string]interface{}
+//	@Router		/api/admin/settings [get]
+//	@Security	TelegramInitData
 func (h *AdminHandler) GetSettings(c *fiber.Ctx) error {
 	adminID := middleware.GetAdminID(c)
 
@@ -649,7 +846,14 @@ func (h *AdminHandler) GetSettings(c *fiber.Ctx) error {
 	return c.JSON(fiber.Map{"settings": settings})
 }
 
-// GetTopupBonus returns current topup bonus percentage
+// GetTopupBonus returns the topup-bonus percent.
+//
+//	@Summary	Get topup bonus
+//	@Tags		admin
+//	@Produce	json
+//	@Success	200	{object}	map[string]interface{}
+//	@Router		/api/admin/settings/topup-bonus [get]
+//	@Security	TelegramInitData
 func (h *AdminHandler) GetTopupBonus(c *fiber.Ctx) error {
 	percent, err := h.adminSvc.GetTopupBonusPercent(c.Context())
 	if err != nil {
@@ -663,7 +867,16 @@ type SetTopupBonusRequest struct {
 	Percent float64 `json:"percent"`
 }
 
-// SetTopupBonus sets topup bonus percentage
+// SetTopupBonus sets the topup-bonus percent.
+//
+//	@Summary	Set topup bonus
+//	@Tags		admin
+//	@Accept		json
+//	@Produce	json
+//	@Param		body	body		map[string]float64	true	"{percent}"
+//	@Success	200		{object}	map[string]interface{}
+//	@Router		/api/admin/settings/topup-bonus [post]
+//	@Security	TelegramInitData
 func (h *AdminHandler) SetTopupBonus(c *fiber.Ctx) error {
 	adminID := middleware.GetAdminID(c)
 
@@ -683,7 +896,14 @@ func (h *AdminHandler) SetTopupBonus(c *fiber.Ctx) error {
 	return c.JSON(fiber.Map{"success": true, "topup_bonus_percent": req.Percent})
 }
 
-// GetReferralBonus returns current referral bonus percentage
+// GetReferralBonus returns referral percent.
+//
+//	@Summary	Get referral bonus percent
+//	@Tags		admin
+//	@Produce	json
+//	@Success	200	{object}	map[string]interface{}
+//	@Router		/api/admin/settings/referral-bonus [get]
+//	@Security	TelegramInitData
 func (h *AdminHandler) GetReferralBonus(c *fiber.Ctx) error {
 	percent, err := h.adminSvc.GetReferralBonusPercent(c.Context())
 	if err != nil {
@@ -697,7 +917,16 @@ type SetReferralBonusRequest struct {
 	Percent float64 `json:"percent"`
 }
 
-// SetReferralBonus sets referral bonus percentage
+// SetReferralBonus sets referral percent.
+//
+//	@Summary	Set referral bonus percent
+//	@Tags		admin
+//	@Accept		json
+//	@Produce	json
+//	@Param		body	body		map[string]float64	true	"{percent}"
+//	@Success	200		{object}	map[string]interface{}
+//	@Router		/api/admin/settings/referral-bonus [post]
+//	@Security	TelegramInitData
 func (h *AdminHandler) SetReferralBonus(c *fiber.Ctx) error {
 	adminID := middleware.GetAdminID(c)
 
@@ -717,7 +946,14 @@ func (h *AdminHandler) SetReferralBonus(c *fiber.Ctx) error {
 	return c.JSON(fiber.Map{"success": true, "referral_bonus_percent": req.Percent})
 }
 
-// GetReferralBonusDays returns current referral bonus days
+// GetReferralBonusDays returns bonus days for referrer.
+//
+//	@Summary	Get referral bonus days
+//	@Tags		admin
+//	@Produce	json
+//	@Success	200	{object}	map[string]interface{}
+//	@Router		/api/admin/settings/referral-bonus-days [get]
+//	@Security	TelegramInitData
 func (h *AdminHandler) GetReferralBonusDays(c *fiber.Ctx) error {
 	days, err := h.adminSvc.GetReferralBonusDays(c.Context())
 	if err != nil {
@@ -731,7 +967,16 @@ type SetReferralBonusDaysRequest struct {
 	Days int `json:"days"`
 }
 
-// SetReferralBonusDays sets referral bonus days
+// SetReferralBonusDays sets bonus days for referrer.
+//
+//	@Summary	Set referral bonus days
+//	@Tags		admin
+//	@Accept		json
+//	@Produce	json
+//	@Param		body	body		map[string]int	true	"{days}"
+//	@Success	200		{object}	map[string]interface{}
+//	@Router		/api/admin/settings/referral-bonus-days [post]
+//	@Security	TelegramInitData
 func (h *AdminHandler) SetReferralBonusDays(c *fiber.Ctx) error {
 	adminID := middleware.GetAdminID(c)
 
@@ -751,7 +996,14 @@ func (h *AdminHandler) SetReferralBonusDays(c *fiber.Ctx) error {
 	return c.JSON(fiber.Map{"success": true, "referral_bonus_days": req.Days})
 }
 
-// GetRegionSwitchPrice returns current region switch price
+// GetRegionSwitchPrice returns region switch price (TON).
+//
+//	@Summary	Get region switch price
+//	@Tags		admin
+//	@Produce	json
+//	@Success	200	{object}	map[string]interface{}
+//	@Router		/api/admin/settings/region-switch-price [get]
+//	@Security	TelegramInitData
 func (h *AdminHandler) GetRegionSwitchPrice(c *fiber.Ctx) error {
 	price, err := h.adminSvc.GetRegionSwitchPrice(c.Context())
 	if err != nil {
@@ -765,7 +1017,16 @@ type SetRegionSwitchPriceRequest struct {
 	Price float64 `json:"price"`
 }
 
-// SetRegionSwitchPrice sets region switch price in TON
+// SetRegionSwitchPrice sets region switch price.
+//
+//	@Summary	Set region switch price
+//	@Tags		admin
+//	@Accept		json
+//	@Produce	json
+//	@Param		body	body		SetRegionSwitchPriceRequest	true	"{price}"
+//	@Success	200		{object}	map[string]interface{}
+//	@Router		/api/admin/settings/region-switch-price [post]
+//	@Security	TelegramInitData
 func (h *AdminHandler) SetRegionSwitchPrice(c *fiber.Ctx) error {
 	adminID := middleware.GetAdminID(c)
 
@@ -796,7 +1057,17 @@ type CreateCashPaymentRequest struct {
 // CreateCashPayment lets the admin proactively create a pending cash payment
 // for a specific user at a custom RUB amount. The user gets an inline-button
 // notification in Telegram and can pay the admin in person; the admin then
-// taps «Подтвердил» to provision the subscription.
+// CreateCashPayment creates a pending cash payment for a user.
+//
+//	@Summary	Create cash payment for user
+//	@Tags		admin
+//	@Accept		json
+//	@Produce	json
+//	@Param		user_id	path		int						true	"user id"
+//	@Param		body	body		CreateCashPaymentRequest	true	"plan + amount in RUB"
+//	@Success	200		{object}	map[string]interface{}
+//	@Router		/api/admin/users/{user_id}/cash-payment [post]
+//	@Security	TelegramInitData
 func (h *AdminHandler) CreateCashPayment(c *fiber.Ctx) error {
 	targetUserID, err := strconv.ParseInt(c.Params("user_id"), 10, 64)
 	if err != nil {
@@ -833,7 +1104,15 @@ func (h *AdminHandler) CreateCashPayment(c *fiber.Ctx) error {
 // --- Cash payments approval flow ---
 
 // ListPendingCashPayments returns pending cash payments awaiting admin
-// review. Newest first. limit defaults to 50.
+// ListPendingCashPayments lists pending cash payments.
+//
+//	@Summary	Pending cash payments
+//	@Tags		admin
+//	@Produce	json
+//	@Param		limit	query		int	false	"page size"	default(50)
+//	@Success	200		{object}	map[string]interface{}
+//	@Router		/api/admin/payments/cash/pending [get]
+//	@Security	TelegramInitData
 func (h *AdminHandler) ListPendingCashPayments(c *fiber.Ctx) error {
 	limit := 50
 	if v := c.Query("limit"); v != "" {
@@ -849,7 +1128,15 @@ func (h *AdminHandler) ListPendingCashPayments(c *fiber.Ctx) error {
 }
 
 // ApproveCashPayment marks a pending cash payment as completed and provisions
-// the subscription. Idempotent for already-completed payments.
+// ApproveCashPayment marks a cash payment as paid → provisions sub.
+//
+//	@Summary	Approve cash payment
+//	@Tags		admin
+//	@Produce	json
+//	@Param		payment_id	path		string	true	"payment uuid"
+//	@Success	200			{object}	map[string]interface{}
+//	@Router		/api/admin/payments/cash/{payment_id}/approve [post]
+//	@Security	TelegramInitData
 func (h *AdminHandler) ApproveCashPayment(c *fiber.Ctx) error {
 	id, err := uuid.Parse(c.Params("payment_id"))
 	if err != nil {
@@ -866,7 +1153,17 @@ type RejectCashPaymentRequest struct {
 }
 
 // RejectCashPayment marks a pending cash payment as failed and notifies the
-// buyer. Optional reason is shown to the user.
+// RejectCashPayment rejects a pending cash payment.
+//
+//	@Summary	Reject cash payment
+//	@Tags		admin
+//	@Accept		json
+//	@Produce	json
+//	@Param		payment_id	path		string					true	"payment uuid"
+//	@Param		body		body		RejectCashPaymentRequest	false	"reason"
+//	@Success	200			{object}	map[string]interface{}
+//	@Router		/api/admin/payments/cash/{payment_id}/reject [post]
+//	@Security	TelegramInitData
 func (h *AdminHandler) RejectCashPayment(c *fiber.Ctx) error {
 	id, err := uuid.Parse(c.Params("payment_id"))
 	if err != nil {
