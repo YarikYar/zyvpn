@@ -81,9 +81,7 @@ func (h *Handler) BuySubscription(c *fiber.Ctx) error {
 		amountRUB := plan.PriceUSD * rates.USDRUB
 		payment, err := h.paymentSvc.CreateCashPaymentWithAmount(c.Context(), userID, planID, serverID, amountRUB)
 		if err != nil {
-			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-				"error": "failed to create payment: " + err.Error(),
-			})
+			return respondInternalError(c, err)
 		}
 		return c.JSON(fiber.Map{
 			"payment":     payment,
@@ -95,9 +93,7 @@ func (h *Handler) BuySubscription(c *fiber.Ctx) error {
 
 	payment, err := h.paymentSvc.CreatePaymentWithServer(c.Context(), userID, planID, serverID, provider)
 	if err != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-			"error": "failed to create payment: " + err.Error(),
-		})
+		return respondInternalError(c, err)
 	}
 
 	// Return payment info based on provider
@@ -191,9 +187,7 @@ func (h *Handler) ActivateTrial(c *fiber.Ctx) error {
 				"error": "У вас уже есть активная подписка",
 			})
 		}
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-			"error": err.Error(),
-		})
+		return respondInternalError(c, err)
 	}
 
 	return c.JSON(fiber.Map{
@@ -285,9 +279,7 @@ func (h *Handler) SwitchServer(c *fiber.Ctx) error {
 					"need_more":      true,
 				})
 			}
-			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-				"error": err.Error(),
-			})
+			return respondInternalError(c, err)
 		}
 	}
 
@@ -298,9 +290,7 @@ func (h *Handler) SwitchServer(c *fiber.Ctx) error {
 				"error": "Нет активной подписки",
 			})
 		}
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-			"error": err.Error(),
-		})
+		return respondInternalError(c, err)
 	}
 
 	return c.JSON(fiber.Map{

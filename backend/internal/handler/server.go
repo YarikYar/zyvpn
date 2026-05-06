@@ -1,6 +1,8 @@
 package handler
 
 import (
+	"log"
+
 	"github.com/gofiber/fiber/v2"
 	"github.com/google/uuid"
 	"github.com/zyvpn/backend/internal/middleware"
@@ -24,9 +26,7 @@ func NewServerHandler(serverSvc *service.ServerService) *ServerHandler {
 func (h *ServerHandler) GetServers(c *fiber.Ctx) error {
 	servers, err := h.serverSvc.GetActiveServers(c.Context())
 	if err != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-			"error": err.Error(),
-		})
+		return respondInternalError(c, err)
 	}
 	return c.JSON(fiber.Map{"servers": servers})
 }
@@ -38,9 +38,7 @@ func (h *ServerHandler) GetAllServers(c *fiber.Ctx) error {
 	_ = middleware.GetAdminID(c)
 	servers, err := h.serverSvc.GetAllServers(c.Context())
 	if err != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-			"error": err.Error(),
-		})
+		return respondInternalError(c, err)
 	}
 	return c.JSON(fiber.Map{"servers": servers})
 }
@@ -145,9 +143,7 @@ func (h *ServerHandler) CreateServer(c *fiber.Ctx) error {
 	}
 
 	if err := h.serverSvc.CreateServer(c.Context(), server); err != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-			"error": err.Error(),
-		})
+		return respondInternalError(c, err)
 	}
 
 	return c.JSON(server.ToAdmin())
@@ -247,9 +243,7 @@ func (h *ServerHandler) UpdateServer(c *fiber.Ctx) error {
 	}
 
 	if err := h.serverSvc.UpdateServer(c.Context(), server); err != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-			"error": err.Error(),
-		})
+		return respondInternalError(c, err)
 	}
 
 	return c.JSON(server.ToAdmin())
@@ -266,9 +260,7 @@ func (h *ServerHandler) DeleteServer(c *fiber.Ctx) error {
 	}
 
 	if err := h.serverSvc.DeleteServer(c.Context(), serverID); err != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-			"error": err.Error(),
-		})
+		return respondInternalError(c, err)
 	}
 
 	return c.JSON(fiber.Map{"success": true})
@@ -286,8 +278,9 @@ func (h *ServerHandler) TestServerConnection(c *fiber.Ctx) error {
 
 	client, _, err := h.serverSvc.GetXUIClient(c.Context(), serverID)
 	if err != nil {
+		log.Printf("[TestServerConnection] GetXUIClient %s: %v", serverID, err)
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-			"error": err.Error(),
+			"error":     "Не удалось подключиться к серверу",
 			"connected": false,
 		})
 	}

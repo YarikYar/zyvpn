@@ -47,8 +47,8 @@ services:
       - TELEGRAM_WEBAPP_URL=${TELEGRAM_WEBAPP_URL:-https://vpn.zaruchevskiy.ru}
       - TON_TESTNET=${TON_TESTNET:-false}
       - TON_WALLET_ADDRESS=${TON_WALLET_ADDRESS}
-      - JWT_SECRET=${JWT_SECRET}
       - ALLOW_ORIGINS=${ALLOW_ORIGINS:-https://vpn.zaruchevskiy.ru,https://api.zaruchevskiy.ru}
+      - INTERNAL_SECRET=${INTERNAL_SECRET}
     ports:
       # Exposed for the file-routing Traefik on 192.168.1.150.
       - "${BACKEND_PORT:-8094}:8080"

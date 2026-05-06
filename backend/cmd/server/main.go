@@ -10,6 +10,7 @@ import (
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/cors"
+	"github.com/gofiber/fiber/v2/middleware/limiter"
 	"github.com/gofiber/fiber/v2/middleware/logger"
 	"github.com/gofiber/fiber/v2/middleware/recover"
 
@@ -101,6 +102,9 @@ func main() {
 	// Middleware
 	app.Use(recover.New())
 	app.Use(logger.New())
+	if cfg.Server.AllowOrigins == "" {
+		log.Println("WARNING: ALLOW_ORIGINS is empty — all cross-origin requests will be rejected")
+	}
 	app.Use(cors.New(cors.Config{
 		AllowOrigins: cfg.Server.AllowOrigins,
 		AllowHeaders: "Origin, Content-Type, Accept, Authorization, X-Telegram-Init-Data",
@@ -113,12 +117,24 @@ func main() {
 	// Public API (no auth required)
 	app.Get("/api/rates", h.GetRates)
 
-	// Webhooks (no auth required) - TON payment callbacks
-	app.Post("/webhook/ton", h.TONWebhook)
-	app.Post("/webhook/stars", h.StarsWebhook)
+	// 60 requests / minute / IP for the user-facing API. Trial-spam,
+	// promo-code brute force и тому подобное.
+	apiLimiter := limiter.New(limiter.Config{
+		Max:        60,
+		Expiration: 1 * time.Minute,
+		LimitReached: func(c *fiber.Ctx) error {
+			return c.Status(fiber.StatusTooManyRequests).JSON(fiber.Map{
+				"error": "Слишком много запросов, попробуйте через минуту",
+			})
+		},
+	})
 
-	// API routes with Telegram authentication
-	api := app.Group("/api", middleware.TelegramAuth(cfg))
+	// API routes: rate limit → Telegram auth → ban check.
+	api := app.Group("/api",
+		apiLimiter,
+		middleware.TelegramAuth(cfg),
+		middleware.BanCheck(adminSvc),
+	)
 
 	// Plans
 	api.Get("/plans", h.GetPlans)
@@ -164,7 +180,11 @@ func main() {
 	api.Get("/servers", serverHandler.GetServers)
 
 	// Admin panel routes (requires Telegram auth + admin check)
-	admin := app.Group("/api/admin", middleware.TelegramAuth(cfg), middleware.AdminAuth(adminSvc))
+	admin := app.Group("/api/admin",
+		middleware.TelegramAuth(cfg),
+		middleware.BanCheck(adminSvc),
+		middleware.AdminAuth(adminSvc),
+	)
 	admin.Get("/stats", adminHandler.GetStats)
 
 	// Admin - User management
@@ -222,8 +242,12 @@ func main() {
 	admin.Delete("/servers/:server_id", serverHandler.DeleteServer)
 	admin.Post("/servers/:server_id/test", serverHandler.TestServerConnection)
 
-	// Internal endpoints (for cron jobs)
-	internal := app.Group("/internal")
+	// Internal endpoints (cron jobs). Behind a shared secret because the
+	// reverse proxy exposes /internal/* publicly.
+	if cfg.Server.InternalSecret == "" {
+		log.Println("WARNING: INTERNAL_SECRET is empty — /internal/cron/* will refuse all requests")
+	}
+	internal := app.Group("/internal", middleware.InternalSecret(cfg.Server.InternalSecret))
 	internal.Post("/cron/expire", func(c *fiber.Ctx) error {
 		if err := subscriptionSvc.ProcessExpiredSubscriptions(c.Context()); err != nil {
 			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{

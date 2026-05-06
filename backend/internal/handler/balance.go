@@ -2,6 +2,7 @@ package handler
 
 import (
 	"fmt"
+	"log"
 	"strconv"
 
 	"github.com/gofiber/fiber/v2"
@@ -124,18 +125,14 @@ func (h *Handler) PayFromBalance(c *fiber.Ctx) error {
 	// Debit balance
 	newBalance, err := h.balanceSvc.DebitForSubscription(c.Context(), userID, plan.PriceTON, payment.ID)
 	if err != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-			"error": "failed to debit balance: " + err.Error(),
-		})
+		return respondInternalError(c, err)
 	}
 
 	// Complete payment and create/extend subscription
 	if err := h.paymentSvc.CompletePayment(c.Context(), payment.ID); err != nil {
 		// Refund on failure
 		h.balanceSvc.CreditRefund(c.Context(), userID, plan.PriceTON, payment.ID)
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-			"error": "failed to complete payment: " + err.Error(),
-		})
+		return respondInternalError(c, err)
 	}
 
 	// Get subscription key
@@ -186,9 +183,7 @@ func (h *Handler) InitTopUp(c *fiber.Ctx) error {
 
 	payment, err := h.paymentSvc.CreateTopUpPayment(c.Context(), userID, req.Amount, req.Provider)
 	if err != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-			"error": "failed to create payment: " + err.Error(),
-		})
+		return respondInternalError(c, err)
 	}
 
 	return c.JSON(fiber.Map{
@@ -294,9 +289,7 @@ func (h *Handler) InitTopUpStars(c *fiber.Ctx) error {
 		payment.ID.String(),
 	)
 	if err != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-			"error": "failed to create invoice: " + err.Error(),
-		})
+		return respondInternalError(c, err)
 	}
 
 	return c.JSON(fiber.Map{
@@ -330,9 +323,23 @@ func (h *Handler) VerifyTopUp(c *fiber.Ctx) error {
 		})
 	}
 
+	// Ownership check.
+	payment, err := h.paymentSvc.GetPayment(c.Context(), paymentID)
+	if err != nil {
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
+			"error": "Платёж не найден",
+		})
+	}
+	if payment.UserID != userID {
+		return c.Status(fiber.StatusForbidden).JSON(fiber.Map{
+			"error": "Доступ запрещён",
+		})
+	}
+
 	if err := h.paymentSvc.CompleteTopUpPayment(c.Context(), paymentID, req.TxHash); err != nil {
+		log.Printf("[VerifyTopUp] %s: %v", paymentID, err)
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-			"error": err.Error(),
+			"error": "Не удалось проверить платёж",
 		})
 	}
 

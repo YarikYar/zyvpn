@@ -4,6 +4,7 @@ import (
 	"crypto/hmac"
 	"crypto/sha256"
 	"encoding/hex"
+	"encoding/json"
 	"net/url"
 	"sort"
 	"strconv"
@@ -104,63 +105,44 @@ func ValidateTelegramInitData(initData, botToken string) (*TelegramInitData, err
 	// Calculate hash
 	h := hmac.New(sha256.New, secretKey.Sum(nil))
 	h.Write([]byte(dataCheckString))
-	calculatedHash := hex.EncodeToString(h.Sum(nil))
+	calculatedHash := h.Sum(nil)
 
-	if calculatedHash != hash {
+	providedHash, err := hex.DecodeString(hash)
+	if err != nil {
+		return nil, fiber.NewError(fiber.StatusUnauthorized, "invalid hash encoding")
+	}
+
+	// Constant-time comparison to avoid leaking timing information.
+	if !hmac.Equal(calculatedHash, providedHash) {
 		return nil, fiber.NewError(fiber.StatusUnauthorized, "invalid hash")
 	}
 
-	// Parse user data
 	userData := &TelegramInitData{
 		QueryID:  values.Get("query_id"),
 		AuthDate: authDate,
 		Hash:     hash,
 	}
 
-	userJSON := values.Get("user")
-	if userJSON != "" {
-		// Parse user JSON manually
-		userJSON, _ = url.QueryUnescape(userJSON)
-		userData.UserID = parseJSONInt(userJSON, "id")
-		userData.Username = parseJSONString(userJSON, "username")
-		userData.FirstName = parseJSONString(userJSON, "first_name")
-		userData.LastName = parseJSONString(userJSON, "last_name")
-		userData.LanguageCode = parseJSONString(userJSON, "language_code")
+	if rawUser := values.Get("user"); rawUser != "" {
+		var u struct {
+			ID           int64  `json:"id"`
+			Username     string `json:"username"`
+			FirstName    string `json:"first_name"`
+			LastName     string `json:"last_name"`
+			LanguageCode string `json:"language_code"`
+		}
+		// Telegram passes user as a JSON string (already URL-decoded by ParseQuery).
+		if err := json.Unmarshal([]byte(rawUser), &u); err != nil {
+			return nil, fiber.NewError(fiber.StatusUnauthorized, "invalid user payload")
+		}
+		userData.UserID = u.ID
+		userData.Username = u.Username
+		userData.FirstName = u.FirstName
+		userData.LastName = u.LastName
+		userData.LanguageCode = u.LanguageCode
 	}
 
 	return userData, nil
-}
-
-func parseJSONString(json, key string) string {
-	search := `"` + key + `":"`
-	start := strings.Index(json, search)
-	if start == -1 {
-		return ""
-	}
-	start += len(search)
-	end := strings.Index(json[start:], `"`)
-	if end == -1 {
-		return ""
-	}
-	return json[start : start+end]
-}
-
-func parseJSONInt(json, key string) int64 {
-	search := `"` + key + `":`
-	start := strings.Index(json, search)
-	if start == -1 {
-		return 0
-	}
-	start += len(search)
-
-	// Find end of number
-	end := start
-	for end < len(json) && (json[end] >= '0' && json[end] <= '9') {
-		end++
-	}
-
-	val, _ := strconv.ParseInt(json[start:end], 10, 64)
-	return val
 }
 
 func GetUserID(c *fiber.Ctx) int64 {

@@ -17,10 +17,10 @@ type Config struct {
 }
 
 type ServerConfig struct {
-	Port         string
-	Environment  string
-	JWTSecret    string
-	AllowOrigins string
+	Port           string
+	Environment    string
+	AllowOrigins   string
+	InternalSecret string
 }
 
 type DatabaseConfig struct {
@@ -61,10 +61,12 @@ func Load() (*Config, error) {
 
 	cfg := &Config{
 		Server: ServerConfig{
-			Port:         getEnv("SERVER_PORT", "8080"),
-			Environment:  getEnv("ENVIRONMENT", "development"),
-			JWTSecret:    getEnv("JWT_SECRET", "your-secret-key-change-in-production"),
-			AllowOrigins: getEnv("ALLOW_ORIGINS", "*"),
+			Port:        getEnv("SERVER_PORT", "8080"),
+			Environment: getEnv("ENVIRONMENT", "development"),
+			// Empty default closes CORS by default; production must
+			// set ALLOW_ORIGINS explicitly.
+			AllowOrigins:   getEnv("ALLOW_ORIGINS", ""),
+			InternalSecret: getEnv("INTERNAL_SECRET", ""),
 		},
 		Database: DatabaseConfig{
 			Host:     getEnv("DB_HOST", "localhost"),

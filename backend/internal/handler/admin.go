@@ -29,9 +29,7 @@ func (h *AdminHandler) GetStats(c *fiber.Ctx) error {
 	adminID := middleware.GetAdminID(c)
 	stats, err := h.adminSvc.GetStats(c.Context(), adminID)
 	if err != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-			"error": err.Error(),
-		})
+		return respondInternalError(c, err)
 	}
 	return c.JSON(stats)
 }
@@ -52,9 +50,7 @@ func (h *AdminHandler) ListUsers(c *fiber.Ctx) error {
 
 	users, total, err := h.adminSvc.ListUsers(c.Context(), adminID, limit, offset, search)
 	if err != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-			"error": err.Error(),
-		})
+		return respondInternalError(c, err)
 	}
 
 	return c.JSON(ListUsersResponse{
@@ -111,9 +107,7 @@ func (h *AdminHandler) SetBalance(c *fiber.Ctx) error {
 	}
 
 	if err := h.adminSvc.SetBalance(c.Context(), adminID, targetUserID, req.Balance); err != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-			"error": err.Error(),
-		})
+		return respondInternalError(c, err)
 	}
 
 	return c.JSON(fiber.Map{"success": true})
@@ -141,9 +135,7 @@ func (h *AdminHandler) AddBalance(c *fiber.Ctx) error {
 	}
 
 	if err := h.adminSvc.AddBalance(c.Context(), adminID, targetUserID, req.Amount); err != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-			"error": err.Error(),
-		})
+		return respondInternalError(c, err)
 	}
 
 	return c.JSON(fiber.Map{"success": true})
@@ -179,9 +171,7 @@ func (h *AdminHandler) ExtendSubscription(c *fiber.Ctx) error {
 	}
 
 	if err := h.adminSvc.ExtendSubscription(c.Context(), adminID, targetUserID, req.Days); err != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-			"error": err.Error(),
-		})
+		return respondInternalError(c, err)
 	}
 
 	return c.JSON(fiber.Map{"success": true})
@@ -198,9 +188,7 @@ func (h *AdminHandler) CancelSubscription(c *fiber.Ctx) error {
 	}
 
 	if err := h.adminSvc.CancelSubscription(c.Context(), adminID, targetUserID); err != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-			"error": err.Error(),
-		})
+		return respondInternalError(c, err)
 	}
 
 	return c.JSON(fiber.Map{"success": true})
@@ -267,9 +255,7 @@ func (h *AdminHandler) BanIP(c *fiber.Ctx) error {
 	}
 
 	if err := h.adminSvc.BanIP(c.Context(), adminID, req.IP, req.Reason, req.ExpiresAt); err != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-			"error": err.Error(),
-		})
+		return respondInternalError(c, err)
 	}
 
 	return c.JSON(fiber.Map{"success": true})
@@ -320,9 +306,7 @@ func (h *AdminHandler) UnbanIP(c *fiber.Ctx) error {
 	}
 
 	if err := h.adminSvc.UnbanIP(c.Context(), adminID, req.IP); err != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-			"error": err.Error(),
-		})
+		return respondInternalError(c, err)
 	}
 
 	return c.JSON(fiber.Map{"success": true})
@@ -336,9 +320,7 @@ func (h *AdminHandler) ListBans(c *fiber.Ctx) error {
 
 	bans, err := h.adminSvc.ListBannedUsers(c.Context(), adminID, limit, offset)
 	if err != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-			"error": err.Error(),
-		})
+		return respondInternalError(c, err)
 	}
 
 	return c.JSON(fiber.Map{"bans": bans})
@@ -399,9 +381,7 @@ func (h *AdminHandler) CreatePromoCode(c *fiber.Ctx) error {
 
 	promo, err := h.adminSvc.GeneratePromoCode(c.Context(), adminID, req.Type, req.Value, req.MaxUses, req.ExpiresAt, req.Description, planID, req.CashAmountRUB)
 	if err != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-			"error": err.Error(),
-		})
+		return respondInternalError(c, err)
 	}
 
 	return c.JSON(promo)
@@ -465,9 +445,7 @@ func (h *AdminHandler) CreateBulkPromoCodes(c *fiber.Ctx) error {
 
 	codes, err := h.adminSvc.GenerateBulkPromoCodes(c.Context(), adminID, req.Count, req.Type, req.Value, req.MaxUses, req.ExpiresAt, req.Prefix, bulkPlanID, req.CashAmountRUB)
 	if err != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-			"error": err.Error(),
-		})
+		return respondInternalError(c, err)
 	}
 
 	return c.JSON(fiber.Map{"codes": codes, "count": len(codes)})
@@ -481,9 +459,7 @@ func (h *AdminHandler) ListPromoCodes(c *fiber.Ctx) error {
 
 	promos, err := h.adminSvc.ListPromoCodes(c.Context(), adminID, limit, offset)
 	if err != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-			"error": err.Error(),
-		})
+		return respondInternalError(c, err)
 	}
 
 	return c.JSON(fiber.Map{"promo_codes": promos})
@@ -511,9 +487,7 @@ func (h *AdminHandler) DeactivatePromoCode(c *fiber.Ctx) error {
 	}
 
 	if err := h.adminSvc.DeactivatePromoCode(c.Context(), adminID, req.Code); err != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-			"error": err.Error(),
-		})
+		return respondInternalError(c, err)
 	}
 
 	return c.JSON(fiber.Map{"success": true})
@@ -529,9 +503,7 @@ func (h *AdminHandler) GetLogs(c *fiber.Ctx) error {
 
 	logs, err := h.adminSvc.GetAdminLogs(c.Context(), adminID, limit, offset)
 	if err != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-			"error": err.Error(),
-		})
+		return respondInternalError(c, err)
 	}
 
 	return c.JSON(fiber.Map{"logs": logs})
@@ -543,9 +515,7 @@ func (h *AdminHandler) GetLogs(c *fiber.Ctx) error {
 func (h *AdminHandler) ListPlans(c *fiber.Ctx) error {
 	plans, err := h.adminSvc.ListAllPlans(c.Context())
 	if err != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-			"error": err.Error(),
-		})
+		return respondInternalError(c, err)
 	}
 	return c.JSON(fiber.Map{"plans": plans})
 }
@@ -594,9 +564,7 @@ func (h *AdminHandler) UpdatePlan(c *fiber.Ctx) error {
 		ClearVisibility:     req.ClearVisibility,
 	})
 	if err != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-			"error": err.Error(),
-		})
+		return respondInternalError(c, err)
 	}
 
 	return c.JSON(plan)
@@ -649,9 +617,7 @@ func (h *AdminHandler) CreatePlan(c *fiber.Ctx) error {
 		VisibleToReferrerID: req.VisibleToReferrerID,
 	})
 	if err != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-			"error": err.Error(),
-		})
+		return respondInternalError(c, err)
 	}
 
 	return c.JSON(plan)
@@ -663,9 +629,7 @@ func (h *AdminHandler) DeletePlan(c *fiber.Ctx) error {
 	planID := c.Params("plan_id")
 
 	if err := h.adminSvc.DeletePlan(c.Context(), adminID, planID); err != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-			"error": err.Error(),
-		})
+		return respondInternalError(c, err)
 	}
 
 	return c.JSON(fiber.Map{"success": true})
@@ -679,9 +643,7 @@ func (h *AdminHandler) GetSettings(c *fiber.Ctx) error {
 
 	settings, err := h.adminSvc.GetSettings(c.Context(), adminID)
 	if err != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-			"error": err.Error(),
-		})
+		return respondInternalError(c, err)
 	}
 
 	return c.JSON(fiber.Map{"settings": settings})
@@ -691,9 +653,7 @@ func (h *AdminHandler) GetSettings(c *fiber.Ctx) error {
 func (h *AdminHandler) GetTopupBonus(c *fiber.Ctx) error {
 	percent, err := h.adminSvc.GetTopupBonusPercent(c.Context())
 	if err != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-			"error": err.Error(),
-		})
+		return respondInternalError(c, err)
 	}
 
 	return c.JSON(fiber.Map{"topup_bonus_percent": percent})
@@ -727,9 +687,7 @@ func (h *AdminHandler) SetTopupBonus(c *fiber.Ctx) error {
 func (h *AdminHandler) GetReferralBonus(c *fiber.Ctx) error {
 	percent, err := h.adminSvc.GetReferralBonusPercent(c.Context())
 	if err != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-			"error": err.Error(),
-		})
+		return respondInternalError(c, err)
 	}
 
 	return c.JSON(fiber.Map{"referral_bonus_percent": percent})
@@ -763,9 +721,7 @@ func (h *AdminHandler) SetReferralBonus(c *fiber.Ctx) error {
 func (h *AdminHandler) GetReferralBonusDays(c *fiber.Ctx) error {
 	days, err := h.adminSvc.GetReferralBonusDays(c.Context())
 	if err != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-			"error": err.Error(),
-		})
+		return respondInternalError(c, err)
 	}
 
 	return c.JSON(fiber.Map{"referral_bonus_days": days})
@@ -799,9 +755,7 @@ func (h *AdminHandler) SetReferralBonusDays(c *fiber.Ctx) error {
 func (h *AdminHandler) GetRegionSwitchPrice(c *fiber.Ctx) error {
 	price, err := h.adminSvc.GetRegionSwitchPrice(c.Context())
 	if err != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-			"error": err.Error(),
-		})
+		return respondInternalError(c, err)
 	}
 
 	return c.JSON(fiber.Map{"region_switch_price": price})
@@ -871,7 +825,7 @@ func (h *AdminHandler) CreateCashPayment(c *fiber.Ctx) error {
 
 	payment, err := h.paymentSvc.CreateCashPaymentWithAmount(c.Context(), targetUserID, planID, serverID, req.AmountRUB)
 	if err != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
+		return respondInternalError(c, err)
 	}
 	return c.JSON(fiber.Map{"payment": payment})
 }
@@ -889,7 +843,7 @@ func (h *AdminHandler) ListPendingCashPayments(c *fiber.Ctx) error {
 	}
 	payments, err := h.paymentSvc.ListPendingCashPayments(c.Context(), limit)
 	if err != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
+		return respondInternalError(c, err)
 	}
 	return c.JSON(fiber.Map{"payments": payments})
 }

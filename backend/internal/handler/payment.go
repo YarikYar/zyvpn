@@ -67,9 +67,24 @@ func (h *Handler) VerifyTONPayment(c *fiber.Ctx) error {
 		})
 	}
 
+	// Ownership check before kicking off TON verification — иначе любой
+	// залогиненный юзер мог бы спамить проверки чужих платежей.
+	payment, err := h.paymentSvc.GetPayment(c.Context(), paymentID)
+	if err != nil {
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
+			"error": "Платёж не найден",
+		})
+	}
+	if payment.UserID != userID {
+		return c.Status(fiber.StatusForbidden).JSON(fiber.Map{
+			"error": "Доступ запрещён",
+		})
+	}
+
 	if err := h.paymentSvc.VerifyTONPayment(c.Context(), paymentID, req.TxHash); err != nil {
+		log.Printf("[VerifyTONPayment] %s: %v", paymentID, err)
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-			"error": err.Error(),
+			"error": "Не удалось проверить платёж",
 		})
 	}
 
@@ -136,9 +151,7 @@ func (h *Handler) RefundStarsPayment(c *fiber.Ctx) error {
 	// Refund via Telegram API
 	if err := h.bot.RefundStarsPayment(userID, chargeID); err != nil {
 		log.Printf("Failed to refund Stars payment: %v", err)
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-			"error": "failed to refund: " + err.Error(),
-		})
+		return respondInternalError(c, err)
 	}
 
 	// Update payment status
@@ -271,9 +284,7 @@ func (h *Handler) InitStarsPayment(c *fiber.Ctx) error {
 	)
 	if err != nil {
 		log.Printf("Failed to create Stars invoice: %v", err)
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-			"error": "failed to create invoice: " + err.Error(),
-		})
+		return respondInternalError(c, err)
 	}
 	log.Printf("Stars invoice created: %s", invoiceLink)
 
