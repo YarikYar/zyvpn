@@ -415,13 +415,18 @@ func (s *SubscriptionService) SwitchServer(ctx context.Context, userID int64, ne
 	// Generate new connection key
 	connectionKey := s.serverSvc.GenerateConnectionKey(newServer, newClient.ID, email)
 
-	// Update subscription in database
+	// Update subscription in database. New XUI client was created with
+	// `remainingTrafficGB` GB quota and zero used; mirror that in our row
+	// so the miniapp shows the correct limit/used pair after a switch.
+	newLimitBytes := int64(remainingTrafficGB) * 1024 * 1024 * 1024
 	sub.ServerID = &newServer.ID
 	sub.XUIClientID = newClient.ID
 	sub.XUIEmail = email
 	sub.ConnectionKey = connectionKey
+	sub.TrafficLimit = newLimitBytes
+	sub.TrafficUsed = 0
 
-	if err := s.repo.UpdateSubscriptionServer(ctx, sub.ID, newServer.ID, newClient.ID, email, connectionKey); err != nil {
+	if err := s.repo.UpdateSubscriptionServer(ctx, sub.ID, newServer.ID, newClient.ID, email, connectionKey, newLimitBytes); err != nil {
 		// Try to cleanup new client
 		_ = newXUIClient.DeleteClient(newClient.ID)
 		return nil, fmt.Errorf("failed to update subscription: %w", err)

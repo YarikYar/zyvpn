@@ -173,15 +173,20 @@ func (r *Repository) HasUsedTrial(ctx context.Context, userID int64) (bool, erro
 	return count > 0, nil
 }
 
-// UpdateSubscriptionServer updates the server for an active subscription (for region switching)
-func (r *Repository) UpdateSubscriptionServer(ctx context.Context, id uuid.UUID, serverID uuid.UUID, xuiClientID, xuiEmail, connectionKey string) error {
+// UpdateSubscriptionServer rewires a subscription to a different XUI server
+// after a region switch. Resets traffic_used to 0 (the new XUI client starts
+// with fresh counters) and sets traffic_limit to whatever quota was created
+// on the new server, so our DB mirror matches XUI's enforcement.
+func (r *Repository) UpdateSubscriptionServer(ctx context.Context, id uuid.UUID, serverID uuid.UUID, xuiClientID, xuiEmail, connectionKey string, trafficLimitBytes int64) error {
 	query := `
 		UPDATE subscriptions SET
 			server_id = $2,
 			xui_client_id = $3,
 			xui_email = $4,
-			connection_key = $5
+			connection_key = $5,
+			traffic_limit = $6,
+			traffic_used = 0
 		WHERE id = $1`
-	_, err := r.db.ExecContext(ctx, query, id, serverID, xuiClientID, xuiEmail, connectionKey)
+	_, err := r.db.ExecContext(ctx, query, id, serverID, xuiClientID, xuiEmail, connectionKey, trafficLimitBytes)
 	return err
 }
