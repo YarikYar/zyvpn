@@ -1,0 +1,1155 @@
+openapi: 3.1.0
+info:
+  title: ZyVPN API
+  version: "1.0"
+  description: |
+    REST API for the ZyVPN Telegram Mini App backend.
+
+    All `/api/*` endpoints require Telegram WebApp `initData` in the
+    `X-Telegram-Init-Data` header. The HMAC of the initData is verified
+    server-side against the bot token; freshness window is 1 hour.
+
+    `/api/admin/*` requires the authenticated user to additionally exist
+    in the `admins` table.
+
+    Public endpoints: `/health`, `/api/rates`.
+
+servers:
+  - url: https://api.zaruchevskiy.ru
+    description: production
+
+tags:
+  - name: public
+  - name: user
+  - name: subscription
+  - name: payments
+  - name: balance
+  - name: promo
+  - name: referrals
+  - name: servers
+  - name: admin
+
+components:
+  securitySchemes:
+    TelegramInitData:
+      type: apiKey
+      in: header
+      name: X-Telegram-Init-Data
+      description: |
+        Raw `Telegram.WebApp.initData` query string. The middleware verifies
+        the HMAC-SHA256 hash against the bot token and rejects requests
+        older than 1 hour.
+
+  schemas:
+    Error:
+      type: object
+      properties:
+        error: { type: string }
+      required: [error]
+
+    Rates:
+      type: object
+      properties:
+        ton_usd: { type: number, format: float }
+        usd_rub: { type: number, format: float }
+        ton_rub: { type: number, format: float }
+
+    User:
+      type: object
+      properties:
+        id: { type: integer, format: int64 }
+        username: { type: string, nullable: true }
+        first_name: { type: string, nullable: true }
+        last_name: { type: string, nullable: true }
+        balance: { type: number, format: float, description: TON balance }
+        referral_code: { type: string }
+        referred_by: { type: integer, format: int64, nullable: true }
+        free_region_switches: { type: integer }
+
+    Plan:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        name: { type: string }
+        description: { type: string }
+        duration_days: { type: integer }
+        traffic_gb: { type: integer, description: 0 = unlimited }
+        max_devices: { type: integer }
+        price_ton: { type: number }
+        price_stars: { type: integer }
+        price_usd: { type: number }
+        is_active: { type: boolean }
+        sort_order: { type: integer }
+        visible_to_referrer_id:
+          type: integer
+          format: int64
+          nullable: true
+          description: If set, plan is visible only to users referred by this user_id
+
+    Subscription:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        user_id: { type: integer, format: int64 }
+        plan_id: { type: string, format: uuid }
+        server_id: { type: string, format: uuid, nullable: true }
+        status: { type: string, enum: [active, expired, cancelled] }
+        started_at: { type: string, format: date-time, nullable: true }
+        expires_at: { type: string, format: date-time, nullable: true }
+        traffic_limit: { type: integer, format: int64 }
+        traffic_used: { type: integer, format: int64 }
+        max_devices: { type: integer }
+        connection_key: { type: string, description: VLESS Reality URI }
+
+    SubscriptionStatus:
+      type: object
+      properties:
+        active: { type: boolean }
+        subscription:
+          $ref: '#/components/schemas/Subscription'
+          nullable: true
+        days_remaining: { type: integer }
+        traffic_gb:
+          type: object
+          properties:
+            used: { type: number }
+            limit: { type: number }
+            remaining: { type: number }
+
+    ServerPublic:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        name: { type: string }
+        country: { type: string }
+        city: { type: string, nullable: true }
+        flag_emoji: { type: string }
+        is_active: { type: boolean }
+        ping_ms: { type: integer, nullable: true }
+        status: { type: string, enum: [online, offline, unknown] }
+        load_percent: { type: number }
+
+    Payment:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        user_id: { type: integer, format: int64 }
+        plan_id: { type: string, format: uuid, nullable: true }
+        server_id: { type: string, format: uuid, nullable: true }
+        payment_type: { type: string, enum: [subscription, top_up] }
+        provider: { type: string, enum: [ton, stars, balance, cash] }
+        amount: { type: number }
+        currency: { type: string }
+        status:
+          type: string
+          enum: [pending, awaiting_tx, completed, failed, refunded]
+        external_id: { type: string, nullable: true }
+        created_at: { type: string, format: date-time }
+        completed_at: { type: string, format: date-time, nullable: true }
+
+    TONPaymentInfo:
+      type: object
+      properties:
+        payment_id: { type: string, format: uuid }
+        wallet_address: { type: string }
+        amount: { type: string }
+        comment: { type: string }
+        deep_link: { type: string }
+
+    PromoCode:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        code: { type: string }
+        type:
+          type: string
+          enum: [balance, days, region_switch, cash_plan]
+        value: { type: number }
+        max_uses: { type: integer, nullable: true }
+        used_count: { type: integer }
+        expires_at: { type: string, format: date-time, nullable: true }
+        is_active: { type: boolean }
+        plan_id: { type: string, format: uuid, nullable: true }
+        cash_amount_rub: { type: number, nullable: true }
+
+    BalanceTransaction:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        user_id: { type: integer, format: int64 }
+        type:
+          type: string
+          enum: [topup, payment, promo, referral, admin_adjust, refund]
+        amount: { type: number }
+        balance_after: { type: number }
+        description: { type: string, nullable: true }
+        created_at: { type: string, format: date-time }
+
+    ReferralStats:
+      type: object
+      properties:
+        total_referred: { type: integer }
+        total_paid: { type: integer }
+        total_bonus_ton: { type: number }
+        total_bonus_days: { type: integer }
+
+paths:
+  /health:
+    get:
+      tags: [public]
+      summary: Liveness probe
+      security: []
+      responses:
+        '200':
+          description: ok
+
+  /api/rates:
+    get:
+      tags: [public]
+      summary: Current TON/USD/RUB exchange rates
+      security: []
+      responses:
+        '200':
+          description: ok
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Rates' }
+
+  /api/user/me:
+    get:
+      tags: [user]
+      summary: Get authenticated user
+      responses:
+        '200':
+          description: ok
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/User' }
+
+  /api/plans:
+    get:
+      tags: [subscription]
+      summary: List plans visible to the caller
+      description: |
+        Returns public plans plus any plan whose `visible_to_referrer_id`
+        matches the caller's `referred_by` (i.e. private referrer-scoped
+        plans).
+      responses:
+        '200':
+          description: ok
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  plans:
+                    type: array
+                    items: { $ref: '#/components/schemas/Plan' }
+
+  /api/subscription/status:
+    get:
+      tags: [subscription]
+      summary: Current subscription status
+      responses:
+        '200':
+          description: ok
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SubscriptionStatus' }
+
+  /api/subscription/key:
+    get:
+      tags: [subscription]
+      summary: VLESS Reality connection key
+      responses:
+        '200':
+          description: ok
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  key: { type: string }
+
+  /api/subscription/buy:
+    post:
+      tags: [subscription]
+      summary: Initiate plan purchase
+      description: |
+        Provider determines the response shape:
+          - `ton` → returns `payment` + `ton_info` for TON Connect deep link.
+          - `stars` → returns `payment`; client follows up with
+            `GET /api/payment/stars/init?payment_id=...` for the invoice link.
+          - `cash` → creates a pending cash payment; admin gets a Telegram
+            notification with approve/reject buttons. Server-side converts
+            plan.PriceUSD * rates.USDRUB into RUB amount, stored in TON
+            equivalent for accounting.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [plan_id, provider]
+              properties:
+                plan_id: { type: string, format: uuid }
+                server_id: { type: string, format: uuid, nullable: true }
+                provider: { type: string, enum: [ton, stars, cash] }
+      responses:
+        '200':
+          description: ok
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  payment: { $ref: '#/components/schemas/Payment' }
+                  ton_info: { $ref: '#/components/schemas/TONPaymentInfo' }
+                  cash_amount: { type: number }
+                  currency: { type: string }
+                  message: { type: string }
+
+  /api/subscription/trial:
+    post:
+      tags: [subscription]
+      summary: Activate free trial
+      responses:
+        '200': { description: ok }
+        '409':
+          description: trial already used or active subscription exists
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+
+  /api/subscription/switch-server/info:
+    get:
+      tags: [subscription]
+      summary: Region switch price + free-switch counter
+      responses:
+        '200':
+          description: ok
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  price: { type: number, description: TON }
+                  free_switches: { type: integer }
+
+  /api/subscription/switch-server:
+    post:
+      tags: [subscription]
+      summary: Switch active subscription to another server
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [server_id]
+              properties:
+                server_id: { type: string, format: uuid }
+      responses:
+        '200':
+          description: ok
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean }
+                  subscription: { $ref: '#/components/schemas/Subscription' }
+                  key: { type: string }
+                  used_free: { type: boolean }
+
+  /api/payment/ton/init:
+    get:
+      tags: [payments]
+      summary: TON deep link for an existing payment
+      parameters:
+        - in: query
+          name: payment_id
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: ok
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/TONPaymentInfo' }
+
+  /api/payment/ton/check:
+    post:
+      tags: [payments]
+      summary: Submit a TON transaction BOC for verification
+      description: |
+        Client sends after `tonConnectUI.sendTransaction`. Backend marks
+        the payment `awaiting_tx`; the TonWorker periodically scans the
+        wallet and completes the payment when the tx is found. Hard
+        ownership check: payment.user_id must match caller.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [payment_id, tx_hash]
+              properties:
+                payment_id: { type: string, format: uuid }
+                tx_hash: { type: string, description: BOC base64 from TON Connect }
+      responses:
+        '200':
+          description: ok
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean }
+                  key: { type: string, description: VLESS key after activation }
+
+  /api/payment/stars/init:
+    get:
+      tags: [payments]
+      summary: Telegram Stars invoice link
+      parameters:
+        - in: query
+          name: payment_id
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: ok
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  payment_id: { type: string, format: uuid }
+                  amount: { type: integer }
+                  currency: { type: string, example: XTR }
+                  invoice_link: { type: string }
+
+  /api/payment/stars/refund:
+    post:
+      tags: [payments]
+      summary: Refund a completed Stars payment
+      parameters:
+        - in: query
+          name: payment_id
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200': { description: ok }
+        '403':
+          description: not your payment
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+
+  /api/payment/status:
+    get:
+      tags: [payments]
+      summary: Poll payment status
+      parameters:
+        - in: query
+          name: payment_id
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: ok
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  payment_id: { type: string, format: uuid }
+                  status:
+                    type: string
+                    enum: [pending, awaiting_tx, completed, failed]
+                  amount: { type: number }
+                  currency: { type: string }
+                  key: { type: string, description: VLESS key when completed }
+                  new_balance: { type: number }
+
+  /api/balance:
+    get:
+      tags: [balance]
+      summary: Current balance
+      responses:
+        '200':
+          description: ok
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  balance: { type: number }
+                  currency: { type: string, example: TON }
+
+  /api/balance/transactions:
+    get:
+      tags: [balance]
+      summary: Balance transaction history
+      parameters:
+        - in: query
+          name: limit
+          schema: { type: integer, default: 20 }
+        - in: query
+          name: offset
+          schema: { type: integer, default: 0 }
+      responses:
+        '200':
+          description: ok
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  transactions:
+                    type: array
+                    items: { $ref: '#/components/schemas/BalanceTransaction' }
+
+  /api/balance/pay:
+    post:
+      tags: [balance]
+      summary: Buy a plan from balance
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [plan_id]
+              properties:
+                plan_id: { type: string, format: uuid }
+      responses:
+        '200':
+          description: ok
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean }
+                  new_balance: { type: number }
+                  key: { type: string }
+
+  /api/balance/topup:
+    post:
+      tags: [balance]
+      summary: Initiate balance top-up
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [amount, provider]
+              properties:
+                amount: { type: number, description: TON amount }
+                provider: { type: string, enum: [ton, stars] }
+      responses:
+        '200':
+          description: ok
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  payment_id: { type: string, format: uuid }
+                  amount: { type: number }
+                  currency: { type: string }
+                  provider: { type: string }
+
+  /api/balance/topup/ton:
+    get:
+      tags: [balance]
+      summary: TON deep link for a top-up
+      parameters:
+        - in: query
+          name: payment_id
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: ok
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/TONPaymentInfo' }
+
+  /api/balance/topup/stars:
+    get:
+      tags: [balance]
+      summary: Stars invoice for a top-up
+      parameters:
+        - in: query
+          name: payment_id
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: ok
+
+  /api/balance/topup/verify:
+    post:
+      tags: [balance]
+      summary: Verify TON top-up transaction
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [payment_id, tx_hash]
+              properties:
+                payment_id: { type: string, format: uuid }
+                tx_hash: { type: string }
+      responses:
+        '200':
+          description: ok
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean }
+                  new_balance: { type: number }
+
+  /api/promo/apply:
+    post:
+      tags: [promo]
+      summary: Redeem a promo code
+      description: |
+        Behavior depends on promo type:
+          - `balance` — credits TON to user balance.
+          - `days` — extends current subscription, or activates trial+days.
+          - `region_switch` — adds free region switches.
+          - `cash_plan` — creates a pending cash payment for the bound plan
+            at the bound RUB amount; admin approves in TG.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [code]
+              properties:
+                code: { type: string }
+      responses:
+        '200':
+          description: ok
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean }
+                  type: { type: string }
+                  value: { type: number }
+                  new_balance: { type: number }
+                  message: { type: string }
+
+  /api/promo/validate:
+    get:
+      tags: [promo]
+      summary: Inspect a promo code without redeeming
+      parameters:
+        - in: query
+          name: code
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: ok
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  valid: { type: boolean }
+                  type: { type: string }
+                  value: { type: number }
+                  description: { type: string }
+
+  /api/referral/link:
+    get:
+      tags: [referrals]
+      summary: User's referral link + code
+      responses:
+        '200':
+          description: ok
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  link: { type: string, description: t.me/<bot>?start=ref_<code> }
+                  code: { type: string }
+
+  /api/referral/stats:
+    get:
+      tags: [referrals]
+      summary: Referral counters
+      responses:
+        '200':
+          description: ok
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ReferralStats' }
+
+  /api/referral/users:
+    get:
+      tags: [referrals]
+      summary: List of users I referred
+      responses:
+        '200':
+          description: ok
+
+  /api/referral/apply:
+    post:
+      tags: [referrals]
+      summary: Manually attach a referrer (only if user hasn't been referred yet)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [code]
+              properties:
+                code: { type: string }
+      responses:
+        '200':
+          description: ok
+
+  /api/servers:
+    get:
+      tags: [servers]
+      summary: Active VPN servers (public view)
+      responses:
+        '200':
+          description: ok
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  servers:
+                    type: array
+                    items: { $ref: '#/components/schemas/ServerPublic' }
+
+  # ---------- Admin (требует user_id ∈ admins) ----------
+
+  /api/admin/stats:
+    get:
+      tags: [admin]
+      summary: Dashboard counters
+      responses:
+        '200': { description: ok }
+        '403': { description: not admin }
+
+  /api/admin/users:
+    get:
+      tags: [admin]
+      summary: List users (paginated, search)
+      parameters:
+        - { in: query, name: limit, schema: { type: integer, default: 50 } }
+        - { in: query, name: offset, schema: { type: integer, default: 0 } }
+        - { in: query, name: search, schema: { type: string } }
+      responses: { '200': { description: ok } }
+
+  /api/admin/users/{user_id}:
+    get:
+      tags: [admin]
+      summary: Get user with subscription
+      parameters:
+        - { in: path, name: user_id, required: true, schema: { type: integer, format: int64 } }
+      responses: { '200': { description: ok }, '404': { description: not found } }
+
+  /api/admin/users/{user_id}/balance/set:
+    post:
+      tags: [admin]
+      summary: Set user balance
+      parameters:
+        - { in: path, name: user_id, required: true, schema: { type: integer, format: int64 } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                balance: { type: number }
+      responses: { '200': { description: ok } }
+
+  /api/admin/users/{user_id}/balance/add:
+    post:
+      tags: [admin]
+      summary: Add to user balance
+      parameters:
+        - { in: path, name: user_id, required: true, schema: { type: integer, format: int64 } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                amount: { type: number }
+      responses: { '200': { description: ok } }
+
+  /api/admin/users/{user_id}/subscription/extend:
+    post:
+      tags: [admin]
+      parameters:
+        - { in: path, name: user_id, required: true, schema: { type: integer, format: int64 } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                days: { type: integer, minimum: 1 }
+      responses: { '200': { description: ok } }
+
+  /api/admin/users/{user_id}/subscription/cancel:
+    post:
+      tags: [admin]
+      parameters:
+        - { in: path, name: user_id, required: true, schema: { type: integer, format: int64 } }
+      responses: { '200': { description: ok } }
+
+  /api/admin/users/{user_id}/cash-payment:
+    post:
+      tags: [admin]
+      summary: Create a pending cash payment for a user
+      description: |
+        Admin chooses plan + custom RUB amount. Backend converts RUB→TON
+        at the current rate, stores the row as currency=TON with original
+        RUB in metadata, sends an inline-button notification to all admins
+        via the bot.
+      parameters:
+        - { in: path, name: user_id, required: true, schema: { type: integer, format: int64 } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [plan_id, amount_rub]
+              properties:
+                plan_id: { type: string, format: uuid }
+                amount_rub: { type: number, exclusiveMinimum: 0 }
+                server_id: { type: string, format: uuid, nullable: true }
+      responses: { '200': { description: ok } }
+
+  /api/admin/users/{user_id}/ban:
+    post:
+      tags: [admin]
+      parameters:
+        - { in: path, name: user_id, required: true, schema: { type: integer, format: int64 } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                reason: { type: string }
+                expires_at: { type: string, format: date-time, nullable: true }
+      responses: { '200': { description: ok }, '409': { description: already banned } }
+
+  /api/admin/users/{user_id}/unban:
+    post:
+      tags: [admin]
+      parameters:
+        - { in: path, name: user_id, required: true, schema: { type: integer, format: int64 } }
+      responses: { '200': { description: ok } }
+
+  /api/admin/bans:
+    get:
+      tags: [admin]
+      parameters:
+        - { in: query, name: limit, schema: { type: integer, default: 50 } }
+        - { in: query, name: offset, schema: { type: integer, default: 0 } }
+      responses: { '200': { description: ok } }
+
+  /api/admin/bans/ip:
+    post:
+      tags: [admin]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [ip]
+              properties:
+                ip: { type: string }
+                reason: { type: string }
+                expires_at: { type: string, format: date-time, nullable: true }
+      responses: { '200': { description: ok } }
+
+  /api/admin/bans/ip/unban:
+    post:
+      tags: [admin]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [ip]
+              properties:
+                ip: { type: string }
+      responses: { '200': { description: ok } }
+
+  /api/admin/promo:
+    get:
+      tags: [admin]
+      summary: List promo codes
+      parameters:
+        - { in: query, name: limit, schema: { type: integer, default: 50 } }
+        - { in: query, name: offset, schema: { type: integer, default: 0 } }
+      responses: { '200': { description: ok } }
+    post:
+      tags: [admin]
+      summary: Create a promo code
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [type]
+              properties:
+                type: { type: string, enum: [balance, days, region_switch, cash_plan] }
+                value: { type: number, description: TON / days / count }
+                max_uses: { type: integer }
+                expires_at: { type: string, format: date-time }
+                description: { type: string }
+                plan_id: { type: string, format: uuid, description: cash_plan only }
+                cash_amount_rub: { type: number, description: cash_plan only }
+      responses: { '200': { description: ok } }
+
+  /api/admin/promo/bulk:
+    post:
+      tags: [admin]
+      summary: Bulk-create N promo codes
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [count, type]
+              properties:
+                count: { type: integer, minimum: 1, maximum: 100 }
+                type: { type: string, enum: [balance, days, region_switch, cash_plan] }
+                value: { type: number }
+                max_uses: { type: integer }
+                expires_at: { type: string, format: date-time }
+                prefix: { type: string }
+                plan_id: { type: string, format: uuid }
+                cash_amount_rub: { type: number }
+      responses: { '200': { description: ok } }
+
+  /api/admin/promo/deactivate:
+    post:
+      tags: [admin]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [code]
+              properties:
+                code: { type: string }
+      responses: { '200': { description: ok } }
+
+  /api/admin/plans:
+    get:
+      tags: [admin]
+      summary: List all plans (incl. inactive)
+      responses: { '200': { description: ok } }
+    post:
+      tags: [admin]
+      summary: Create a plan
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name: { type: string }
+                description: { type: string }
+                duration_days: { type: integer }
+                traffic_gb: { type: integer }
+                max_devices: { type: integer }
+                price_ton: { type: number }
+                price_stars: { type: integer }
+                price_usd: { type: number }
+                sort_order: { type: integer }
+                visible_to_referrer_id: { type: integer, format: int64 }
+      responses: { '200': { description: ok } }
+
+  /api/admin/plans/{plan_id}:
+    put:
+      tags: [admin]
+      parameters:
+        - { in: path, name: plan_id, required: true, schema: { type: string, format: uuid } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name: { type: string }
+                description: { type: string }
+                duration_days: { type: integer }
+                traffic_gb: { type: integer }
+                max_devices: { type: integer }
+                price_ton: { type: number }
+                price_stars: { type: integer }
+                price_usd: { type: number }
+                is_active: { type: boolean }
+                sort_order: { type: integer }
+                visible_to_referrer_id: { type: integer, format: int64 }
+                clear_visibility: { type: boolean, description: force visibility back to public }
+      responses: { '200': { description: ok } }
+    delete:
+      tags: [admin]
+      parameters:
+        - { in: path, name: plan_id, required: true, schema: { type: string, format: uuid } }
+      responses: { '200': { description: ok } }
+
+  /api/admin/servers:
+    get:
+      tags: [admin]
+      summary: List all servers with private fields (xui creds)
+      responses: { '200': { description: ok } }
+    post:
+      tags: [admin]
+      summary: Create a server
+      responses: { '200': { description: ok } }
+
+  /api/admin/servers/{server_id}:
+    get:
+      tags: [admin]
+      parameters:
+        - { in: path, name: server_id, required: true, schema: { type: string, format: uuid } }
+      responses: { '200': { description: ok } }
+    put:
+      tags: [admin]
+      parameters:
+        - { in: path, name: server_id, required: true, schema: { type: string, format: uuid } }
+      responses: { '200': { description: ok } }
+    delete:
+      tags: [admin]
+      parameters:
+        - { in: path, name: server_id, required: true, schema: { type: string, format: uuid } }
+      responses: { '200': { description: ok } }
+
+  /api/admin/servers/{server_id}/test:
+    post:
+      tags: [admin]
+      summary: Probe XUI panel for a server (login + GetInboundInfo)
+      parameters:
+        - { in: path, name: server_id, required: true, schema: { type: string, format: uuid } }
+      responses: { '200': { description: ok } }
+
+  /api/admin/payments/cash/pending:
+    get:
+      tags: [admin]
+      summary: List pending cash payments
+      responses: { '200': { description: ok } }
+
+  /api/admin/payments/cash/{payment_id}/approve:
+    post:
+      tags: [admin]
+      summary: Mark a pending cash payment as paid → provision subscription
+      parameters:
+        - { in: path, name: payment_id, required: true, schema: { type: string, format: uuid } }
+      responses: { '200': { description: ok } }
+
+  /api/admin/payments/cash/{payment_id}/reject:
+    post:
+      tags: [admin]
+      parameters:
+        - { in: path, name: payment_id, required: true, schema: { type: string, format: uuid } }
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                reason: { type: string }
+      responses: { '200': { description: ok } }
+
+  /api/admin/settings:
+    get:
+      tags: [admin]
+      responses: { '200': { description: ok } }
+
+  /api/admin/settings/topup-bonus:
+    get: { tags: [admin], responses: { '200': { description: ok } } }
+    post:
+      tags: [admin]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object, properties: { percent: { type: number } } }
+      responses: { '200': { description: ok } }
+
+  /api/admin/settings/referral-bonus:
+    get: { tags: [admin], responses: { '200': { description: ok } } }
+    post:
+      tags: [admin]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object, properties: { percent: { type: number } } }
+      responses: { '200': { description: ok } }
+
+  /api/admin/settings/referral-bonus-days:
+    get: { tags: [admin], responses: { '200': { description: ok } } }
+    post:
+      tags: [admin]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object, properties: { days: { type: integer } } }
+      responses: { '200': { description: ok } }
+
+  /api/admin/settings/region-switch-price:
+    get: { tags: [admin], responses: { '200': { description: ok } } }
+    post:
+      tags: [admin]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object, properties: { price: { type: number } } }
+      responses: { '200': { description: ok } }
+
+  /api/admin/logs:
+    get:
+      tags: [admin]
+      summary: Admin action audit log
+      parameters:
+        - { in: query, name: limit, schema: { type: integer, default: 50 } }
+        - { in: query, name: offset, schema: { type: integer, default: 0 } }
+      responses: { '200': { description: ok } }
+
+security:
+  - TelegramInitData: []
