@@ -16,6 +16,21 @@ type ServerHandler struct {
 	serverSvc *service.ServerService
 }
 
+// Response wrapper types — needed for swag to generate typed schemas
+// instead of generic map[string]interface{}.
+
+type ServersResponse struct {
+	Servers []model.ServerPublic `json:"servers"`
+}
+
+type IncidentsResponse struct {
+	Incidents []model.Incident `json:"incidents"`
+}
+
+type AdminServersResponse struct {
+	Servers []model.ServerAdmin `json:"servers"`
+}
+
 // NewServerHandler creates a new server handler
 func NewServerHandler(serverSvc *service.ServerService) *ServerHandler {
 	return &ServerHandler{serverSvc: serverSvc}
@@ -29,8 +44,8 @@ func NewServerHandler(serverSvc *service.ServerService) *ServerHandler {
 //	@Tags		servers
 //	@Produce	json
 //	@Param		hours	query		int	false	"window in hours"	default(168)
-//	@Param		limit	query		int	false	"max items"		default(50)
-//	@Success	200		{object}	map[string]interface{}
+//	@Param		limit	query		int	false	"max items"			default(50)
+//	@Success	200		{object}	IncidentsResponse
 //	@Router		/api/servers/incidents [get]
 //	@Security	TelegramInitData
 func (h *ServerHandler) GetIncidents(c *fiber.Ctx) error {
@@ -59,7 +74,7 @@ func (h *ServerHandler) GetIncidents(c *fiber.Ctx) error {
 //	@Summary	List active servers
 //	@Tags		servers
 //	@Produce	json
-//	@Success	200	{object}	map[string]interface{}
+//	@Success	200	{object}	ServersResponse
 //	@Router		/api/servers [get]
 //	@Security	TelegramInitData
 func (h *ServerHandler) GetServers(c *fiber.Ctx) error {
@@ -77,7 +92,7 @@ func (h *ServerHandler) GetServers(c *fiber.Ctx) error {
 //	@Summary	List all servers (admin)
 //	@Tags		admin
 //	@Produce	json
-//	@Success	200	{object}	map[string]interface{}
+//	@Success	200	{object}	AdminServersResponse
 //	@Router		/api/admin/servers [get]
 //	@Security	TelegramInitData
 func (h *ServerHandler) GetAllServers(c *fiber.Ctx) error {

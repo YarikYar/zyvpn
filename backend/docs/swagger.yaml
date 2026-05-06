@@ -5,6 +5,13 @@ definitions:
       amount:
         type: number
     type: object
+  handler.AdminServersResponse:
+    properties:
+      servers:
+        items:
+          $ref: '#/definitions/model.ServerAdmin'
+        type: array
+    type: object
   handler.ApplyPromoCodeRequest:
     properties:
       code:
@@ -153,6 +160,13 @@ definitions:
       days:
         type: integer
     type: object
+  handler.IncidentsResponse:
+    properties:
+      incidents:
+        items:
+          $ref: '#/definitions/model.Incident'
+        type: array
+    type: object
   handler.ListUsersResponse:
     properties:
       total:
@@ -171,6 +185,13 @@ definitions:
     properties:
       reason:
         type: string
+    type: object
+  handler.ServersResponse:
+    properties:
+      servers:
+        items:
+          $ref: '#/definitions/model.ServerPublic'
+        type: array
     type: object
   handler.SetBalanceRequest:
     properties:
@@ -274,6 +295,23 @@ definitions:
       payment_id:
         type: string
       tx_hash:
+        type: string
+    type: object
+  model.Incident:
+    properties:
+      country:
+        type: string
+      duration_seconds:
+        type: integer
+      ended_at:
+        type: string
+      flag_emoji:
+        type: string
+      server_id:
+        type: string
+      server_name:
+        type: string
+      started_at:
         type: string
     type: object
   model.PaymentProvider:
@@ -408,6 +446,92 @@ definitions:
         type: string
       updated_at:
         type: string
+    type: object
+  model.ServerAdmin:
+    properties:
+      capacity:
+        type: integer
+      city:
+        type: string
+      country:
+        type: string
+      created_at:
+        type: string
+      current_load:
+        type: integer
+      flag_emoji:
+        type: string
+      id:
+        type: string
+      is_active:
+        type: boolean
+      last_check_at:
+        type: string
+      name:
+        type: string
+      ping_ms:
+        type: integer
+      public_key:
+        type: string
+      server_address:
+        type: string
+      server_name:
+        type: string
+      server_port:
+        type: integer
+      short_id:
+        type: string
+      sort_order:
+        type: integer
+      status:
+        type: string
+      updated_at:
+        type: string
+      xui_base_url:
+        type: string
+      xui_inbound_id:
+        type: integer
+      xui_password:
+        type: string
+      xui_username:
+        type: string
+    type: object
+  model.ServerPublic:
+    properties:
+      city:
+        type: string
+      country:
+        type: string
+      flag_emoji:
+        type: string
+      id:
+        type: string
+      is_active:
+        type: boolean
+      load_percent:
+        type: number
+      name:
+        type: string
+      ping_ms:
+        type: integer
+      status:
+        type: string
+      status_since:
+        type: string
+      traffic_24h_down:
+        type: integer
+      traffic_24h_up:
+        description: Traffic since N hours ago; nil if not enough snapshots in window.
+        type: integer
+      traffic_all_time:
+        type: integer
+      uptime_7d:
+        type: number
+      uptime_24h:
+        description: |-
+          Monitoring fields populated by ServerService.
+          Uptime ratios are 0.0–1.0; nil = no data yet.
+        type: number
     type: object
   model.Subscription:
     properties:
@@ -908,8 +1032,7 @@ paths:
         "200":
           description: OK
           schema:
-            additionalProperties: true
-            type: object
+            $ref: '#/definitions/handler.AdminServersResponse'
       security:
       - TelegramInitData: []
       summary: List all servers (admin)
@@ -2043,8 +2166,7 @@ paths:
         "200":
           description: OK
           schema:
-            additionalProperties: true
-            type: object
+            $ref: '#/definitions/handler.ServersResponse'
       security:
       - TelegramInitData: []
       summary: List active servers
@@ -2069,8 +2191,7 @@ paths:
         "200":
           description: OK
           schema:
-            additionalProperties: true
-            type: object
+            $ref: '#/definitions/handler.IncidentsResponse'
       security:
       - TelegramInitData: []
       summary: Recent server incidents
