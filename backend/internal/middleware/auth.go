@@ -41,6 +41,30 @@ func TelegramAuth(cfg *config.Config) fiber.Handler {
 			}
 		}
 
+		// Dev bypass — for redesign testing without a real Telegram WebApp.
+		// Accepts X-User-ID header as the identity, OR parses initData
+		// without HMAC validation. NEVER enable in production.
+		if cfg.Server.InsecureTGAuthBypass {
+			if uidStr := c.Get("X-User-ID"); uidStr != "" {
+				if uid, err := strconv.ParseInt(uidStr, 10, 64); err == nil && uid > 0 {
+					c.Locals(TelegramUserKey, &TelegramInitData{UserID: uid})
+					c.Locals(UserIDKey, uid)
+					return c.Next()
+				}
+			}
+			if initData != "" {
+				userData, err := parseInitDataNoVerify(initData)
+				if err == nil && userData.UserID > 0 {
+					c.Locals(TelegramUserKey, userData)
+					c.Locals(UserIDKey, userData.UserID)
+					return c.Next()
+				}
+			}
+			return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
+				"error": "bypass mode: provide X-User-ID header or initData with user.id",
+			})
+		}
+
 		if initData == "" {
 			return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
 				"error": "missing telegram init data",
@@ -59,6 +83,40 @@ func TelegramAuth(cfg *config.Config) fiber.Handler {
 
 		return c.Next()
 	}
+}
+
+// parseInitDataNoVerify extracts user info from a Telegram initData query
+// string without checking the HMAC. Used only when InsecureTGAuthBypass is
+// on. Returns an error if the user JSON is missing or malformed.
+func parseInitDataNoVerify(initData string) (*TelegramInitData, error) {
+	values, err := url.ParseQuery(initData)
+	if err != nil {
+		return nil, err
+	}
+	authDate, _ := strconv.ParseInt(values.Get("auth_date"), 10, 64)
+	out := &TelegramInitData{
+		QueryID:  values.Get("query_id"),
+		AuthDate: authDate,
+		Hash:     values.Get("hash"),
+	}
+	if rawUser := values.Get("user"); rawUser != "" {
+		var u struct {
+			ID           int64  `json:"id"`
+			Username     string `json:"username"`
+			FirstName    string `json:"first_name"`
+			LastName     string `json:"last_name"`
+			LanguageCode string `json:"language_code"`
+		}
+		if err := json.Unmarshal([]byte(rawUser), &u); err != nil {
+			return nil, err
+		}
+		out.UserID = u.ID
+		out.Username = u.Username
+		out.FirstName = u.FirstName
+		out.LastName = u.LastName
+		out.LanguageCode = u.LanguageCode
+	}
+	return out, nil
 }
 
 func ValidateTelegramInitData(initData, botToken string) (*TelegramInitData, error) {

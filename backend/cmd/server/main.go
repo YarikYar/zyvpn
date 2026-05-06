@@ -122,6 +122,9 @@ func main() {
 	if cfg.Server.AllowOrigins == "" {
 		log.Println("WARNING: ALLOW_ORIGINS is empty — all cross-origin requests will be rejected")
 	}
+	if cfg.Server.InsecureTGAuthBypass {
+		log.Println("WARNING: INSECURE_TG_AUTH_BYPASS=true — Telegram initData HMAC validation is DISABLED. Anyone can impersonate any user. Disable in production.")
+	}
 	app.Use(cors.New(cors.Config{
 		AllowOrigins: cfg.Server.AllowOrigins,
 		AllowHeaders: "Origin, Content-Type, Accept, Authorization, X-Telegram-Init-Data",

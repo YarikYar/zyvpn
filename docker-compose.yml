@@ -49,6 +49,7 @@ services:
       - TON_WALLET_ADDRESS=${TON_WALLET_ADDRESS}
       - ALLOW_ORIGINS=${ALLOW_ORIGINS:-https://vpn.zaruchevskiy.ru,https://api.zaruchevskiy.ru}
       - INTERNAL_SECRET=${INTERNAL_SECRET}
+      - INSECURE_TG_AUTH_BYPASS=${INSECURE_TG_AUTH_BYPASS:-}
     ports:
       # Exposed for the file-routing Traefik on 192.168.1.150.
       - "${BACKEND_PORT:-8094}:8080"

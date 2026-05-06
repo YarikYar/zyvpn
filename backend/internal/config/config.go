@@ -21,6 +21,11 @@ type ServerConfig struct {
 	Environment    string
 	AllowOrigins   string
 	InternalSecret string
+	// InsecureTGAuthBypass disables HMAC validation of Telegram initData.
+	// When true, initData is parsed but not verified, OR the user is
+	// identified by the X-User-ID header. ONLY for fronted dev / debugging
+	// — never enable in production.
+	InsecureTGAuthBypass bool
 }
 
 type DatabaseConfig struct {
@@ -65,8 +70,9 @@ func Load() (*Config, error) {
 			Environment: getEnv("ENVIRONMENT", "development"),
 			// Empty default closes CORS by default; production must
 			// set ALLOW_ORIGINS explicitly.
-			AllowOrigins:   getEnv("ALLOW_ORIGINS", ""),
-			InternalSecret: getEnv("INTERNAL_SECRET", ""),
+			AllowOrigins:         getEnv("ALLOW_ORIGINS", ""),
+			InternalSecret:       getEnv("INTERNAL_SECRET", ""),
+			InsecureTGAuthBypass: getEnv("INSECURE_TG_AUTH_BYPASS", "") == "true",
 		},
 		Database: DatabaseConfig{
 			Host:     getEnv("DB_HOST", "localhost"),
