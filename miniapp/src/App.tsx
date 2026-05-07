@@ -1,79 +1,178 @@
-import { useEffect } from 'react'
-import { Routes, Route } from 'react-router-dom'
-import { useTelegram } from './hooks/useTelegram'
-import { useStore } from './store'
-import HomePage from './pages/HomePage'
-import KeyPage from './pages/KeyPage'
-import ReferralPage from './pages/ReferralPage'
-import PaymentPage from './pages/PaymentPage'
-import BalancePage from './pages/BalancePage'
-import AdminPage from './pages/AdminPage'
+import { useRef, useState, type ReactNode } from 'react'
+import { AnimatePresence, motion } from 'motion/react'
+
+import { MaintenanceScreen, SplashScreen } from '@/components/maintenance-screen'
+import { NoInitDataScreen } from '@/components/no-init-data-screen'
+import { SiteBalanceChip } from '@/components/site-balance-chip'
+import { SiteBrandChip } from '@/components/site-brand-chip'
+import { SiteHeader } from '@/components/site-header'
+import { MainSection } from '@/components/sections/main'
+import { ReferralsSection } from '@/components/sections/referrals'
+import { RegionSection } from '@/components/sections/region'
+import { SettingsSection } from '@/components/sections/settings'
+import {
+  SubscriptionSection,
+  type SubscriptionView,
+} from '@/components/sections/subscription'
+import { WalletSection } from '@/components/sections/wallet'
+import { hasInitData } from '@/lib/api'
+import { BackButtonProvider } from '@/lib/back-button'
+import { LocaleProvider } from '@/lib/i18n'
+import { navItems, type NavKey } from '@/lib/nav'
+import { useMe } from '@/lib/queries'
+import { scrollMainToTop } from '@/lib/use-scroll-reset'
+
+const tabOrder: NavKey[] = navItems.map((n) => n.key)
+
+const TRANSITION = {
+  type: "spring",
+  bounce: 0,
+  duration: 0.45,
+} as const
+
+const variants = {
+  enter: (d: number) => ({ opacity: 0, x: d * 28 }),
+  center: { opacity: 1, x: 0 },
+  exit: (d: number) => ({ opacity: 0, x: d * -28 }),
+}
 
 function App() {
-  const { webApp, user, initData } = useTelegram()
-  const { fetchUser, fetchPlans, fetchRates } = useStore()
-
-  useEffect(() => {
-    if (webApp) {
-      webApp.ready()
-      webApp.expand()
-    }
-    // Fetch rates immediately (no auth needed)
-    fetchRates()
-  }, [webApp, fetchRates])
-
-  useEffect(() => {
-    if (initData) {
-      fetchUser()
-      fetchPlans()
-    }
-  }, [initData, fetchUser, fetchPlans])
-
-  if (!user) {
-    // Without Telegram init data we can't authenticate. This usually means
-    // the user opened the URL in a regular browser or in Telegram's in-app
-    // browser instead of opening the Mini App via the bot.
-    const noInitData = !initData
+  if (!hasInitData()) {
     return (
-      <div className="flex items-center justify-center min-h-screen p-6">
-        <div className="text-center max-w-sm">
-          {noInitData ? (
-            <>
-              <div className="text-4xl mb-4">🤖</div>
-              <h2 className="text-lg font-semibold mb-2">Открой через бота</h2>
-              <p className="text-hint mb-4">
-                Эта страница работает только внутри Telegram Mini App. Открой бота
-                и нажми «Открыть магазин».
-              </p>
-              <a
-                href="https://t.me/zyvpn_bot"
-                className="inline-block px-6 py-3 rounded-lg bg-tg-button text-tg-button-text font-medium"
-              >
-                Открыть @zyvpn_bot
-              </a>
-            </>
-          ) : (
-            <>
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-tg-button mx-auto mb-4"></div>
-              <p className="text-hint">Loading...</p>
-            </>
-          )}
-        </div>
-      </div>
+      <LocaleProvider>
+        <NoInitDataScreen />
+      </LocaleProvider>
     )
   }
 
   return (
-    <div className="min-h-screen pb-20">
-      <Routes>
-        <Route path="/" element={<HomePage />} />
-        <Route path="/key" element={<KeyPage />} />
-        <Route path="/referral" element={<ReferralPage />} />
-        <Route path="/payment/:planId" element={<PaymentPage />} />
-        <Route path="/balance" element={<BalancePage />} />
-        <Route path="/admin" element={<AdminPage />} />
-      </Routes>
-    </div>
+    <LocaleProvider>
+      <BackButtonProvider>
+        <AuthGate>
+          <AppShell />
+        </AuthGate>
+      </BackButtonProvider>
+    </LocaleProvider>
+  )
+}
+
+function AuthGate({ children }: { children: ReactNode }) {
+  const meQuery = useMe()
+  if (meQuery.isPending) return <SplashScreen />
+  if (meQuery.isError) {
+    return (
+      <MaintenanceScreen
+        onRetry={() => {
+          void meQuery.refetch()
+        }}
+        retrying={meQuery.isFetching}
+      />
+    )
+  }
+  return <>{children}</>
+}
+
+function AppShell() {
+  const [active, setActive] = useState<NavKey>('Main')
+  const [walletOpen, setWalletOpen] = useState(false)
+  const [pendingSubView, setPendingSubView] =
+    useState<SubscriptionView | null>(null)
+  const previousTabRef = useRef<NavKey>('Main')
+  const directionRef = useRef(0)
+
+  const handleNavChange = (next: NavKey) => {
+    if (walletOpen) {
+      scrollMainToTop()
+      directionRef.current = -1
+      setWalletOpen(false)
+      if (next !== active) setActive(next)
+      return
+    }
+    if (next === active) return
+    scrollMainToTop()
+    directionRef.current =
+      tabOrder.indexOf(next) > tabOrder.indexOf(active) ? 1 : -1
+    setActive(next)
+  }
+
+  const handleOpenWallet = () => {
+    if (walletOpen) return
+    scrollMainToTop()
+    directionRef.current = 1
+    setWalletOpen(true)
+  }
+
+  const handleCloseWallet = () => {
+    scrollMainToTop()
+    directionRef.current = -1
+    setWalletOpen(false)
+  }
+
+  const handleShowKey = () => {
+    scrollMainToTop()
+    previousTabRef.current = active
+    setPendingSubView('success')
+    if (active !== 'Subscription') {
+      directionRef.current =
+        tabOrder.indexOf('Subscription') > tabOrder.indexOf(active) ? 1 : -1
+      setActive('Subscription')
+    }
+  }
+
+  const handleSubscriptionExternalBack = () => {
+    scrollMainToTop()
+    const target = previousTabRef.current
+    directionRef.current =
+      tabOrder.indexOf(target) > tabOrder.indexOf(active) ? 1 : -1
+    setActive(target)
+  }
+
+  const direction = directionRef.current
+
+  return (
+    <>
+      <SiteBrandChip />
+      <SiteBalanceChip onClick={handleOpenWallet} />
+      <main
+        className="relative overflow-x-clip overflow-y-auto pb-24 sm:pb-28"
+        style={{
+          height: '100dvh',
+          paddingTop:
+            'calc(var(--tg-safe-area-inset-top, env(safe-area-inset-top)) + 5rem)',
+        }}
+      >
+        <AnimatePresence mode="popLayout" initial={false} custom={direction}>
+          <motion.div
+            key={walletOpen ? 'wallet' : active}
+            custom={direction}
+            variants={variants}
+            initial="enter"
+            animate="center"
+            exit="exit"
+            transition={TRANSITION}
+          >
+            {walletOpen ? (
+              <WalletSection onClose={handleCloseWallet} />
+            ) : (
+              <>
+                {active === 'Main' && <MainSection onShowKey={handleShowKey} />}
+                {active === 'Region' && <RegionSection />}
+                {active === 'Subscription' && (
+                  <SubscriptionSection
+                    requestView={pendingSubView}
+                    onConsumeRequest={() => setPendingSubView(null)}
+                    onExternalBack={handleSubscriptionExternalBack}
+                  />
+                )}
+                {active === 'Referrals' && <ReferralsSection />}
+                {active === 'Settings' && <SettingsSection />}
+              </>
+            )}
+          </motion.div>
+        </AnimatePresence>
+      </main>
+      <SiteHeader active={active} onChange={handleNavChange} />
+    </>
   )
 }
 
