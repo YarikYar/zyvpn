@@ -113,6 +113,11 @@ function unwrapList<T>(value: unknown): T[] {
       "referrals",
       "incidents",
       "rows",
+      "bans",
+      "promos",
+      "codes",
+      "payments",
+      "logs",
     ]) {
       if (Array.isArray(obj[key])) return obj[key] as T[]
     }
@@ -263,6 +268,134 @@ export type ServerIncident = {
   started_at: string
 }
 
+export type AdminStats = {
+  users_total?: number
+  users_active?: number
+  users_new_today?: number
+  subscriptions_active?: number
+  revenue_ton_total?: number
+  revenue_ton_30d?: number
+  revenue_rub_30d?: number
+  payments_pending?: number
+  trial_used?: number
+  servers_online?: number
+  servers_total?: number
+  bans_active?: number
+}
+
+export type AdminUser = {
+  id: number
+  username?: string
+  first_name?: string
+  last_name?: string
+  language_code?: string
+  is_admin?: boolean
+  is_banned?: boolean
+  balance_ton?: number
+  subscription_plan?: string
+  subscription_ends_at?: string
+  trial_used?: boolean
+  referrer_id?: number | null
+  created_at?: string
+  last_seen_at?: string
+}
+
+export type AdminBan = {
+  user_id: number
+  username?: string
+  first_name?: string
+  reason?: string
+  banned_at?: string
+}
+
+export type AdminIpBan = {
+  ip: string
+  reason?: string
+  banned_at?: string
+}
+
+export type AdminPromoType = "balance" | "discount" | "days" | string
+
+export type AdminPromo = {
+  code: string
+  type?: AdminPromoType
+  amount?: number
+  uses_total?: number | null
+  uses_left?: number | null
+  expires_at?: string | null
+  is_active?: boolean
+  created_at?: string
+}
+
+export type AdminPromoCreate = {
+  code?: string
+  type: AdminPromoType
+  amount: number
+  uses_total?: number | null
+  expires_at?: string | null
+}
+
+export type AdminCashPayment = {
+  id: string
+  user_id: number
+  username?: string
+  first_name?: string
+  plan_id: string
+  plan_name?: string
+  amount_rub?: number
+  amount_ton?: number
+  note?: string
+  created_at?: string
+}
+
+export type AdminPlanInput = {
+  id?: string
+  name: string
+  duration_days: number
+  traffic_gb: number | null
+  price_ton: number
+  price_stars?: number
+  max_devices?: number
+  is_active?: boolean
+  visible_to_referrer_id?: number | null
+  popular?: boolean
+  description?: string
+}
+
+export type AdminServerInput = {
+  id?: string
+  country: string
+  city?: string
+  name?: string
+  host?: string
+  port?: number
+  is_active?: boolean
+}
+
+export type AdminServerTest = {
+  ok: boolean
+  ping_ms?: number
+  message?: string
+}
+
+export type AdminSettings = {
+  topup_bonus_percent?: number
+  referral_bonus_percent?: number
+  referral_bonus_days?: number
+  region_switch_price_ton?: number
+}
+
+export type AdminLogLevel = "info" | "warn" | "error" | "debug" | string
+
+export type AdminLog = {
+  id?: string
+  level?: AdminLogLevel
+  message: string
+  source?: string
+  user_id?: number
+  created_at?: string
+}
+
 export const api = {
   health: () =>
     request<{ status: string }>("/health", { publicEndpoint: true }),
@@ -375,6 +508,144 @@ export const api = {
       method: "POST",
       body: input,
     }),
+
+  adminStats: () => request<AdminStats>("/api/admin/stats"),
+  adminUsers: (params?: { search?: string; limit?: number; offset?: number }) =>
+    listRequest<AdminUser>("/api/admin/users", { query: params }),
+  adminUser: (id: number) =>
+    request<AdminUser>(`/api/admin/users/${id}`),
+  adminUserBalanceSet: (id: number, body: { amount: number; reason?: string }) =>
+    request<{ ok: boolean }>(`/api/admin/users/${id}/balance/set`, {
+      method: "POST",
+      body,
+    }),
+  adminUserBalanceAdd: (id: number, body: { amount: number; reason?: string }) =>
+    request<{ ok: boolean }>(`/api/admin/users/${id}/balance/add`, {
+      method: "POST",
+      body,
+    }),
+  adminUserSubscriptionExtend: (id: number, body: { days: number }) =>
+    request<{ ok: boolean }>(`/api/admin/users/${id}/subscription/extend`, {
+      method: "POST",
+      body,
+    }),
+  adminUserSubscriptionCancel: (id: number) =>
+    request<{ ok: boolean }>(`/api/admin/users/${id}/subscription/cancel`, {
+      method: "POST",
+    }),
+  adminUserCashPayment: (
+    id: number,
+    body: { plan_id: string; amount_rub?: number; note?: string },
+  ) =>
+    request<{ ok: boolean }>(`/api/admin/users/${id}/cash-payment`, {
+      method: "POST",
+      body,
+    }),
+  adminUserBan: (id: number, body?: { reason?: string }) =>
+    request<{ ok: boolean }>(`/api/admin/users/${id}/ban`, {
+      method: "POST",
+      body,
+    }),
+  adminUserUnban: (id: number) =>
+    request<{ ok: boolean }>(`/api/admin/users/${id}/unban`, {
+      method: "POST",
+    }),
+
+  adminBans: () => listRequest<AdminBan>("/api/admin/bans"),
+  adminBansIp: () => listRequest<AdminIpBan>("/api/admin/bans/ip"),
+  adminUnbanIp: (body: { ip: string }) =>
+    request<{ ok: boolean }>("/api/admin/bans/ip/unban", {
+      method: "POST",
+      body,
+    }),
+
+  adminPromos: () => listRequest<AdminPromo>("/api/admin/promo"),
+  adminPromoCreate: (body: AdminPromoCreate) =>
+    request<AdminPromo>("/api/admin/promo", {
+      method: "POST",
+      body,
+    }),
+  adminPromoBulk: (body: AdminPromoCreate & { count: number; prefix?: string }) =>
+    request<{ codes: string[] }>("/api/admin/promo/bulk", {
+      method: "POST",
+      body,
+    }),
+  adminPromoDeactivate: (body: { code: string }) =>
+    request<{ ok: boolean }>("/api/admin/promo/deactivate", {
+      method: "POST",
+      body,
+    }),
+
+  adminCashPending: () =>
+    listRequest<AdminCashPayment>("/api/admin/payments/cash/pending"),
+  adminCashApprove: (id: string) =>
+    request<{ ok: boolean }>(
+      `/api/admin/payments/cash/${encodeURIComponent(id)}/approve`,
+      { method: "POST" },
+    ),
+  adminCashReject: (id: string, body?: { reason?: string }) =>
+    request<{ ok: boolean }>(
+      `/api/admin/payments/cash/${encodeURIComponent(id)}/reject`,
+      { method: "POST", body },
+    ),
+
+  adminPlans: () => listRequest<Plan>("/api/admin/plans"),
+  adminPlanCreate: (body: AdminPlanInput) =>
+    request<Plan>("/api/admin/plans", { method: "POST", body }),
+  adminPlanUpdate: (id: string, body: Partial<AdminPlanInput>) =>
+    request<Plan>(`/api/admin/plans/${encodeURIComponent(id)}`, {
+      method: "PUT",
+      body,
+    }),
+  adminPlanDelete: (id: string) =>
+    request<{ ok: boolean }>(`/api/admin/plans/${encodeURIComponent(id)}`, {
+      method: "DELETE",
+    }),
+
+  adminServers: () => listRequest<Server>("/api/admin/servers"),
+  adminServer: (id: string) =>
+    request<Server>(`/api/admin/servers/${encodeURIComponent(id)}`),
+  adminServerCreate: (body: AdminServerInput) =>
+    request<Server>("/api/admin/servers", { method: "POST", body }),
+  adminServerUpdate: (id: string, body: Partial<AdminServerInput>) =>
+    request<Server>(`/api/admin/servers/${encodeURIComponent(id)}`, {
+      method: "PUT",
+      body,
+    }),
+  adminServerDelete: (id: string) =>
+    request<{ ok: boolean }>(`/api/admin/servers/${encodeURIComponent(id)}`, {
+      method: "DELETE",
+    }),
+  adminServerTest: (id: string) =>
+    request<AdminServerTest>(
+      `/api/admin/servers/${encodeURIComponent(id)}/test`,
+      { method: "POST" },
+    ),
+
+  adminSettings: () => request<AdminSettings>("/api/admin/settings"),
+  adminSettingTopupBonus: (body: { percent: number }) =>
+    request<{ ok: boolean }>("/api/admin/settings/topup-bonus", {
+      method: "POST",
+      body,
+    }),
+  adminSettingReferralBonus: (body: { percent: number }) =>
+    request<{ ok: boolean }>("/api/admin/settings/referral-bonus", {
+      method: "POST",
+      body,
+    }),
+  adminSettingReferralBonusDays: (body: { days: number }) =>
+    request<{ ok: boolean }>("/api/admin/settings/referral-bonus-days", {
+      method: "POST",
+      body,
+    }),
+  adminSettingRegionSwitchPrice: (body: { price_ton: number }) =>
+    request<{ ok: boolean }>("/api/admin/settings/region-switch-price", {
+      method: "POST",
+      body,
+    }),
+
+  adminLogs: (params?: { limit?: number; offset?: number; level?: string }) =>
+    listRequest<AdminLog>("/api/admin/logs", { query: params }),
 }
 
 export function hasInitData() {

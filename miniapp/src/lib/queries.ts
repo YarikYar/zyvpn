@@ -41,6 +41,19 @@ export const queryKeys = {
   referralStats: ["referral", "stats"] as const,
   referralUsers: ["referral", "users"] as const,
   paymentStatus: (id: string) => ["payment", "status", id] as const,
+  adminStats: ["admin", "stats"] as const,
+  adminUsers: (params?: { search?: string; limit?: number; offset?: number }) =>
+    ["admin", "users", params ?? {}] as const,
+  adminUser: (id: number) => ["admin", "users", id] as const,
+  adminBans: ["admin", "bans"] as const,
+  adminBansIp: ["admin", "bans", "ip"] as const,
+  adminPromos: ["admin", "promos"] as const,
+  adminCashPending: ["admin", "cash", "pending"] as const,
+  adminPlans: ["admin", "plans"] as const,
+  adminServers: ["admin", "servers"] as const,
+  adminSettings: ["admin", "settings"] as const,
+  adminLogs: (params?: { limit?: number; offset?: number; level?: string }) =>
+    ["admin", "logs", params ?? {}] as const,
 }
 
 export function useRates() {
@@ -229,5 +242,320 @@ export function usePaymentStatus(paymentId: string | null, intervalMs = 2_000) {
       }
       return intervalMs
     },
+  })
+}
+
+
+export function useAdminStats() {
+  return useQuery({
+    queryKey: queryKeys.adminStats,
+    queryFn: () => api.adminStats(),
+    staleTime: 30_000,
+  })
+}
+
+export function useAdminUsers(params?: {
+  search?: string
+  limit?: number
+  offset?: number
+}) {
+  return useQuery({
+    queryKey: queryKeys.adminUsers(params),
+    queryFn: () => api.adminUsers(params),
+    staleTime: 15_000,
+  })
+}
+
+export function useAdminUser(id: number | null) {
+  return useQuery({
+    queryKey: queryKeys.adminUser(id ?? 0),
+    queryFn: () => api.adminUser(id!),
+    enabled: typeof id === "number" && id > 0,
+  })
+}
+
+export function useAdminUserMutations(id: number | null) {
+  const qc = useQueryClient()
+  const invalidate = () => {
+    if (typeof id === "number") {
+      qc.invalidateQueries({ queryKey: queryKeys.adminUser(id) })
+    }
+    qc.invalidateQueries({ queryKey: ["admin", "users"] })
+    qc.invalidateQueries({ queryKey: queryKeys.adminBans })
+    qc.invalidateQueries({ queryKey: queryKeys.adminStats })
+  }
+  const balanceSet = useMutation({
+    mutationFn: (body: { amount: number; reason?: string }) =>
+      api.adminUserBalanceSet(id!, body),
+    onSuccess: invalidate,
+  })
+  const balanceAdd = useMutation({
+    mutationFn: (body: { amount: number; reason?: string }) =>
+      api.adminUserBalanceAdd(id!, body),
+    onSuccess: invalidate,
+  })
+  const subscriptionExtend = useMutation({
+    mutationFn: (body: { days: number }) =>
+      api.adminUserSubscriptionExtend(id!, body),
+    onSuccess: invalidate,
+  })
+  const subscriptionCancel = useMutation({
+    mutationFn: () => api.adminUserSubscriptionCancel(id!),
+    onSuccess: invalidate,
+  })
+  const cashPayment = useMutation({
+    mutationFn: (body: { plan_id: string; amount_rub?: number; note?: string }) =>
+      api.adminUserCashPayment(id!, body),
+    onSuccess: invalidate,
+  })
+  const ban = useMutation({
+    mutationFn: (body?: { reason?: string }) => api.adminUserBan(id!, body),
+    onSuccess: invalidate,
+  })
+  const unban = useMutation({
+    mutationFn: () => api.adminUserUnban(id!),
+    onSuccess: invalidate,
+  })
+  return {
+    balanceSet,
+    balanceAdd,
+    subscriptionExtend,
+    subscriptionCancel,
+    cashPayment,
+    ban,
+    unban,
+  }
+}
+
+export function useAdminBans() {
+  return useQuery({
+    queryKey: queryKeys.adminBans,
+    queryFn: () => api.adminBans(),
+  })
+}
+
+export function useAdminBansIp() {
+  return useQuery({
+    queryKey: queryKeys.adminBansIp,
+    queryFn: () => api.adminBansIp(),
+  })
+}
+
+export function useAdminUnbanIp() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: api.adminUnbanIp,
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: queryKeys.adminBansIp })
+    },
+  })
+}
+
+export function useAdminPromos() {
+  return useQuery({
+    queryKey: queryKeys.adminPromos,
+    queryFn: () => api.adminPromos(),
+  })
+}
+
+export function useAdminPromoCreate() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: api.adminPromoCreate,
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: queryKeys.adminPromos })
+    },
+  })
+}
+
+export function useAdminPromoBulk() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: api.adminPromoBulk,
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: queryKeys.adminPromos })
+    },
+  })
+}
+
+export function useAdminPromoDeactivate() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: api.adminPromoDeactivate,
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: queryKeys.adminPromos })
+    },
+  })
+}
+
+export function useAdminCashPending() {
+  return useQuery({
+    queryKey: queryKeys.adminCashPending,
+    queryFn: () => api.adminCashPending(),
+    refetchInterval: 15_000,
+  })
+}
+
+export function useAdminCashApprove() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: api.adminCashApprove,
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: queryKeys.adminCashPending })
+      qc.invalidateQueries({ queryKey: queryKeys.adminStats })
+    },
+  })
+}
+
+export function useAdminCashReject() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ id, reason }: { id: string; reason?: string }) =>
+      api.adminCashReject(id, reason ? { reason } : undefined),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: queryKeys.adminCashPending })
+      qc.invalidateQueries({ queryKey: queryKeys.adminStats })
+    },
+  })
+}
+
+export function useAdminPlans() {
+  return useQuery({
+    queryKey: queryKeys.adminPlans,
+    queryFn: () => api.adminPlans(),
+  })
+}
+
+export function useAdminPlanCreate() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: api.adminPlanCreate,
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: queryKeys.adminPlans })
+      qc.invalidateQueries({ queryKey: queryKeys.plans })
+    },
+  })
+}
+
+export function useAdminPlanUpdate() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({
+      id,
+      input,
+    }: {
+      id: string
+      input: Parameters<typeof api.adminPlanUpdate>[1]
+    }) => api.adminPlanUpdate(id, input),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: queryKeys.adminPlans })
+      qc.invalidateQueries({ queryKey: queryKeys.plans })
+    },
+  })
+}
+
+export function useAdminPlanDelete() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: api.adminPlanDelete,
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: queryKeys.adminPlans })
+      qc.invalidateQueries({ queryKey: queryKeys.plans })
+    },
+  })
+}
+
+export function useAdminServers() {
+  return useQuery({
+    queryKey: queryKeys.adminServers,
+    queryFn: () => api.adminServers(),
+  })
+}
+
+export function useAdminServerCreate() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: api.adminServerCreate,
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: queryKeys.adminServers })
+      qc.invalidateQueries({ queryKey: queryKeys.servers })
+    },
+  })
+}
+
+export function useAdminServerUpdate() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({
+      id,
+      input,
+    }: {
+      id: string
+      input: Parameters<typeof api.adminServerUpdate>[1]
+    }) => api.adminServerUpdate(id, input),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: queryKeys.adminServers })
+      qc.invalidateQueries({ queryKey: queryKeys.servers })
+    },
+  })
+}
+
+export function useAdminServerDelete() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: api.adminServerDelete,
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: queryKeys.adminServers })
+      qc.invalidateQueries({ queryKey: queryKeys.servers })
+    },
+  })
+}
+
+export function useAdminServerTest() {
+  return useMutation({
+    mutationFn: api.adminServerTest,
+  })
+}
+
+export function useAdminSettings() {
+  return useQuery({
+    queryKey: queryKeys.adminSettings,
+    queryFn: () => api.adminSettings(),
+  })
+}
+
+export function useAdminSettingMutations() {
+  const qc = useQueryClient()
+  const invalidate = () => {
+    qc.invalidateQueries({ queryKey: queryKeys.adminSettings })
+  }
+  const topupBonus = useMutation({
+    mutationFn: api.adminSettingTopupBonus,
+    onSuccess: invalidate,
+  })
+  const referralBonus = useMutation({
+    mutationFn: api.adminSettingReferralBonus,
+    onSuccess: invalidate,
+  })
+  const referralBonusDays = useMutation({
+    mutationFn: api.adminSettingReferralBonusDays,
+    onSuccess: invalidate,
+  })
+  const regionSwitchPrice = useMutation({
+    mutationFn: api.adminSettingRegionSwitchPrice,
+    onSuccess: invalidate,
+  })
+  return { topupBonus, referralBonus, referralBonusDays, regionSwitchPrice }
+}
+
+export function useAdminLogs(params?: {
+  limit?: number
+  offset?: number
+  level?: string
+}) {
+  return useQuery({
+    queryKey: queryKeys.adminLogs(params),
+    queryFn: () => api.adminLogs(params),
+    refetchInterval: 30_000,
   })
 }

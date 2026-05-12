@@ -6,6 +6,7 @@ import { NoInitDataScreen } from '@/components/no-init-data-screen'
 import { SiteBalanceChip } from '@/components/site-balance-chip'
 import { SiteBrandChip } from '@/components/site-brand-chip'
 import { SiteHeader } from '@/components/site-header'
+import { AdminSection } from '@/components/sections/admin'
 import { MainSection } from '@/components/sections/main'
 import { ReferralsSection } from '@/components/sections/referrals'
 import { RegionSection } from '@/components/sections/region'
@@ -75,12 +76,20 @@ function AuthGate({ children }: { children: ReactNode }) {
 function AppShell() {
   const [active, setActive] = useState<NavKey>('Main')
   const [walletOpen, setWalletOpen] = useState(false)
+  const [adminOpen, setAdminOpen] = useState(false)
   const [pendingSubView, setPendingSubView] =
     useState<SubscriptionView | null>(null)
   const previousTabRef = useRef<NavKey>('Main')
   const directionRef = useRef(0)
 
   const handleNavChange = (next: NavKey) => {
+    if (adminOpen) {
+      scrollMainToTop()
+      directionRef.current = -1
+      setAdminOpen(false)
+      if (next !== active) setActive(next)
+      return
+    }
     if (walletOpen) {
       scrollMainToTop()
       directionRef.current = -1
@@ -106,6 +115,19 @@ function AppShell() {
     scrollMainToTop()
     directionRef.current = -1
     setWalletOpen(false)
+  }
+
+  const handleOpenAdmin = () => {
+    if (adminOpen) return
+    scrollMainToTop()
+    directionRef.current = 1
+    setAdminOpen(true)
+  }
+
+  const handleCloseAdmin = () => {
+    scrollMainToTop()
+    directionRef.current = -1
+    setAdminOpen(false)
   }
 
   const handleShowKey = () => {
@@ -143,7 +165,7 @@ function AppShell() {
       >
         <AnimatePresence mode="popLayout" initial={false} custom={direction}>
           <motion.div
-            key={walletOpen ? 'wallet' : active}
+            key={adminOpen ? 'admin' : walletOpen ? 'wallet' : active}
             custom={direction}
             variants={variants}
             initial="enter"
@@ -151,7 +173,9 @@ function AppShell() {
             exit="exit"
             transition={TRANSITION}
           >
-            {walletOpen ? (
+            {adminOpen ? (
+              <AdminSection onClose={handleCloseAdmin} />
+            ) : walletOpen ? (
               <WalletSection onClose={handleCloseWallet} />
             ) : (
               <>
@@ -165,7 +189,9 @@ function AppShell() {
                   />
                 )}
                 {active === 'Referrals' && <ReferralsSection />}
-                {active === 'Settings' && <SettingsSection />}
+                {active === 'Settings' && (
+                  <SettingsSection onOpenAdmin={handleOpenAdmin} />
+                )}
               </>
             )}
           </motion.div>

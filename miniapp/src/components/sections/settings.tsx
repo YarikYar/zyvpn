@@ -1,14 +1,29 @@
-import { Globe, Moon, Palette, Settings as SettingsIcon, Sun } from "lucide-react"
+import {
+  ChevronRight,
+  Globe,
+  Moon,
+  Palette,
+  Settings as SettingsIcon,
+  Shield,
+  Sun,
+} from "lucide-react"
 
 import { SectionHeading } from "@/components/sections/section-heading"
 import { SegmentedToggle } from "@/components/ui/segmented-toggle"
 import { useTheme } from "@/hooks/use-theme"
 import { useLocale } from "@/lib/i18n"
+import { useMe } from "@/lib/queries"
 
-export function SettingsSection() {
+export function SettingsSection({
+  onOpenAdmin,
+}: {
+  onOpenAdmin?: () => void
+}) {
   const { t } = useLocale()
   const { theme, setTheme } = useTheme()
   const { locale, setLocale } = useLocale()
+  const meQuery = useMe()
+  const isAdmin = !!meQuery.data?.is_admin
 
   return (
     <section className="px-6 pb-16">
@@ -74,6 +89,36 @@ export function SettingsSection() {
           </div>
         </li>
       </ul>
+
+      {isAdmin && onOpenAdmin && (
+        <>
+          <h3 className="text-foreground mt-10 inline-flex items-center gap-2 text-lg font-semibold tracking-tight">
+            <Shield className="text-muted-foreground size-4" strokeWidth={2} />
+            {t.settings.administration}
+          </h3>
+          <button
+            type="button"
+            onClick={onOpenAdmin}
+            className="bg-card border-border hover:bg-muted/40 mt-3 flex w-full items-center gap-3 rounded-2xl border p-4 text-left transition-colors"
+          >
+            <span className="inline-flex size-9 shrink-0 items-center justify-center rounded-xl bg-foreground/10 text-foreground">
+              <Shield className="size-4" strokeWidth={2} />
+            </span>
+            <div className="min-w-0 flex-1">
+              <p className="text-foreground font-semibold tracking-tight">
+                {t.settings.adminEntry}
+              </p>
+              <p className="text-muted-foreground mt-0.5 text-sm">
+                {t.settings.adminEntrySubtitle}
+              </p>
+            </div>
+            <ChevronRight
+              className="text-muted-foreground size-4 shrink-0"
+              strokeWidth={2}
+            />
+          </button>
+        </>
+      )}
     </section>
   )
 }

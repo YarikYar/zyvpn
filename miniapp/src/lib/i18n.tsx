@@ -151,6 +151,197 @@ type StaticMessages = {
     themeDark: string
     language: string
     languageSubtitle: string
+    administration: string
+    adminEntry: string
+    adminEntrySubtitle: string
+  }
+  admin: {
+    title: string
+    intro: string
+    sections: {
+      stats: { title: string; subtitle: string }
+      users: { title: string; subtitle: string }
+      bans: { title: string; subtitle: string }
+      promo: { title: string; subtitle: string }
+      cash: { title: string; subtitle: string }
+      plans: { title: string; subtitle: string }
+      servers: { title: string; subtitle: string }
+      settings: { title: string; subtitle: string }
+      logs: { title: string; subtitle: string }
+    }
+    stats: {
+      usersTotal: string
+      usersActive: string
+      usersNewToday: string
+      subsActive: string
+      revenueTon: string
+      revenueRub: string
+      revenue30d: string
+      cashPending: string
+      trialUsed: string
+      serversOnline: string
+      bansActive: string
+    }
+    users: {
+      searchPlaceholder: string
+      empty: string
+      banned: string
+      noSubscription: string
+      balance: string
+      subscription: string
+      lastSeen: string
+      joined: string
+      actions: {
+        addBalance: string
+        setBalance: string
+        extendDays: string
+        cancelSubscription: string
+        cashPayment: string
+        ban: string
+        unban: string
+      }
+      promptAmount: string
+      promptDays: string
+      promptReason: string
+      promptPlan: string
+      promptRub: string
+      confirmCancel: string
+      confirmBan: string
+      confirmUnban: string
+    }
+    bans: {
+      tabUsers: string
+      tabIp: string
+      emptyUsers: string
+      emptyIps: string
+      banned: string
+      unban: string
+      addIp: string
+      ipPlaceholder: string
+      reasonPlaceholder: string
+      addIpCta: string
+    }
+    promo: {
+      empty: string
+      createTitle: string
+      bulkTitle: string
+      codeLabel: string
+      codePlaceholder: string
+      typeLabel: string
+      types: { balance: string; discount: string; days: string }
+      amountLabel: string
+      usesLabel: string
+      usesPlaceholder: string
+      expiresLabel: string
+      createCta: string
+      bulkCountLabel: string
+      bulkPrefixLabel: string
+      bulkCta: string
+      deactivate: string
+      active: string
+      inactive: string
+      uses: (left: number, total: number | null) => string
+      generatedTitle: string
+      copyAll: string
+    }
+    cash: {
+      empty: string
+      approve: string
+      reject: string
+      rejectReason: string
+      plan: string
+      amount: string
+      submitted: string
+    }
+    plans: {
+      empty: string
+      createCta: string
+      editCta: string
+      deleteCta: string
+      confirmDelete: string
+      fields: {
+        id: string
+        name: string
+        durationDays: string
+        trafficGb: string
+        unlimitedTraffic: string
+        priceTon: string
+        priceStars: string
+        maxDevices: string
+        description: string
+        isActive: string
+        popular: string
+        visibleToReferrerId: string
+      }
+      createTitle: string
+      updateTitle: string
+      saveCta: string
+      cancelCta: string
+      active: string
+      inactive: string
+      popularLabel: string
+    }
+    servers: {
+      empty: string
+      createCta: string
+      editCta: string
+      deleteCta: string
+      testCta: string
+      testRunning: string
+      testOk: (ping: number) => string
+      testFail: string
+      confirmDelete: string
+      online: string
+      offline: string
+      fields: {
+        id: string
+        country: string
+        city: string
+        name: string
+        host: string
+        port: string
+        isActive: string
+      }
+      createTitle: string
+      updateTitle: string
+      saveCta: string
+      cancelCta: string
+    }
+    settingsTab: {
+      topupBonus: string
+      topupBonusHelp: string
+      referralBonus: string
+      referralBonusHelp: string
+      referralBonusDays: string
+      referralBonusDaysHelp: string
+      regionSwitchPrice: string
+      regionSwitchPriceHelp: string
+      percentUnit: string
+      daysUnit: string
+      tonUnit: string
+      save: string
+      saved: string
+    }
+    logs: {
+      empty: string
+      filterAll: string
+      level: Record<"info" | "warn" | "error" | "debug", string>
+    }
+    common: {
+      save: string
+      cancel: string
+      apply: string
+      delete: string
+      edit: string
+      create: string
+      loading: string
+      error: string
+      refresh: string
+      saved: string
+      enter: string
+      yes: string
+      no: string
+    }
   }
   maintenance: {
     title: string
@@ -415,6 +606,9 @@ const en: StaticMessages = {
     themeDark: "Dark",
     language: "Language",
     languageSubtitle: "Interface language",
+    administration: "Administration",
+    adminEntry: "Admin panel",
+    adminEntrySubtitle: "Manage users, plans and servers",
   },
   maintenance: {
     title: "Service is temporarily unavailable",
@@ -436,6 +630,200 @@ const en: StaticMessages = {
       promo: "Promo code",
       topup: "Top-up",
       referralReward: "Referral reward",
+    },
+  },
+  admin: {
+    title: "Admin panel",
+    intro: "Internal tools — backend-only access.",
+    sections: {
+      stats: { title: "Stats", subtitle: "Users, revenue, uptime" },
+      users: { title: "Users", subtitle: "Search, balance, subscriptions, ban" },
+      bans: { title: "Bans", subtitle: "User and IP bans" },
+      promo: { title: "Promo codes", subtitle: "Create, bulk, deactivate" },
+      cash: { title: "Cash payments", subtitle: "Approve or reject requests" },
+      plans: { title: "Plans", subtitle: "Tariffs, prices, visibility" },
+      servers: { title: "Servers", subtitle: "Endpoints, health, region" },
+      settings: { title: "Bonuses & pricing", subtitle: "Top-up, referral, region switch" },
+      logs: { title: "Logs", subtitle: "Backend events" },
+    },
+    stats: {
+      usersTotal: "Total users",
+      usersActive: "Active users",
+      usersNewToday: "New today",
+      subsActive: "Active subs",
+      revenueTon: "Revenue, TON",
+      revenueRub: "Revenue, ₽",
+      revenue30d: "Last 30 days",
+      cashPending: "Cash pending",
+      trialUsed: "Trial used",
+      serversOnline: "Servers online",
+      bansActive: "Active bans",
+    },
+    users: {
+      searchPlaceholder: "Search by ID, @handle or name",
+      empty: "Nothing found",
+      banned: "Banned",
+      noSubscription: "No subscription",
+      balance: "Balance",
+      subscription: "Subscription",
+      lastSeen: "Last seen",
+      joined: "Joined",
+      actions: {
+        addBalance: "Add balance",
+        setBalance: "Set balance",
+        extendDays: "Extend days",
+        cancelSubscription: "Cancel subscription",
+        cashPayment: "Add cash payment",
+        ban: "Ban user",
+        unban: "Unban user",
+      },
+      promptAmount: "Amount (TON)",
+      promptDays: "Days to add",
+      promptReason: "Reason (optional)",
+      promptPlan: "Plan ID",
+      promptRub: "Amount (₽)",
+      confirmCancel: "Cancel the active subscription?",
+      confirmBan: "Ban this user?",
+      confirmUnban: "Unban this user?",
+    },
+    bans: {
+      tabUsers: "Users",
+      tabIp: "IPs",
+      emptyUsers: "No banned users",
+      emptyIps: "No banned IPs",
+      banned: "Banned",
+      unban: "Unban",
+      addIp: "Add IP ban",
+      ipPlaceholder: "0.0.0.0",
+      reasonPlaceholder: "Reason (optional)",
+      addIpCta: "Block IP",
+    },
+    promo: {
+      empty: "No promo codes yet",
+      createTitle: "Create code",
+      bulkTitle: "Bulk generation",
+      codeLabel: "Code",
+      codePlaceholder: "WELCOME or empty for random",
+      typeLabel: "Type",
+      types: { balance: "Balance bonus", discount: "Discount", days: "Days" },
+      amountLabel: "Amount",
+      usesLabel: "Total uses",
+      usesPlaceholder: "Empty for unlimited",
+      expiresLabel: "Expires (YYYY-MM-DD, optional)",
+      createCta: "Create",
+      bulkCountLabel: "Count",
+      bulkPrefixLabel: "Prefix",
+      bulkCta: "Generate",
+      deactivate: "Deactivate",
+      active: "Active",
+      inactive: "Inactive",
+      uses: (left, total) =>
+        total === null ? `${left} uses (∞)` : `${left} / ${total} uses`,
+      generatedTitle: "Generated codes",
+      copyAll: "Copy all",
+    },
+    cash: {
+      empty: "No pending cash payments",
+      approve: "Approve",
+      reject: "Reject",
+      rejectReason: "Reason (optional)",
+      plan: "Plan",
+      amount: "Amount",
+      submitted: "Submitted",
+    },
+    plans: {
+      empty: "No plans yet",
+      createCta: "New plan",
+      editCta: "Edit",
+      deleteCta: "Delete",
+      confirmDelete: "Delete this plan?",
+      fields: {
+        id: "ID",
+        name: "Name",
+        durationDays: "Duration (days)",
+        trafficGb: "Traffic (GB)",
+        unlimitedTraffic: "Unlimited traffic",
+        priceTon: "Price (TON)",
+        priceStars: "Price (Stars)",
+        maxDevices: "Max devices",
+        description: "Description",
+        isActive: "Active",
+        popular: "Popular",
+        visibleToReferrerId: "Visible only to referrer ID",
+      },
+      createTitle: "Create plan",
+      updateTitle: "Edit plan",
+      saveCta: "Save",
+      cancelCta: "Cancel",
+      active: "Active",
+      inactive: "Hidden",
+      popularLabel: "Popular",
+    },
+    servers: {
+      empty: "No servers yet",
+      createCta: "New server",
+      editCta: "Edit",
+      deleteCta: "Delete",
+      testCta: "Test",
+      testRunning: "Testing…",
+      testOk: (ping) => `OK · ${ping} ms`,
+      testFail: "Test failed",
+      confirmDelete: "Delete this server?",
+      online: "Online",
+      offline: "Offline",
+      fields: {
+        id: "ID",
+        country: "Country code (ISO)",
+        city: "City",
+        name: "Name",
+        host: "Host",
+        port: "Port",
+        isActive: "Active",
+      },
+      createTitle: "Create server",
+      updateTitle: "Edit server",
+      saveCta: "Save",
+      cancelCta: "Cancel",
+    },
+    settingsTab: {
+      topupBonus: "Top-up bonus",
+      topupBonusHelp: "Extra balance percent on top-ups.",
+      referralBonus: "Referral bonus",
+      referralBonusHelp: "Share of referee payments credited to referrer.",
+      referralBonusDays: "Referral free days",
+      referralBonusDaysHelp: "Bonus days for the referee on first paid plan.",
+      regionSwitchPrice: "Region switch price",
+      regionSwitchPriceHelp: "Cost of switching server outside the free quota.",
+      percentUnit: "%",
+      daysUnit: "days",
+      tonUnit: "TON",
+      save: "Save",
+      saved: "Saved",
+    },
+    logs: {
+      empty: "No logs in window",
+      filterAll: "All",
+      level: {
+        info: "Info",
+        warn: "Warning",
+        error: "Error",
+        debug: "Debug",
+      },
+    },
+    common: {
+      save: "Save",
+      cancel: "Cancel",
+      apply: "Apply",
+      delete: "Delete",
+      edit: "Edit",
+      create: "Create",
+      loading: "Loading…",
+      error: "Something went wrong",
+      refresh: "Refresh",
+      saved: "Saved",
+      enter: "Enter",
+      yes: "Yes",
+      no: "No",
     },
   },
 }
@@ -640,6 +1028,9 @@ const ru: StaticMessages = {
     themeDark: "Тёмная",
     language: "Язык",
     languageSubtitle: "Язык интерфейса",
+    administration: "Администрирование",
+    adminEntry: "Админка",
+    adminEntrySubtitle: "Пользователи, тарифы, серверы",
   },
   maintenance: {
     title: "Сервис временно недоступен",
@@ -661,6 +1052,200 @@ const ru: StaticMessages = {
       promo: "Промокод",
       topup: "Пополнение",
       referralReward: "Реферальная награда",
+    },
+  },
+  admin: {
+    title: "Админка",
+    intro: "Внутренние инструменты — доступ только для админов.",
+    sections: {
+      stats: { title: "Статистика", subtitle: "Юзеры, выручка, аптайм" },
+      users: { title: "Пользователи", subtitle: "Поиск, баланс, подписки, бан" },
+      bans: { title: "Баны", subtitle: "Юзеры и IP-адреса" },
+      promo: { title: "Промокоды", subtitle: "Создание, пачкой, деактивация" },
+      cash: { title: "Оплаты налом", subtitle: "Подтверждай или отклоняй заявки" },
+      plans: { title: "Тарифы", subtitle: "Цены, видимость, активность" },
+      servers: { title: "Серверы", subtitle: "Точки, здоровье, регион" },
+      settings: { title: "Бонусы и цены", subtitle: "Пополнение, рефералка, смена региона" },
+      logs: { title: "Логи", subtitle: "События бэкенда" },
+    },
+    stats: {
+      usersTotal: "Всего юзеров",
+      usersActive: "Активные",
+      usersNewToday: "Новых за сегодня",
+      subsActive: "Активные подписки",
+      revenueTon: "Выручка, TON",
+      revenueRub: "Выручка, ₽",
+      revenue30d: "За 30 дней",
+      cashPending: "Налом в ожидании",
+      trialUsed: "Триалов",
+      serversOnline: "Серверов онлайн",
+      bansActive: "Активных банов",
+    },
+    users: {
+      searchPlaceholder: "ID, @username или имя",
+      empty: "Ничего не найдено",
+      banned: "Забанен",
+      noSubscription: "Без подписки",
+      balance: "Баланс",
+      subscription: "Подписка",
+      lastSeen: "Был в сети",
+      joined: "Создан",
+      actions: {
+        addBalance: "Пополнить баланс",
+        setBalance: "Установить баланс",
+        extendDays: "Продлить дни",
+        cancelSubscription: "Отменить подписку",
+        cashPayment: "Добавить оплату налом",
+        ban: "Забанить",
+        unban: "Разбанить",
+      },
+      promptAmount: "Сумма (TON)",
+      promptDays: "Сколько дней добавить",
+      promptReason: "Причина (опционально)",
+      promptPlan: "ID тарифа",
+      promptRub: "Сумма (₽)",
+      confirmCancel: "Отменить активную подписку?",
+      confirmBan: "Забанить пользователя?",
+      confirmUnban: "Разбанить пользователя?",
+    },
+    bans: {
+      tabUsers: "Юзеры",
+      tabIp: "IP",
+      emptyUsers: "Нет забаненных юзеров",
+      emptyIps: "Нет забаненных IP",
+      banned: "Бан",
+      unban: "Снять бан",
+      addIp: "Заблокировать IP",
+      ipPlaceholder: "0.0.0.0",
+      reasonPlaceholder: "Причина (опционально)",
+      addIpCta: "Заблокировать",
+    },
+    promo: {
+      empty: "Пока ничего нет",
+      createTitle: "Создать код",
+      bulkTitle: "Сгенерировать пачкой",
+      codeLabel: "Код",
+      codePlaceholder: "WELCOME или пусто для рандома",
+      typeLabel: "Тип",
+      types: { balance: "Бонус на баланс", discount: "Скидка", days: "Дни" },
+      amountLabel: "Размер",
+      usesLabel: "Активаций",
+      usesPlaceholder: "Пусто — без лимита",
+      expiresLabel: "Срок действия (ГГГГ-ММ-ДД, опционально)",
+      createCta: "Создать",
+      bulkCountLabel: "Количество",
+      bulkPrefixLabel: "Префикс",
+      bulkCta: "Сгенерировать",
+      deactivate: "Отключить",
+      active: "Активен",
+      inactive: "Отключён",
+      uses: (left, total) =>
+        total === null ? `${left} активаций (∞)` : `${left} / ${total} активаций`,
+      generatedTitle: "Сгенерированные коды",
+      copyAll: "Скопировать всё",
+    },
+    cash: {
+      empty: "Заявок на оплату налом нет",
+      approve: "Подтвердить",
+      reject: "Отклонить",
+      rejectReason: "Причина (опционально)",
+      plan: "Тариф",
+      amount: "Сумма",
+      submitted: "Создана",
+    },
+    plans: {
+      empty: "Тарифов пока нет",
+      createCta: "Новый тариф",
+      editCta: "Изменить",
+      deleteCta: "Удалить",
+      confirmDelete: "Удалить тариф?",
+      fields: {
+        id: "ID",
+        name: "Название",
+        durationDays: "Срок (дни)",
+        trafficGb: "Трафик (ГБ)",
+        unlimitedTraffic: "Безлимит",
+        priceTon: "Цена (TON)",
+        priceStars: "Цена (Stars)",
+        maxDevices: "Макс. устройств",
+        description: "Описание",
+        isActive: "Активен",
+        popular: "Популярный",
+        visibleToReferrerId: "Виден только реферреру ID",
+      },
+      createTitle: "Новый тариф",
+      updateTitle: "Изменить тариф",
+      saveCta: "Сохранить",
+      cancelCta: "Отмена",
+      active: "Активен",
+      inactive: "Скрыт",
+      popularLabel: "Популярный",
+    },
+    servers: {
+      empty: "Серверов пока нет",
+      createCta: "Новый сервер",
+      editCta: "Изменить",
+      deleteCta: "Удалить",
+      testCta: "Тест",
+      testRunning: "Проверка…",
+      testOk: (ping) => `OK · ${ping} мс`,
+      testFail: "Не отвечает",
+      confirmDelete: "Удалить сервер?",
+      online: "Онлайн",
+      offline: "Офлайн",
+      fields: {
+        id: "ID",
+        country: "Код страны (ISO)",
+        city: "Город",
+        name: "Имя",
+        host: "Хост",
+        port: "Порт",
+        isActive: "Активен",
+      },
+      createTitle: "Новый сервер",
+      updateTitle: "Изменить сервер",
+      saveCta: "Сохранить",
+      cancelCta: "Отмена",
+    },
+    settingsTab: {
+      topupBonus: "Бонус на пополнение",
+      topupBonusHelp: "Процент бонуса на пополнения баланса.",
+      referralBonus: "Реферальный процент",
+      referralBonusHelp: "Какой процент уходит рефереру с платежа друга.",
+      referralBonusDays: "Реф. бонусные дни",
+      referralBonusDaysHelp: "Бесплатные дни приглашённому при первой покупке.",
+      regionSwitchPrice: "Цена смены региона",
+      regionSwitchPriceHelp: "Сколько стоит смена сервера сверх бесплатной квоты.",
+      percentUnit: "%",
+      daysUnit: "дней",
+      tonUnit: "TON",
+      save: "Сохранить",
+      saved: "Сохранено",
+    },
+    logs: {
+      empty: "Логов в окне нет",
+      filterAll: "Все",
+      level: {
+        info: "Инфо",
+        warn: "Внимание",
+        error: "Ошибка",
+        debug: "Дебаг",
+      },
+    },
+    common: {
+      save: "Сохранить",
+      cancel: "Отмена",
+      apply: "Применить",
+      delete: "Удалить",
+      edit: "Изменить",
+      create: "Создать",
+      loading: "Загрузка…",
+      error: "Что-то пошло не так",
+      refresh: "Обновить",
+      saved: "Сохранено",
+      enter: "Ввод",
+      yes: "Да",
+      no: "Нет",
     },
   },
 }
