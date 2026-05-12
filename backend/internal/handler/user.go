@@ -46,5 +46,10 @@ func (h *Handler) GetMe(c *fiber.Ctx) error {
 		})
 	}
 
+	isAdmin, err := h.adminSvc.IsAdmin(c.Context(), user.ID)
+	if err == nil {
+		userWithSub.IsAdmin = isAdmin
+	}
+
 	return c.JSON(userWithSub)
 }

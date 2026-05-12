@@ -21,4 +21,5 @@ type User struct {
 type UserWithSubscription struct {
 	User
 	Subscription *Subscription `json:"subscription,omitempty"`
+	IsAdmin      bool          `json:"is_admin"`
 }

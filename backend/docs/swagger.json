@@ -3783,6 +3783,9 @@
                 "id": {
                     "type": "integer"
                 },
+                "is_admin": {
+                    "type": "boolean"
+                },
                 "language_code": {
                     "type": "string"
                 },
