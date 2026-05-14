@@ -40,16 +40,12 @@ definitions:
     type: object
   handler.BulkPromoCodeRequest:
     properties:
-      cash_amount_rub:
-        type: number
       count:
         type: integer
       expires_at:
         type: string
       max_uses:
         type: integer
-      plan_id:
-        type: string
       prefix:
         type: string
       type:
@@ -67,15 +63,6 @@ definitions:
         - ton
         - stars
         - cash
-        type: string
-    type: object
-  handler.CreateCashPaymentRequest:
-    properties:
-      amount_rub:
-        type: number
-      plan_id:
-        type: string
-      server_id:
         type: string
     type: object
   handler.CreatePlanRequest:
@@ -107,16 +94,12 @@ definitions:
     type: object
   handler.CreatePromoCodeRequest:
     properties:
-      cash_amount_rub:
-        type: number
       description:
         type: string
       expires_at:
         type: string
       max_uses:
         type: integer
-      plan_id:
-        type: string
       type:
         $ref: '#/definitions/model.PromoCodeType'
       value:
@@ -190,11 +173,6 @@ definitions:
   handler.PayFromBalanceRequest:
     properties:
       plan_id:
-        type: string
-    type: object
-  handler.RejectCashPaymentRequest:
-    properties:
-      reason:
         type: string
     type: object
   handler.ServersResponse:
@@ -334,13 +312,11 @@ definitions:
     - ton
     - stars
     - balance
-    - cash
     type: string
     x-enum-varnames:
     - PaymentProviderTON
     - PaymentProviderStars
     - PaymentProviderBalance
-    - PaymentProviderCash
   model.Plan:
     properties:
       created_at:
@@ -382,8 +358,6 @@ definitions:
     type: object
   model.PromoCode:
     properties:
-      cash_amount_rub:
-        type: number
       code:
         type: string
       created_at:
@@ -398,9 +372,6 @@ definitions:
         type: boolean
       max_uses:
         type: integer
-      plan_id:
-        description: CashPlan-specific fields. Both NULL for non-cash_plan promos.
-        type: string
       type:
         $ref: '#/definitions/model.PromoCodeType'
       used_count:
@@ -413,7 +384,6 @@ definitions:
     enum:
     - balance
     - days
-    - cash_plan
     type: string
     x-enum-comments:
       PromoCodeTypeBalance: Credits TON to balance
@@ -421,11 +391,9 @@ definitions:
     x-enum-descriptions:
     - Credits TON to balance
     - Adds days to subscription
-    - ""
     x-enum-varnames:
     - PromoCodeTypeBalance
     - PromoCodeTypeDays
-    - PromoCodeTypeCashPlan
   model.Server:
     properties:
       capacity:
@@ -802,76 +770,6 @@ paths:
       security:
       - TelegramInitData: []
       summary: Admin audit log
-      tags:
-      - admin
-  /api/admin/payments/cash/{payment_id}/approve:
-    post:
-      parameters:
-      - description: payment uuid
-        in: path
-        name: payment_id
-        required: true
-        type: string
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            additionalProperties: true
-            type: object
-      security:
-      - TelegramInitData: []
-      summary: Approve cash payment
-      tags:
-      - admin
-  /api/admin/payments/cash/{payment_id}/reject:
-    post:
-      consumes:
-      - application/json
-      parameters:
-      - description: payment uuid
-        in: path
-        name: payment_id
-        required: true
-        type: string
-      - description: reason
-        in: body
-        name: body
-        schema:
-          $ref: '#/definitions/handler.RejectCashPaymentRequest'
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            additionalProperties: true
-            type: object
-      security:
-      - TelegramInitData: []
-      summary: Reject cash payment
-      tags:
-      - admin
-  /api/admin/payments/cash/pending:
-    get:
-      parameters:
-      - default: 50
-        description: page size
-        in: query
-        name: limit
-        type: integer
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            additionalProperties: true
-            type: object
-      security:
-      - TelegramInitData: []
-      summary: Pending cash payments
       tags:
       - admin
   /api/admin/plans:
@@ -1504,35 +1402,6 @@ paths:
       security:
       - TelegramInitData: []
       summary: Ban user
-      tags:
-      - admin
-  /api/admin/users/{user_id}/cash-payment:
-    post:
-      consumes:
-      - application/json
-      parameters:
-      - description: user id
-        in: path
-        name: user_id
-        required: true
-        type: integer
-      - description: plan + amount in RUB
-        in: body
-        name: body
-        required: true
-        schema:
-          $ref: '#/definitions/handler.CreateCashPaymentRequest'
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            additionalProperties: true
-            type: object
-      security:
-      - TelegramInitData: []
-      summary: Create cash payment for user
       tags:
       - admin
   /api/admin/users/{user_id}/subscription/cancel:

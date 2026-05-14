@@ -118,18 +118,6 @@ func (r *Repository) GetPendingPayments(ctx context.Context, olderThan time.Dura
 	return payments, err
 }
 
-// GetPendingCashPayments returns pending cash payments for admin review.
-func (r *Repository) GetPendingCashPayments(ctx context.Context, limit int) ([]model.Payment, error) {
-	var payments []model.Payment
-	query := `
-		SELECT * FROM payments
-		WHERE provider = 'cash' AND status = 'pending'
-		ORDER BY created_at DESC
-		LIMIT $1`
-	err := r.db.SelectContext(ctx, &payments, query, limit)
-	return payments, err
-}
-
 func (r *Repository) HasCompletedPayment(ctx context.Context, userID int64) (bool, error) {
 	var count int
 	query := "SELECT COUNT(*) FROM payments WHERE user_id = $1 AND status = 'completed'"

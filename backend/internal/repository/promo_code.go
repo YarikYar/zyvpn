@@ -70,10 +70,9 @@ func (r *Repository) UsePromoCode(ctx context.Context, userID int64, promoCodeID
 // CreatePromoCode creates a new promo code (for admin use)
 func (r *Repository) CreatePromoCode(ctx context.Context, promo *model.PromoCode) error {
 	_, err := r.db.ExecContext(ctx, `
-		INSERT INTO promo_codes (code, type, value, max_uses, expires_at, is_active, description, plan_id, cash_amount_rub)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
-		promo.Code, promo.Type, promo.Value, promo.MaxUses, promo.ExpiresAt, promo.IsActive, promo.Description,
-		promo.PlanID, promo.CashAmountRUB)
+		INSERT INTO promo_codes (code, type, value, max_uses, expires_at, is_active, description)
+		VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+		promo.Code, promo.Type, promo.Value, promo.MaxUses, promo.ExpiresAt, promo.IsActive, promo.Description)
 	return err
 }
 

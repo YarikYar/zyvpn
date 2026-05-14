@@ -444,13 +444,11 @@ func (h *AdminHandler) ListBans(c *fiber.Ctx) error {
 // --- Promo Code Management ---
 
 type CreatePromoCodeRequest struct {
-	Type          model.PromoCodeType `json:"type"`
-	Value         float64             `json:"value"`
-	MaxUses       *int                `json:"max_uses,omitempty"`
-	ExpiresAt     *time.Time          `json:"expires_at,omitempty"`
-	Description   string              `json:"description,omitempty"`
-	PlanID        *string             `json:"plan_id,omitempty"`
-	CashAmountRUB *float64            `json:"cash_amount_rub,omitempty"`
+	Type        model.PromoCodeType `json:"type"`
+	Value       float64             `json:"value"`
+	MaxUses     *int                `json:"max_uses,omitempty"`
+	ExpiresAt   *time.Time          `json:"expires_at,omitempty"`
+	Description string              `json:"description,omitempty"`
 }
 
 // CreatePromoCode creates a single promo code.
@@ -475,36 +473,21 @@ func (h *AdminHandler) CreatePromoCode(c *fiber.Ctx) error {
 	}
 
 	switch req.Type {
-	case model.PromoCodeTypeBalance, model.PromoCodeTypeDays, model.PromoCodeTypeCashPlan:
+	case model.PromoCodeTypeBalance, model.PromoCodeTypeDays:
 		// ok
 	default:
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-			"error": "invalid promo code type, must be 'balance', 'days' or 'cash_plan'",
+			"error": "invalid promo code type, must be 'balance' or 'days'",
 		})
 	}
 
-	// `value` is unused for cash_plan but the legacy validation expects it.
-	// Default to 1 to keep callers simple.
 	if req.Value <= 0 {
-		if req.Type == model.PromoCodeTypeCashPlan {
-			req.Value = 1
-		} else {
-			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-				"error": "value must be positive",
-			})
-		}
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "value must be positive",
+		})
 	}
 
-	var planID *uuid.UUID
-	if req.PlanID != nil && *req.PlanID != "" {
-		pid, err := uuid.Parse(*req.PlanID)
-		if err != nil {
-			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "invalid plan_id"})
-		}
-		planID = &pid
-	}
-
-	promo, err := h.adminSvc.GeneratePromoCode(c.Context(), adminID, req.Type, req.Value, req.MaxUses, req.ExpiresAt, req.Description, planID, req.CashAmountRUB)
+	promo, err := h.adminSvc.GeneratePromoCode(c.Context(), adminID, req.Type, req.Value, req.MaxUses, req.ExpiresAt, req.Description)
 	if err != nil {
 		return respondInternalError(c, err)
 	}
@@ -513,14 +496,12 @@ func (h *AdminHandler) CreatePromoCode(c *fiber.Ctx) error {
 }
 
 type BulkPromoCodeRequest struct {
-	Count         int                 `json:"count"`
-	Type          model.PromoCodeType `json:"type"`
-	Value         float64             `json:"value"`
-	MaxUses       *int                `json:"max_uses,omitempty"`
-	ExpiresAt     *time.Time          `json:"expires_at,omitempty"`
-	Prefix        string              `json:"prefix,omitempty"`
-	PlanID        *string             `json:"plan_id,omitempty"`
-	CashAmountRUB *float64            `json:"cash_amount_rub,omitempty"`
+	Count     int                 `json:"count"`
+	Type      model.PromoCodeType `json:"type"`
+	Value     float64             `json:"value"`
+	MaxUses   *int                `json:"max_uses,omitempty"`
+	ExpiresAt *time.Time          `json:"expires_at,omitempty"`
+	Prefix    string              `json:"prefix,omitempty"`
 }
 
 // CreateBulkPromoCodes generates N promo codes at once.
@@ -550,7 +531,7 @@ func (h *AdminHandler) CreateBulkPromoCodes(c *fiber.Ctx) error {
 	}
 
 	switch req.Type {
-	case model.PromoCodeTypeBalance, model.PromoCodeTypeDays, model.PromoCodeTypeCashPlan:
+	case model.PromoCodeTypeBalance, model.PromoCodeTypeDays:
 		// ok
 	default:
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
@@ -559,25 +540,12 @@ func (h *AdminHandler) CreateBulkPromoCodes(c *fiber.Ctx) error {
 	}
 
 	if req.Value <= 0 {
-		if req.Type == model.PromoCodeTypeCashPlan {
-			req.Value = 1
-		} else {
-			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-				"error": "value must be positive",
-			})
-		}
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "value must be positive",
+		})
 	}
 
-	var bulkPlanID *uuid.UUID
-	if req.PlanID != nil && *req.PlanID != "" {
-		pid, err := uuid.Parse(*req.PlanID)
-		if err != nil {
-			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "invalid plan_id"})
-		}
-		bulkPlanID = &pid
-	}
-
-	codes, err := h.adminSvc.GenerateBulkPromoCodes(c.Context(), adminID, req.Count, req.Type, req.Value, req.MaxUses, req.ExpiresAt, req.Prefix, bulkPlanID, req.CashAmountRUB)
+	codes, err := h.adminSvc.GenerateBulkPromoCodes(c.Context(), adminID, req.Count, req.Type, req.Value, req.MaxUses, req.ExpiresAt, req.Prefix)
 	if err != nil {
 		return respondInternalError(c, err)
 	}
@@ -1035,137 +1003,6 @@ func (h *AdminHandler) SetReferralBonusDays(c *fiber.Ctx) error {
 	}
 
 	return c.JSON(fiber.Map{"success": true, "referral_bonus_days": req.Days})
-}
-
-// --- Cash payments admin actions ---
-
-type CreateCashPaymentRequest struct {
-	PlanID    string  `json:"plan_id"`
-	AmountRUB float64 `json:"amount_rub"`
-	ServerID  *string `json:"server_id,omitempty"`
-}
-
-// CreateCashPayment lets the admin proactively create a pending cash payment
-// for a specific user at a custom RUB amount. The user gets an inline-button
-// notification in Telegram and can pay the admin in person; the admin then
-// CreateCashPayment creates a pending cash payment for a user.
-//
-//	@Summary	Create cash payment for user
-//	@Tags		admin
-//	@Accept		json
-//	@Produce	json
-//	@Param		user_id	path		int						true	"user id"
-//	@Param		body	body		CreateCashPaymentRequest	true	"plan + amount in RUB"
-//	@Success	200		{object}	map[string]interface{}
-//	@Router		/api/admin/users/{user_id}/cash-payment [post]
-//	@Security	TelegramInitData
-func (h *AdminHandler) CreateCashPayment(c *fiber.Ctx) error {
-	targetUserID, err := strconv.ParseInt(c.Params("user_id"), 10, 64)
-	if err != nil {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "invalid user_id"})
-	}
-
-	var req CreateCashPaymentRequest
-	if err := c.BodyParser(&req); err != nil {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "invalid request body"})
-	}
-	planID, err := uuid.Parse(req.PlanID)
-	if err != nil {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "invalid plan_id"})
-	}
-	if req.AmountRUB <= 0 {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "amount_rub must be positive"})
-	}
-	var serverID *uuid.UUID
-	if req.ServerID != nil && *req.ServerID != "" {
-		sid, err := uuid.Parse(*req.ServerID)
-		if err != nil {
-			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "invalid server_id"})
-		}
-		serverID = &sid
-	}
-
-	payment, err := h.paymentSvc.CreateCashPaymentWithAmount(c.Context(), targetUserID, planID, serverID, req.AmountRUB)
-	if err != nil {
-		return respondInternalError(c, err)
-	}
-	return c.JSON(fiber.Map{"payment": payment})
-}
-
-// --- Cash payments approval flow ---
-
-// ListPendingCashPayments returns pending cash payments awaiting admin
-// ListPendingCashPayments lists pending cash payments.
-//
-//	@Summary	Pending cash payments
-//	@Tags		admin
-//	@Produce	json
-//	@Param		limit	query		int	false	"page size"	default(50)
-//	@Success	200		{object}	map[string]interface{}
-//	@Router		/api/admin/payments/cash/pending [get]
-//	@Security	TelegramInitData
-func (h *AdminHandler) ListPendingCashPayments(c *fiber.Ctx) error {
-	limit := 50
-	if v := c.Query("limit"); v != "" {
-		if n, err := strconv.Atoi(v); err == nil && n > 0 {
-			limit = n
-		}
-	}
-	payments, err := h.paymentSvc.ListPendingCashPayments(c.Context(), limit)
-	if err != nil {
-		return respondInternalError(c, err)
-	}
-	return c.JSON(fiber.Map{"payments": payments})
-}
-
-// ApproveCashPayment marks a pending cash payment as completed and provisions
-// ApproveCashPayment marks a cash payment as paid → provisions sub.
-//
-//	@Summary	Approve cash payment
-//	@Tags		admin
-//	@Produce	json
-//	@Param		payment_id	path		string	true	"payment uuid"
-//	@Success	200			{object}	map[string]interface{}
-//	@Router		/api/admin/payments/cash/{payment_id}/approve [post]
-//	@Security	TelegramInitData
-func (h *AdminHandler) ApproveCashPayment(c *fiber.Ctx) error {
-	id, err := uuid.Parse(c.Params("payment_id"))
-	if err != nil {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "invalid payment_id"})
-	}
-	if err := h.paymentSvc.ApproveCashPayment(c.Context(), id); err != nil {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": err.Error()})
-	}
-	return c.JSON(fiber.Map{"success": true})
-}
-
-type RejectCashPaymentRequest struct {
-	Reason string `json:"reason"`
-}
-
-// RejectCashPayment marks a pending cash payment as failed and notifies the
-// RejectCashPayment rejects a pending cash payment.
-//
-//	@Summary	Reject cash payment
-//	@Tags		admin
-//	@Accept		json
-//	@Produce	json
-//	@Param		payment_id	path		string					true	"payment uuid"
-//	@Param		body		body		RejectCashPaymentRequest	false	"reason"
-//	@Success	200			{object}	map[string]interface{}
-//	@Router		/api/admin/payments/cash/{payment_id}/reject [post]
-//	@Security	TelegramInitData
-func (h *AdminHandler) RejectCashPayment(c *fiber.Ctx) error {
-	id, err := uuid.Parse(c.Params("payment_id"))
-	if err != nil {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "invalid payment_id"})
-	}
-	var req RejectCashPaymentRequest
-	_ = c.BodyParser(&req)
-	if err := h.paymentSvc.RejectCashPayment(c.Context(), id, req.Reason); err != nil {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": err.Error()})
-	}
-	return c.JSON(fiber.Map{"success": true})
 }
 
 // --- Subscription admin actions ---

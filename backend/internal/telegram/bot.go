@@ -9,8 +9,8 @@ import (
 
 	"github.com/google/uuid"
 	tele "gopkg.in/telebot.v3"
+
 	"github.com/zyvpn/backend/internal/config"
-	"github.com/zyvpn/backend/internal/model"
 	"github.com/zyvpn/backend/internal/repository"
 	"github.com/zyvpn/backend/internal/service"
 )
@@ -449,13 +449,6 @@ func (b *Bot) handleCallback(c tele.Context) error {
 	// telebot adds \f prefix to callback data
 	clean := strings.TrimPrefix(data, "\f")
 
-	// Cash approve/reject buttons embed the payment uuid: "cash_approve|<uuid>"
-	if rest, ok := strings.CutPrefix(clean, "cash_approve|"); ok {
-		return b.handleCashApprove(c, rest)
-	}
-	if rest, ok := strings.CutPrefix(clean, "cash_reject|"); ok {
-		return b.handleCashReject(c, rest)
-	}
 	// «Скачать в чат» buttons in /apps: "appfile|<app_key>"
 	if rest, ok := strings.CutPrefix(clean, "appfile|"); ok {
 		return b.sendAppDocument(context.Background(), c, rest)
@@ -668,117 +661,3 @@ func (b *Bot) RefundStarsPayment(userID int64, telegramPaymentChargeID string) e
 	return nil
 }
 
-// --- Cash payment admin flow ---
-
-// SetPaymentService is reused by the cash flow to call back into the
-// payment service from inline-button handlers. The existing
-// SetPaymentService at the bottom of this file is what main.go invokes;
-// below are just helpers.
-
-// NotifyAdminsCashPayment sends an alert with inline approve/reject buttons
-// to every admin in the database. Best-effort: failure to deliver to any
-// individual admin is logged but doesn't stop iteration.
-func (b *Bot) NotifyAdminsCashPayment(payment *model.Payment, plan *model.Plan, user *model.User, amountRUB float64) error {
-	admins, err := b.repo.ListAdmins(context.Background())
-	if err != nil {
-		return fmt.Errorf("list admins: %w", err)
-	}
-	if len(admins) == 0 {
-		log.Printf("[Bot] cash payment %s created but no admins to notify", payment.ID)
-		return nil
-	}
-
-	uname := ""
-	if user != nil && user.Username != nil && *user.Username != "" {
-		uname = " @" + *user.Username
-	}
-	displayName := ""
-	if user != nil && user.FirstName != nil {
-		displayName = *user.FirstName
-	}
-
-	text := fmt.Sprintf(
-		"💵 <b>Новый платёж наличными</b>\n\n"+
-			"Тариф: <b>%s</b>\n"+
-			"К оплате: <b>%.0f ₽</b> (≈ %.4f TON)\n"+
-			"Покупатель: %s%s (id <code>%d</code>)\n\n"+
-			"Подтверди после получения наличных.",
-		plan.Name, amountRUB, payment.Amount, displayName, uname, payment.UserID,
-	)
-
-	kb := &tele.ReplyMarkup{}
-	kb.Inline(
-		kb.Row(
-			kb.Data("✅ Подтвердил", "cash_approve|"+payment.ID.String()),
-			kb.Data("❌ Отклонить", "cash_reject|"+payment.ID.String()),
-		),
-	)
-
-	for _, admin := range admins {
-		if _, err := b.bot.Send(&tele.User{ID: admin.UserID}, text, kb, tele.ModeHTML); err != nil {
-			log.Printf("[Bot] notify admin %d about cash payment %s: %v", admin.UserID, payment.ID, err)
-		}
-	}
-	return nil
-}
-
-func (b *Bot) NotifyCashApproved(chatID int64, plan *model.Plan) error {
-	text := fmt.Sprintf("✅ <b>Оплата получена</b>\n\nТариф «%s» активирован. Откройте мини-приложение, чтобы получить ключ.", plan.Name)
-	kb := &tele.ReplyMarkup{}
-	kb.Inline(kb.Row(kb.WebApp("📱 Открыть VPN", &tele.WebApp{URL: b.cfg.Telegram.WebAppURL})))
-	_, err := b.bot.Send(&tele.User{ID: chatID}, text, kb, tele.ModeHTML)
-	return err
-}
-
-func (b *Bot) NotifyCashRejected(chatID int64, plan *model.Plan, reason string) error {
-	text := fmt.Sprintf("❌ <b>Оплата отклонена</b>\n\nТариф: %s", plan.Name)
-	if reason != "" {
-		text += "\nПричина: " + reason
-	}
-	_, err := b.bot.Send(&tele.User{ID: chatID}, text, tele.ModeHTML)
-	return err
-}
-
-// handleCashApprove is called by the inline-button handler when an admin
-// taps «Подтвердил».
-func (b *Bot) handleCashApprove(c tele.Context, paymentID string) error {
-	if !b.isAdminUser(c.Sender().ID) {
-		return c.Respond(&tele.CallbackResponse{Text: "Только для админов", ShowAlert: true})
-	}
-	if b.paymentSvc == nil {
-		return c.Respond(&tele.CallbackResponse{Text: "Сервис не настроен"})
-	}
-	pid, err := uuid.Parse(paymentID)
-	if err != nil {
-		return c.Respond(&tele.CallbackResponse{Text: "Неверный ID", ShowAlert: true})
-	}
-	if err := b.paymentSvc.ApproveCashPayment(context.Background(), pid); err != nil {
-		return c.Respond(&tele.CallbackResponse{Text: "Ошибка: " + err.Error(), ShowAlert: true})
-	}
-	_ = c.Edit(c.Message().Text + "\n\n✅ Подтверждено: " + c.Sender().FirstName)
-	return c.Respond(&tele.CallbackResponse{Text: "Подтверждено"})
-}
-
-// handleCashReject is called when an admin taps «Отклонить».
-func (b *Bot) handleCashReject(c tele.Context, paymentID string) error {
-	if !b.isAdminUser(c.Sender().ID) {
-		return c.Respond(&tele.CallbackResponse{Text: "Только для админов", ShowAlert: true})
-	}
-	if b.paymentSvc == nil {
-		return c.Respond(&tele.CallbackResponse{Text: "Сервис не настроен"})
-	}
-	pid, err := uuid.Parse(paymentID)
-	if err != nil {
-		return c.Respond(&tele.CallbackResponse{Text: "Неверный ID", ShowAlert: true})
-	}
-	if err := b.paymentSvc.RejectCashPayment(context.Background(), pid, "отклонено админом"); err != nil {
-		return c.Respond(&tele.CallbackResponse{Text: "Ошибка: " + err.Error(), ShowAlert: true})
-	}
-	_ = c.Edit(c.Message().Text + "\n\n❌ Отклонено: " + c.Sender().FirstName)
-	return c.Respond(&tele.CallbackResponse{Text: "Отклонено"})
-}
-
-func (b *Bot) isAdminUser(userID int64) bool {
-	ok, _ := b.repo.IsAdmin(context.Background(), userID)
-	return ok
-}

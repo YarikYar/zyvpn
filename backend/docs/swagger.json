@@ -175,119 +175,6 @@
                 }
             }
         },
-        "/api/admin/payments/cash/pending": {
-            "get": {
-                "security": [
-                    {
-                        "TelegramInitData": []
-                    }
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "admin"
-                ],
-                "summary": "Pending cash payments",
-                "parameters": [
-                    {
-                        "type": "integer",
-                        "default": 50,
-                        "description": "page size",
-                        "name": "limit",
-                        "in": "query"
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "type": "object",
-                            "additionalProperties": true
-                        }
-                    }
-                }
-            }
-        },
-        "/api/admin/payments/cash/{payment_id}/approve": {
-            "post": {
-                "security": [
-                    {
-                        "TelegramInitData": []
-                    }
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "admin"
-                ],
-                "summary": "Approve cash payment",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "payment uuid",
-                        "name": "payment_id",
-                        "in": "path",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "type": "object",
-                            "additionalProperties": true
-                        }
-                    }
-                }
-            }
-        },
-        "/api/admin/payments/cash/{payment_id}/reject": {
-            "post": {
-                "security": [
-                    {
-                        "TelegramInitData": []
-                    }
-                ],
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "admin"
-                ],
-                "summary": "Reject cash payment",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "payment uuid",
-                        "name": "payment_id",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "description": "reason",
-                        "name": "body",
-                        "in": "body",
-                        "schema": {
-                            "$ref": "#/definitions/handler.RejectCashPaymentRequest"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "type": "object",
-                            "additionalProperties": true
-                        }
-                    }
-                }
-            }
-        },
         "/api/admin/plans": {
             "get": {
                 "security": [
@@ -1301,52 +1188,6 @@
                             "additionalProperties": {
                                 "type": "string"
                             }
-                        }
-                    }
-                }
-            }
-        },
-        "/api/admin/users/{user_id}/cash-payment": {
-            "post": {
-                "security": [
-                    {
-                        "TelegramInitData": []
-                    }
-                ],
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "admin"
-                ],
-                "summary": "Create cash payment for user",
-                "parameters": [
-                    {
-                        "type": "integer",
-                        "description": "user id",
-                        "name": "user_id",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "description": "plan + amount in RUB",
-                        "name": "body",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/handler.CreateCashPaymentRequest"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "type": "object",
-                            "additionalProperties": true
                         }
                     }
                 }
@@ -2824,9 +2665,6 @@
         "handler.BulkPromoCodeRequest": {
             "type": "object",
             "properties": {
-                "cash_amount_rub": {
-                    "type": "number"
-                },
                 "count": {
                     "type": "integer"
                 },
@@ -2835,9 +2673,6 @@
                 },
                 "max_uses": {
                     "type": "integer"
-                },
-                "plan_id": {
-                    "type": "string"
                 },
                 "prefix": {
                     "type": "string"
@@ -2864,20 +2699,6 @@
                         "stars",
                         "cash"
                     ]
-                }
-            }
-        },
-        "handler.CreateCashPaymentRequest": {
-            "type": "object",
-            "properties": {
-                "amount_rub": {
-                    "type": "number"
-                },
-                "plan_id": {
-                    "type": "string"
-                },
-                "server_id": {
-                    "type": "string"
                 }
             }
         },
@@ -2925,9 +2746,6 @@
         "handler.CreatePromoCodeRequest": {
             "type": "object",
             "properties": {
-                "cash_amount_rub": {
-                    "type": "number"
-                },
                 "description": {
                     "type": "string"
                 },
@@ -2936,9 +2754,6 @@
                 },
                 "max_uses": {
                     "type": "integer"
-                },
-                "plan_id": {
-                    "type": "string"
                 },
                 "type": {
                     "$ref": "#/definitions/model.PromoCodeType"
@@ -3052,14 +2867,6 @@
             "type": "object",
             "properties": {
                 "plan_id": {
-                    "type": "string"
-                }
-            }
-        },
-        "handler.RejectCashPaymentRequest": {
-            "type": "object",
-            "properties": {
-                "reason": {
                     "type": "string"
                 }
             }
@@ -3266,14 +3073,12 @@
             "enum": [
                 "ton",
                 "stars",
-                "balance",
-                "cash"
+                "balance"
             ],
             "x-enum-varnames": [
                 "PaymentProviderTON",
                 "PaymentProviderStars",
-                "PaymentProviderBalance",
-                "PaymentProviderCash"
+                "PaymentProviderBalance"
             ]
         },
         "model.Plan": {
@@ -3331,9 +3136,6 @@
         "model.PromoCode": {
             "type": "object",
             "properties": {
-                "cash_amount_rub": {
-                    "type": "number"
-                },
                 "code": {
                     "type": "string"
                 },
@@ -3355,10 +3157,6 @@
                 "max_uses": {
                     "type": "integer"
                 },
-                "plan_id": {
-                    "description": "CashPlan-specific fields. Both NULL for non-cash_plan promos.",
-                    "type": "string"
-                },
                 "type": {
                     "$ref": "#/definitions/model.PromoCodeType"
                 },
@@ -3375,8 +3173,7 @@
             "type": "string",
             "enum": [
                 "balance",
-                "days",
-                "cash_plan"
+                "days"
             ],
             "x-enum-comments": {
                 "PromoCodeTypeBalance": "Credits TON to balance",
@@ -3384,13 +3181,11 @@
             },
             "x-enum-descriptions": [
                 "Credits TON to balance",
-                "Adds days to subscription",
-                ""
+                "Adds days to subscription"
             ],
             "x-enum-varnames": [
                 "PromoCodeTypeBalance",
-                "PromoCodeTypeDays",
-                "PromoCodeTypeCashPlan"
+                "PromoCodeTypeDays"
             ]
         },
         "model.Server": {
