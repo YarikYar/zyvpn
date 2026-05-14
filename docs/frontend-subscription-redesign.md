@@ -1,6 +1,14 @@
 # Памятка фронту: переход на подписочную модель с мульти-регионом
 
-Бэк-ветка: `corevpn-dev`. После мержа бэка фронт должен обновиться синхронно — старая модель `subscription.server_id` / paid region switch отвалится.
+Бэк-ветка: `corevpn-dev` (объединяет два больших изменения — мультисерверная подписка + удаление налички). После мержа бэка фронт должен обновиться синхронно — старая модель `subscription.server_id` / paid region switch / cash-оплата отвалятся.
+
+## Что вообще удаляется (TL;DR)
+
+1. **Платная смена региона** — концепции больше нет, юзер получает все серверы тарифа сразу.
+2. **Оплата наличкой** — провайдер `cash` удалён вместе со всеми связанными ручками.
+3. **Промокоды типа `cash_plan` и `region_switch`** — удалены вместе с соответствующей логикой.
+
+Подробности по каждому пункту ниже.
 
 ## Что меняется в модели
 
@@ -235,6 +243,73 @@ VPN-клиент (v2rayNG/Hiddify) сам этот URL ходит и тянет 
 3. **Server multi-select** — `<ServerPicker selectedIds={...} onChange={...} />` для админки, с группировкой по регионам и галочкой «выбрать всё в регионе»
 4. **Subscription URL card** — основной элемент `MainSection` и `SubscriptionSection`. QR + URL + copy/share + кнопка «Как подключиться»
 5. **Connect instructions modal** — drawer/modal с инструкциями для popular VPN-клиентов с скриншотами/иконками
+
+## Удаление оплаты наличкой
+
+### API изменения
+
+#### `POST /api/subscription/buy`
+- ❌ Провайдер `cash` больше не принимается. Запрос `{"provider": "cash"}` → 400.
+- ✅ Допустимы только `ton` и `stars`.
+
+#### Удалённые админ-эндпоинты
+- ❌ `POST /api/admin/users/:user_id/cash-payment` — больше не существует
+- ❌ `GET /api/admin/payments/cash/pending`
+- ❌ `POST /api/admin/payments/cash/:payment_id/approve`
+- ❌ `POST /api/admin/payments/cash/:payment_id/reject`
+
+#### `POST /api/admin/promo` и `/api/admin/promo/bulk`
+- ❌ Тип `cash_plan` больше не валиден
+- ❌ Поля `plan_id` и `cash_amount_rub` в request body удалены
+- ✅ Допустимые типы: только `balance` и `days`
+
+### UI изменения
+
+#### Юзерская часть (`PlansSection`, экран выбора оплаты)
+- ❌ Убрать кнопку «Оплатить наличными» / RUB-варианта на экране тарифа
+- ❌ Убрать любые upsell-сообщения «свяжитесь с представителем»
+- ✅ Оставить только TON + Stars кнопки
+
+#### Admin → `admin/cash.tsx`
+- ❌ **Этот экран целиком теряет смысл** — список pending cash payments больше не существует.
+- ✅ Удалить файл из навигации админки или скрыть пункт «Cash payments».
+
+#### Admin → `admin/promo.tsx`
+- ❌ Из формы создания/bulk-создания промокода убрать опцию `cash_plan`
+- ❌ Убрать поля «План (для cash_plan)» и «Сумма в рублях»
+- ✅ Оставить только `balance` и `days` в селекторе типа
+
+#### Admin → `admin/users.tsx`
+- ❌ Если есть кнопка «Создать cash payment» на карточке юзера — убрать
+- ✅ Кнопка «Перевыпустить subscription URL» остаётся (см. раздел subscription)
+
+#### Telegram-бот
+- ❌ В админский чат больше не приходят уведомления «Новый платёж наличными» с кнопками Подтвердить/Отклонить — это бэк-only изменение, фронт не трогает.
+
+### `lib/api.ts`
+- В типе `Payment` поле `provider` теперь union `"ton" | "stars" | "balance"` (без `"cash"`)
+- В типе `PromoCode` убрать поля `plan_id` и `cash_amount_rub`
+- Убрать тип `PromoCodeType = "cash_plan"` если он в union
+
+### `lib/i18n.tsx`
+Удалить ключи (примерные):
+- `payment.method.cash`, `payment.method.cashDesc`
+- `payment.cash.contact`, `payment.cash.amount`
+- `admin.cash.*` (целая ветка)
+- `admin.promo.types.cashPlan`
+- `promo.types.regionSwitch` (если оставались) и `promo.types.cashPlan`
+
+### Чек-лист (cash removal)
+- [ ] `src/lib/api.ts` — типы `Payment.provider`, `PromoCode`
+- [ ] `src/lib/queries.ts` — убрать мутации `useCashPayment*`, `useApproveCash`, `useRejectCash`
+- [ ] `src/lib/i18n.tsx` — удалить cash-ключи
+- [ ] `src/components/sections/admin/cash.tsx` — удалить файл, убрать из навигации
+- [ ] `src/components/sections/admin/promo.tsx` — убрать тип `cash_plan` из селектора
+- [ ] `src/components/sections/admin/users.tsx` — убрать «Создать cash payment»
+- [ ] Экран оплаты тарифа — оставить только TON + Stars
+- [ ] Поиск по коду на `cash`/`Cash` — удалить все остатки
+
+---
 
 ## Чек-лист по файлам
 
