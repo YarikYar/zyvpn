@@ -8,7 +8,9 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	mathrand "math/rand/v2"
 	"net/url"
+	"sort"
 	"strings"
 	"time"
 
@@ -472,11 +474,36 @@ func (s *SubscriptionService) BuildSubscriptionContent(ctx context.Context, toke
 		return nil, err
 	}
 
-	links := make([]string, 0, len(clients))
+	// Live load-balancing: фильтруем offline-серверы, сортируем по
+	// (ping_ms ASC, current_load ASC). Внутри одной «тяжести» — рандом,
+	// чтобы N юзеров с одинаковым best-сервером не уходили все на один.
+	ranked := make([]model.SubscriptionClient, 0, len(clients))
 	for _, c := range clients {
 		if !c.Enabled {
 			continue
 		}
+		if c.Server == nil || !c.Server.IsActive {
+			continue
+		}
+		if c.Server.Status != "" && c.Server.Status != "online" {
+			continue
+		}
+		ranked = append(ranked, c)
+	}
+	// pre-shuffle to give равным-по-метрикам серверам случайный порядок
+	mathrand.Shuffle(len(ranked), func(i, j int) {
+		ranked[i], ranked[j] = ranked[j], ranked[i]
+	})
+	sort.SliceStable(ranked, func(i, j int) bool {
+		pi, pj := pingScore(ranked[i].Server.PingMs), pingScore(ranked[j].Server.PingMs)
+		if pi != pj {
+			return pi < pj
+		}
+		return ranked[i].Server.CurrentLoad < ranked[j].Server.CurrentLoad
+	})
+
+	links := make([]string, 0, len(ranked))
+	for _, c := range ranked {
 		links = append(links, c.ConnectionKey)
 	}
 	plaintext := strings.Join(links, "\n")
@@ -494,7 +521,7 @@ func (s *SubscriptionService) BuildSubscriptionContent(ctx context.Context, toke
 		Body:            body,
 		UserInfoHeader:  header,
 		ProfileTitle:    "CoreVPN — " + plan.Name,
-		UpdateInterval:  24,
+		UpdateInterval:  1,
 		ContentTypeHint: "text/plain; charset=utf-8",
 	}, nil
 }
@@ -546,4 +573,15 @@ func generateSubToken() (string, error) {
 func shortID(id uuid.UUID) string {
 	s := id.String()
 	return strings.ReplaceAll(s[:8], "-", "")
+}
+
+// pingScore нормализует ping_ms для сортировки. nil → большой штраф
+// (но не «бесконечность», чтобы непрозвонившийся сервер не убегал
+// в самый конец — он ещё может быть жив, просто HealthWorker не успел
+// сделать первый probe).
+func pingScore(ms *int) int {
+	if ms == nil {
+		return 999
+	}
+	return *ms
 }
