@@ -48,6 +48,6 @@ func (h *Handler) GetSubscriptionPublic(c *fiber.Ctx) error {
 	c.Set("Profile-Title", content.ProfileTitle)
 	// inline-имя файла для клиентов которые умеют его читать как
 	// отображаемое имя подписки.
-	c.Set("Content-Disposition", `inline; filename="zyvpn"`)
+	c.Set("Content-Disposition", `inline; filename="corevpn"`)
 	return c.Send(content.Body)
 }

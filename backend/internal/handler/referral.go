@@ -52,7 +52,7 @@ func (h *Handler) GetReferralLink(c *fiber.Ctx) error {
 	}
 
 	// Get bot username from config or hardcode
-	botUsername := "zyvpn_bot" // This should come from config
+	botUsername := "corevpn_bot" // This should come from config
 
 	link, err := h.referralSvc.GetReferralLink(c.Context(), userID, botUsername)
 	if err != nil {

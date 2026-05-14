@@ -172,7 +172,7 @@ func (b *Bot) handleStart(c tele.Context) error {
 
 	text := fmt.Sprintf(`Привет, %s! 👋
 
-🔐 <b>ZyVPN</b> — быстрый и безопасный VPN
+🔐 <b>CoreVPN</b> — быстрый и безопасный VPN
 
 ✅ Протокол VLESS + Reality
 ✅ Высокая скорость
@@ -307,7 +307,7 @@ func (b *Bot) handleKey(c tele.Context) error {
 }
 
 func (b *Bot) handleHelp(c tele.Context) error {
-	text := `📖 <b>Помощь по ZyVPN</b>
+	text := `📖 <b>Помощь по CoreVPN</b>
 
 <b>🔧 Настройка VPN:</b>
 
@@ -396,8 +396,8 @@ func (b *Bot) handleSupport(c tele.Context) error {
 
 Если у вас возникли вопросы или проблемы, напишите нам:
 
-📧 support@zyvpn.com
-💬 @zyvpn_support
+📧 support@corevpn.com
+💬 @corevpn_support
 
 Мы ответим в течение 24 часов.`
 

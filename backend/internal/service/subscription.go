@@ -471,7 +471,7 @@ func (s *SubscriptionService) BuildSubscriptionContent(ctx context.Context, toke
 	return &SubscriptionContent{
 		Body:            body,
 		UserInfoHeader:  header,
-		ProfileTitle:    "ZyVPN — " + plan.Name,
+		ProfileTitle:    "CoreVPN — " + plan.Name,
 		UpdateInterval:  24,
 		ContentTypeHint: "text/plain; charset=utf-8",
 	}, nil

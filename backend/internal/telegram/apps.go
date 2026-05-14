@@ -110,7 +110,7 @@ func fetchLatestRelease(ctx context.Context, repo string) (*ghRelease, error) {
 		return nil, err
 	}
 	req.Header.Set("Accept", "application/vnd.github+json")
-	req.Header.Set("User-Agent", "zyvpn-bot")
+	req.Header.Set("User-Agent", "corevpn-bot")
 
 	client := &http.Client{Timeout: 30 * time.Second}
 	resp, err := client.Do(req)
@@ -230,7 +230,7 @@ func downloadFile(ctx context.Context, url string) (io.ReadCloser, error) {
 	if err != nil {
 		return nil, err
 	}
-	req.Header.Set("User-Agent", "zyvpn-bot")
+	req.Header.Set("User-Agent", "corevpn-bot")
 
 	client := &http.Client{Timeout: 5 * time.Minute}
 	resp, err := client.Do(req)
