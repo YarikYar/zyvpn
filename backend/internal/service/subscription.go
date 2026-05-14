@@ -55,6 +55,7 @@ func (s *SubscriptionService) GetActiveSubscription(ctx context.Context, userID 
 	if err != nil {
 		return nil, err
 	}
+	s.hydrateLiveKeys(clients)
 	sub.Clients = clients
 	return sub, nil
 }
@@ -68,8 +69,28 @@ func (s *SubscriptionService) GetSubscription(ctx context.Context, id uuid.UUID)
 	if err != nil {
 		return nil, err
 	}
+	s.hydrateLiveKeys(clients)
 	sub.Clients = clients
 	return sub, nil
+}
+
+// hydrateLiveKeys перегенерит connection_key каждого клиента из текущих
+// настроек серверов. Сохранённый в БД ключ — снэпшот момента покупки и
+// не используется для отдачи юзеру. Так любая правка сервера в админке
+// (Reality keys, port, sni, address) автоматически прилетает в /sub и в
+// status response — без ре-провизии клиентов в xui.
+func (s *SubscriptionService) hydrateLiveKeys(clients []model.SubscriptionClient) {
+	if s.serverSvc == nil {
+		return
+	}
+	for i := range clients {
+		if clients[i].Server == nil {
+			continue
+		}
+		clients[i].ConnectionKey = s.serverSvc.GenerateConnectionKey(
+			clients[i].Server, clients[i].XUIClientID, clients[i].XUIEmail,
+		)
+	}
 }
 
 // CreateSubscription активирует тариф: создаёт subscription row, генерит
@@ -445,6 +466,7 @@ func (s *SubscriptionService) BuildSubscriptionContent(ctx context.Context, toke
 	if err != nil {
 		return nil, err
 	}
+	s.hydrateLiveKeys(clients)
 	plan, err := s.repo.GetPlan(ctx, sub.PlanID)
 	if err != nil {
 		return nil, err
