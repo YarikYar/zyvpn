@@ -162,8 +162,8 @@ func (h *Handler) PayFromBalance(c *fiber.Ctx) error {
 		return respondInternalError(c, err)
 	}
 
-	// Get subscription key
-	key, _ := h.subscriptionSvc.GetConnectionKey(c.Context(), userID)
+	// Get subscription URL (вместо одного connection_key теперь даём ссылку)
+	subURL, _ := h.subscriptionSvc.GetSubscriptionURLForUser(c.Context(), userID)
 
 	// Notify via bot
 	if h.bot != nil {
@@ -174,9 +174,9 @@ func (h *Handler) PayFromBalance(c *fiber.Ctx) error {
 	}
 
 	return c.JSON(fiber.Map{
-		"success":     true,
-		"new_balance": newBalance,
-		"key":         key,
+		"success":          true,
+		"new_balance":      newBalance,
+		"subscription_url": subURL,
 	})
 }
 

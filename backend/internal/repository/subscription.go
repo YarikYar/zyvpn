@@ -42,6 +42,20 @@ func (r *Repository) GetActiveSubscription(ctx context.Context, userID int64) (*
 	return &sub, nil
 }
 
+// GetSubscriptionByToken — для публичного /sub/<token> endpoint.
+func (r *Repository) GetSubscriptionByToken(ctx context.Context, token string) (*model.Subscription, error) {
+	var sub model.Subscription
+	err := r.db.GetContext(ctx, &sub,
+		"SELECT * FROM subscriptions WHERE sub_token = $1", token)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, ErrSubscriptionNotFound
+		}
+		return nil, err
+	}
+	return &sub, nil
+}
+
 func (r *Repository) GetUserSubscriptions(ctx context.Context, userID int64) ([]model.Subscription, error) {
 	var subs []model.Subscription
 	query := "SELECT * FROM subscriptions WHERE user_id = $1 ORDER BY created_at DESC"
@@ -52,52 +66,22 @@ func (r *Repository) GetUserSubscriptions(ctx context.Context, userID int64) ([]
 func (r *Repository) CreateSubscription(ctx context.Context, sub *model.Subscription) error {
 	query := `
 		INSERT INTO subscriptions (
-			user_id, plan_id, server_id, status, xui_client_id, xui_email, connection_key,
+			user_id, plan_id, status, sub_token,
 			started_at, expires_at, traffic_limit, traffic_used, max_devices
-		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
 		RETURNING id, created_at`
 
 	return r.db.QueryRowContext(ctx, query,
 		sub.UserID,
 		sub.PlanID,
-		sub.ServerID,
 		sub.Status,
-		sub.XUIClientID,
-		sub.XUIEmail,
-		sub.ConnectionKey,
+		sub.SubToken,
 		sub.StartedAt,
 		sub.ExpiresAt,
 		sub.TrafficLimit,
 		sub.TrafficUsed,
 		sub.MaxDevices,
 	).Scan(&sub.ID, &sub.CreatedAt)
-}
-
-func (r *Repository) UpdateSubscription(ctx context.Context, sub *model.Subscription) error {
-	query := `
-		UPDATE subscriptions SET
-			status = $2,
-			xui_client_id = $3,
-			xui_email = $4,
-			connection_key = $5,
-			started_at = $6,
-			expires_at = $7,
-			traffic_limit = $8,
-			traffic_used = $9
-		WHERE id = $1`
-
-	_, err := r.db.ExecContext(ctx, query,
-		sub.ID,
-		sub.Status,
-		sub.XUIClientID,
-		sub.XUIEmail,
-		sub.ConnectionKey,
-		sub.StartedAt,
-		sub.ExpiresAt,
-		sub.TrafficLimit,
-		sub.TrafficUsed,
-	)
-	return err
 }
 
 func (r *Repository) UpdateSubscriptionStatus(ctx context.Context, id uuid.UUID, status model.SubscriptionStatus) error {
@@ -112,6 +96,16 @@ func (r *Repository) UpdateSubscriptionTraffic(ctx context.Context, id uuid.UUID
 	_, err := r.db.ExecContext(ctx,
 		"UPDATE subscriptions SET traffic_used = $2 WHERE id = $1",
 		id, trafficUsed,
+	)
+	return err
+}
+
+// RotateSubscriptionToken — для админ-ручки «перевыпустить URL подписки»
+// при компрометации ссылки. Старый /sub/<old_token> сразу перестанет работать.
+func (r *Repository) RotateSubscriptionToken(ctx context.Context, id uuid.UUID, newToken string) error {
+	_, err := r.db.ExecContext(ctx,
+		"UPDATE subscriptions SET sub_token = $2 WHERE id = $1",
+		id, newToken,
 	)
 	return err
 }
@@ -171,22 +165,4 @@ func (r *Repository) HasUsedTrial(ctx context.Context, userID int64) (bool, erro
 		return false, err
 	}
 	return count > 0, nil
-}
-
-// UpdateSubscriptionServer rewires a subscription to a different XUI server
-// after a region switch. Resets traffic_used to 0 (the new XUI client starts
-// with fresh counters) and sets traffic_limit to whatever quota was created
-// on the new server, so our DB mirror matches XUI's enforcement.
-func (r *Repository) UpdateSubscriptionServer(ctx context.Context, id uuid.UUID, serverID uuid.UUID, xuiClientID, xuiEmail, connectionKey string, trafficLimitBytes int64) error {
-	query := `
-		UPDATE subscriptions SET
-			server_id = $2,
-			xui_client_id = $3,
-			xui_email = $4,
-			connection_key = $5,
-			traffic_limit = $6,
-			traffic_used = 0
-		WHERE id = $1`
-	_, err := r.db.ExecContext(ctx, query, id, serverID, xuiClientID, xuiEmail, connectionKey, trafficLimitBytes)
-	return err
 }

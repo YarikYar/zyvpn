@@ -10,6 +10,7 @@ import (
 
 	"github.com/zyvpn/backend/internal/model"
 	"github.com/zyvpn/backend/internal/repository"
+	"github.com/zyvpn/backend/internal/xui"
 )
 
 const (
@@ -18,18 +19,20 @@ const (
 )
 
 type HealthWorker struct {
-	repo      *repository.Repository
-	serverSvc *ServerService
+	repo            *repository.Repository
+	serverSvc       *ServerService
+	subscriptionSvc *SubscriptionService
 
 	lastSnapshot   map[uuid.UUID]time.Time
 	lastSnapshotMu sync.Mutex
 }
 
-func NewHealthWorker(repo *repository.Repository, serverSvc *ServerService) *HealthWorker {
+func NewHealthWorker(repo *repository.Repository, serverSvc *ServerService, subscriptionSvc *SubscriptionService) *HealthWorker {
 	return &HealthWorker{
-		repo:         repo,
-		serverSvc:    serverSvc,
-		lastSnapshot: make(map[uuid.UUID]time.Time),
+		repo:            repo,
+		serverSvc:       serverSvc,
+		subscriptionSvc: subscriptionSvc,
+		lastSnapshot:    make(map[uuid.UUID]time.Time),
 	}
 }
 
@@ -83,7 +86,10 @@ func (w *HealthWorker) checkAllServers(ctx context.Context) {
 }
 
 // checkServer probes the XUI panel, updates health, records status-change
-// events for uptime calc, and periodically snapshots traffic counters.
+// events for uptime calc, snapshots inbound traffic, and — крутая часть —
+// bulk-sync'ит per-client traffic в `subscription_clients`. После каждого
+// тика триггерим EnforceTrafficLimit для подписок чьи клиенты обновились,
+// чтобы вовремя отрубать перерасход.
 func (w *HealthWorker) checkServer(ctx context.Context, srv model.Server) {
 	id := srv.ID
 	if id == uuid.Nil {
@@ -107,6 +113,10 @@ func (w *HealthWorker) checkServer(ctx context.Context, srv model.Server) {
 	pingMs := int(time.Since(start).Milliseconds())
 	w.recordStatus(ctx, id, "online", &pingMs)
 
+	// Bulk-sync трафика по клиентам этого инбаунда. inbound.ClientStats
+	// уже есть в ответе getInbound — ноль дополнительных запросов в xui.
+	w.syncClientTraffic(ctx, srv, inbound.ClientStats)
+
 	// Traffic snapshot — rate-limit per server to TrafficSnapshotInterval to
 	// keep the table compact.
 	w.lastSnapshotMu.Lock()
@@ -125,6 +135,53 @@ func (w *HealthWorker) checkServer(ctx context.Context, srv model.Server) {
 		}
 		if err := w.repo.RecordTrafficSnapshot(ctx, snap); err != nil {
 			log.Printf("[Health Worker] %s: traffic snapshot failed: %v", srv.Name, err)
+		}
+	}
+}
+
+// syncClientTraffic обновляет subscription_clients.traffic_used по данным
+// xui clientStats. Затем по уникальным subscription_id триггерит
+// EnforceTrafficLimit — если суммарный used ≥ limit, клиенты этой подписки
+// будут disabled во всех серверах.
+//
+// Безопасно если подписки на этом сервере нет — UPDATE по (server_id, email)
+// просто не задевает строк.
+func (w *HealthWorker) syncClientTraffic(ctx context.Context, srv model.Server, stats []xui.Traffic) {
+	if len(stats) == 0 {
+		return
+	}
+
+	// 1) batch-апдейт per-client used + параллельно пересчитываем агрегат
+	//    по subscription_id (читая sub_id из subscription_clients по email).
+	updatedSubs := make(map[uuid.UUID]struct{})
+	for _, st := range stats {
+		used := st.Up + st.Down
+		client, err := w.repo.GetSubscriptionClientByServerEmail(ctx, srv.ID, st.Email)
+		if err != nil {
+			// клиент xui не зарегистрирован у нас — это нормально для
+			// импортированных вручную или тестовых клиентов.
+			continue
+		}
+		if client.TrafficUsed != used {
+			if err := w.repo.UpdateSubscriptionClientTraffic(ctx, client.ID, used); err != nil {
+				log.Printf("[Health Worker] %s: update client traffic for %s: %v",
+					srv.Name, st.Email, err)
+				continue
+			}
+		}
+		updatedSubs[client.SubscriptionID] = struct{}{}
+	}
+
+	// 2) Для каждой задетой подписки — пересчитать сумму и enforcement.
+	for subID := range updatedSubs {
+		if err := w.repo.RecomputeSubscriptionTrafficUsed(ctx, subID); err != nil {
+			log.Printf("[Health Worker] recompute sub %s traffic: %v", subID, err)
+			continue
+		}
+		if w.subscriptionSvc != nil {
+			if err := w.subscriptionSvc.EnforceTrafficLimit(ctx, subID); err != nil {
+				log.Printf("[Health Worker] enforce limit sub %s: %v", subID, err)
+			}
 		}
 	}
 }

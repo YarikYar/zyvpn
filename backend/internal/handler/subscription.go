@@ -5,15 +5,15 @@ import (
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/google/uuid"
+
 	"github.com/zyvpn/backend/internal/middleware"
 	"github.com/zyvpn/backend/internal/model"
 	"github.com/zyvpn/backend/internal/service"
 )
 
 type BuySubscriptionRequest struct {
-	PlanID   string  `json:"plan_id" example:"a3b1f8a2-..."`
-	ServerID *string `json:"server_id,omitempty"`
-	Provider string  `json:"provider" enums:"ton,stars,cash"`
+	PlanID   string `json:"plan_id" example:"a3b1f8a2-..."`
+	Provider string `json:"provider" enums:"ton,stars,cash"`
 }
 
 // BuySubscription initiates plan purchase. Provider determines response
@@ -52,18 +52,6 @@ func (h *Handler) BuySubscription(c *fiber.Ctx) error {
 		})
 	}
 
-	// Parse optional server ID
-	var serverID *uuid.UUID
-	if req.ServerID != nil && *req.ServerID != "" {
-		sid, err := uuid.Parse(*req.ServerID)
-		if err != nil {
-			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-				"error": "Неверный ID сервера",
-			})
-		}
-		serverID = &sid
-	}
-
 	var provider model.PaymentProvider
 	switch req.Provider {
 	case "ton":
@@ -78,7 +66,8 @@ func (h *Handler) BuySubscription(c *fiber.Ctx) error {
 		})
 	}
 
-	// Cash goes through a dedicated path that emits an admin notification.
+	// Серверы теперь определяются тарифом — server_id больше не выбирается
+	// юзером и не передаётся в платёж.
 	if provider == model.PaymentProviderCash {
 		plan, err := h.planService.GetPlan(c.Context(), planID)
 		if err != nil {
@@ -93,7 +82,7 @@ func (h *Handler) BuySubscription(c *fiber.Ctx) error {
 			})
 		}
 		amountRUB := plan.PriceUSD * rates.USDRUB
-		payment, err := h.paymentSvc.CreateCashPaymentWithAmount(c.Context(), userID, planID, serverID, amountRUB)
+		payment, err := h.paymentSvc.CreateCashPaymentWithAmount(c.Context(), userID, planID, nil, amountRUB)
 		if err != nil {
 			return respondInternalError(c, err)
 		}
@@ -105,12 +94,11 @@ func (h *Handler) BuySubscription(c *fiber.Ctx) error {
 		})
 	}
 
-	payment, err := h.paymentSvc.CreatePaymentWithServer(c.Context(), userID, planID, serverID, provider)
+	payment, err := h.paymentSvc.CreatePaymentWithServer(c.Context(), userID, planID, nil, provider)
 	if err != nil {
 		return respondInternalError(c, err)
 	}
 
-	// Return payment info based on provider
 	if provider == model.PaymentProviderTON {
 		tonInfo, err := h.paymentSvc.GetTONPaymentInfo(c.Context(), payment.ID)
 		if err != nil {
@@ -124,22 +112,22 @@ func (h *Handler) BuySubscription(c *fiber.Ctx) error {
 		})
 	}
 
-	// Stars payment - would create Telegram invoice
 	return c.JSON(fiber.Map{
 		"payment": payment,
 	})
 }
 
-// GetSubscriptionKey returns the VLESS Reality URI for the active sub.
+// GetSubscriptionURL returns the subscription URL for the user's active
+// subscription. UI кладёт это в QR + копи-кнопку.
 //
-//	@Summary	Connection key
+//	@Summary	Subscription URL (для VPN-клиента)
 //	@Tags		subscription
 //	@Produce	json
 //	@Success	200	{object}	map[string]string
 //	@Failure	404	{object}	map[string]string
-//	@Router		/api/subscription/key [get]
+//	@Router		/api/subscription/url [get]
 //	@Security	TelegramInitData
-func (h *Handler) GetSubscriptionKey(c *fiber.Ctx) error {
+func (h *Handler) GetSubscriptionURL(c *fiber.Ctx) error {
 	userID := middleware.GetUserID(c)
 	if userID == 0 {
 		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
@@ -147,7 +135,7 @@ func (h *Handler) GetSubscriptionKey(c *fiber.Ctx) error {
 		})
 	}
 
-	key, err := h.subscriptionSvc.GetConnectionKey(c.Context(), userID)
+	subURL, err := h.subscriptionSvc.GetSubscriptionURLForUser(c.Context(), userID)
 	if err != nil {
 		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
 			"error": "Нет активной подписки",
@@ -155,12 +143,12 @@ func (h *Handler) GetSubscriptionKey(c *fiber.Ctx) error {
 	}
 
 	return c.JSON(fiber.Map{
-		"key": key,
+		"subscription_url": subURL,
 	})
 }
 
 // GetSubscriptionStatus returns active subscription status including
-// remaining days and traffic.
+// remaining days, traffic and the list of accessible servers.
 //
 //	@Summary	Subscription status
 //	@Tags		subscription
@@ -183,14 +171,18 @@ func (h *Handler) GetSubscriptionStatus(c *fiber.Ctx) error {
 		})
 	}
 
-	// Sync traffic
+	// Sync traffic перед ответом — чтобы фронт видел свежее used.
+	// Это тяжёлый вызов (N походов в xui), HealthWorker должен закрыть
+	// эту задачу фоном; здесь оставлено как «горячий» путь когда юзер
+	// открывает экран.
 	_ = h.subscriptionSvc.SyncTraffic(c.Context(), sub.ID)
 	sub, _ = h.subscriptionSvc.GetSubscription(c.Context(), sub.ID)
 
 	return c.JSON(fiber.Map{
-		"active":         sub.IsActive(),
-		"subscription":   sub,
-		"days_remaining": sub.DaysRemaining(),
+		"active":           sub.IsActive(),
+		"subscription":     sub,
+		"subscription_url": h.subscriptionSvc.BuildSubscriptionURL(sub),
+		"days_remaining":   sub.DaysRemaining(),
 		"traffic_gb": fiber.Map{
 			"used":      float64(sub.TrafficUsed) / (1024 * 1024 * 1024),
 			"limit":     float64(sub.TrafficLimit) / (1024 * 1024 * 1024),
@@ -233,130 +225,8 @@ func (h *Handler) ActivateTrial(c *fiber.Ctx) error {
 	}
 
 	return c.JSON(fiber.Map{
-		"success":      true,
-		"subscription": sub,
-		"key":          sub.ConnectionKey,
-	})
-}
-
-type SwitchServerRequest struct {
-	ServerID string `json:"server_id"`
-}
-
-// GetSwitchServerInfo returns price + free-switch counter for region change.
-//
-//	@Summary	Region switch info
-//	@Tags		subscription
-//	@Produce	json
-//	@Success	200	{object}	map[string]interface{}
-//	@Router		/api/subscription/switch-server/info [get]
-//	@Security	TelegramInitData
-func (h *Handler) GetSwitchServerInfo(c *fiber.Ctx) error {
-	userID := middleware.GetUserID(c)
-	if userID == 0 {
-		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
-			"error": "Необходима авторизация",
-		})
-	}
-
-	// Get user for free switches count
-	user, err := h.userService.GetUser(c.Context(), userID)
-	if err != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-			"error": "Не удалось получить данные пользователя",
-		})
-	}
-
-	// Get region switch price
-	price, err := h.adminSvc.GetRegionSwitchPrice(c.Context())
-	if err != nil {
-		price = 0.1 // Default fallback
-	}
-
-	return c.JSON(fiber.Map{
-		"price":         price,
-		"free_switches": user.FreeRegionSwitches,
-	})
-}
-
-// SwitchServer switches the active subscription to a different server.
-//
-//	@Summary	Switch active subscription to another server
-//	@Tags		subscription
-//	@Accept		json
-//	@Produce	json
-//	@Param		body	body		SwitchServerRequest	true	"target server"
-//	@Success	200		{object}	map[string]interface{}
-//	@Failure	400		{object}	map[string]string
-//	@Failure	402		{object}	map[string]string	"not enough balance"
-//	@Router		/api/subscription/switch-server [post]
-//	@Security	TelegramInitData
-func (h *Handler) SwitchServer(c *fiber.Ctx) error {
-	userID := middleware.GetUserID(c)
-	if userID == 0 {
-		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
-			"error": "Необходима авторизация",
-		})
-	}
-
-	var req SwitchServerRequest
-	if err := c.BodyParser(&req); err != nil {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-			"error": "Неверный формат запроса",
-		})
-	}
-
-	serverID, err := uuid.Parse(req.ServerID)
-	if err != nil {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-			"error": "Неверный ID сервера",
-		})
-	}
-
-	// Check if user has free switches
-	usedFree, err := h.userService.UseFreeRegionSwitch(c.Context(), userID)
-	if err != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-			"error": "Ошибка при проверке бесплатных переключений",
-		})
-	}
-
-	// If no free switch available, charge from balance
-	if !usedFree {
-		// Get price
-		price, err := h.adminSvc.GetRegionSwitchPrice(c.Context())
-		if err != nil {
-			price = 0.1
-		}
-
-		// Try to charge from balance
-		_, err = h.balanceSvc.ChargeRegionSwitch(c.Context(), userID, price)
-		if err != nil {
-			if errors.Is(err, service.ErrInsufficientBalance) {
-				return c.Status(fiber.StatusPaymentRequired).JSON(fiber.Map{
-					"error":          "Недостаточно средств на балансе",
-					"price":          price,
-					"need_more":      true,
-				})
-			}
-			return respondInternalError(c, err)
-		}
-	}
-
-	sub, err := h.subscriptionSvc.SwitchServer(c.Context(), userID, serverID)
-	if err != nil {
-		if errors.Is(err, service.ErrSubscriptionNotActive) {
-			return c.Status(fiber.StatusConflict).JSON(fiber.Map{
-				"error": "Нет активной подписки",
-			})
-		}
-		return respondInternalError(c, err)
-	}
-
-	return c.JSON(fiber.Map{
-		"success":      true,
-		"subscription": sub,
-		"key":          sub.ConnectionKey,
-		"used_free":    usedFree,
+		"success":          true,
+		"subscription":     sub,
+		"subscription_url": h.subscriptionSvc.BuildSubscriptionURL(sub),
 	})
 }

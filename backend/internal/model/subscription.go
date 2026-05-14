@@ -15,20 +15,36 @@ const (
 )
 
 type Subscription struct {
-	ID            uuid.UUID          `json:"id" db:"id"`
-	UserID        int64              `json:"user_id" db:"user_id"`
-	PlanID        uuid.UUID          `json:"plan_id" db:"plan_id"`
-	ServerID      *uuid.UUID         `json:"server_id,omitempty" db:"server_id"`
-	Status        SubscriptionStatus `json:"status" db:"status"`
-	XUIClientID   string             `json:"xui_client_id" db:"xui_client_id"`
-	XUIEmail      string             `json:"xui_email" db:"xui_email"`
-	ConnectionKey string             `json:"connection_key,omitempty" db:"connection_key"`
-	StartedAt     *time.Time         `json:"started_at,omitempty" db:"started_at"`
-	ExpiresAt     *time.Time         `json:"expires_at,omitempty" db:"expires_at"`
-	TrafficLimit  int64              `json:"traffic_limit" db:"traffic_limit"`
-	TrafficUsed   int64              `json:"traffic_used" db:"traffic_used"`
-	MaxDevices    int                `json:"max_devices" db:"max_devices"`
-	CreatedAt     time.Time          `json:"created_at" db:"created_at"`
+	ID           uuid.UUID          `json:"id" db:"id"`
+	UserID       int64              `json:"user_id" db:"user_id"`
+	PlanID       uuid.UUID          `json:"plan_id" db:"plan_id"`
+	Status       SubscriptionStatus `json:"status" db:"status"`
+	SubToken     string             `json:"sub_token" db:"sub_token"`
+	StartedAt    *time.Time         `json:"started_at,omitempty" db:"started_at"`
+	ExpiresAt    *time.Time         `json:"expires_at,omitempty" db:"expires_at"`
+	TrafficLimit int64              `json:"traffic_limit" db:"traffic_limit"`
+	TrafficUsed  int64              `json:"traffic_used" db:"traffic_used"`
+	MaxDevices   int                `json:"max_devices" db:"max_devices"`
+	CreatedAt    time.Time          `json:"created_at" db:"created_at"`
+	// Clients — per-server xui-клиенты этой подписки. JOIN c subscription_clients.
+	Clients []SubscriptionClient `json:"servers" db:"-"`
+}
+
+// SubscriptionClient — xui-клиент этой подписки на конкретном сервере.
+// У подписки их N (по числу серверов в её тарифе).
+type SubscriptionClient struct {
+	ID             uuid.UUID `json:"id" db:"id"`
+	SubscriptionID uuid.UUID `json:"subscription_id" db:"subscription_id"`
+	ServerID       uuid.UUID `json:"server_id" db:"server_id"`
+	XUIClientID    string    `json:"xui_client_id" db:"xui_client_id"`
+	XUIEmail       string    `json:"xui_email" db:"xui_email"`
+	ConnectionKey  string    `json:"connection_key" db:"connection_key"`
+	TrafficUsed    int64     `json:"traffic_used" db:"traffic_used"`
+	Enabled        bool      `json:"enabled" db:"enabled"`
+	CreatedAt      time.Time `json:"created_at" db:"created_at"`
+	// Server — JOIN'нутая инфа о сервере (имя/город/флаг/пинг/статус).
+	// Заполняется только в read-методах, иначе nil.
+	Server *Server `json:"server,omitempty" db:"-"`
 }
 
 type SubscriptionWithPlan struct {

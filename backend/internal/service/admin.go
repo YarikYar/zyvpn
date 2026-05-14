@@ -538,6 +538,9 @@ type UpdatePlanParams struct {
 	// ClearVisibility forces visible_to_referrer_id back to NULL even when
 	// VisibleToReferrerID is nil (which would otherwise mean "leave as-is").
 	ClearVisibility bool
+	// ServerIDs — список серверов тарифа. nil — не трогаем, []uuid.UUID{} —
+	// полностью очищаем (тариф становится «нерабочим», не активируется).
+	ServerIDs *[]uuid.UUID
 }
 
 // CreatePlanParams holds parameters for creating a plan
@@ -552,6 +555,9 @@ type CreatePlanParams struct {
 	PriceUSD            float64
 	SortOrder           int
 	VisibleToReferrerID *int64
+	// ServerIDs — обязателен. Без серверов план не активируется и не
+	// показывается юзеру.
+	ServerIDs []uuid.UUID
 }
 
 // ListAllPlans lists all plans including inactive
@@ -570,6 +576,18 @@ func (s *AdminService) UpdatePlan(ctx context.Context, adminID int64, planID str
 		return nil, err
 	}
 
+	// Если переданы новые ServerIDs — перепишем plan_servers.
+	if params.ServerIDs != nil {
+		if err := s.repo.SetPlanServers(ctx, plan.ID, *params.ServerIDs); err != nil {
+			return nil, fmt.Errorf("update plan servers: %w", err)
+		}
+	}
+
+	// Hydrate перед возвратом, чтобы фронт сразу получил актуальный список.
+	if err := s.repo.HydratePlanWithServers(ctx, plan); err != nil {
+		return nil, err
+	}
+
 	// Log action
 	_ = s.repo.LogAdminAction(ctx, adminID, model.AdminActionUpdatePlan, nil, map[string]interface{}{
 		"plan_id": planID,
@@ -584,16 +602,29 @@ func (s *AdminService) CreatePlan(ctx context.Context, adminID int64, params Cre
 	if ok, _ := s.IsAdmin(ctx, adminID); !ok {
 		return nil, ErrNotAdmin
 	}
+	if len(params.ServerIDs) == 0 {
+		return nil, errors.New("в тарифе должен быть хотя бы один сервер")
+	}
 
 	plan, err := s.repo.CreatePlan(ctx, params.Name, params.Description, params.DurationDays, params.TrafficGB, params.MaxDevices, params.PriceTON, params.PriceStars, params.PriceUSD, params.SortOrder, params.VisibleToReferrerID)
 	if err != nil {
 		return nil, err
 	}
+	if err := s.repo.SetPlanServers(ctx, plan.ID, params.ServerIDs); err != nil {
+		// Rollback: удаляем только что созданный плана, чтобы не оставить
+		// «безсерверного» сироту.
+		_ = s.repo.DeletePlanByID(ctx, plan.ID)
+		return nil, fmt.Errorf("set plan servers: %w", err)
+	}
+	if err := s.repo.HydratePlanWithServers(ctx, plan); err != nil {
+		return nil, err
+	}
 
 	// Log action
 	_ = s.repo.LogAdminAction(ctx, adminID, model.AdminActionCreatePlan, nil, map[string]interface{}{
-		"plan_id": plan.ID,
-		"name":    params.Name,
+		"plan_id":    plan.ID,
+		"name":       params.Name,
+		"server_ids": params.ServerIDs,
 	})
 
 	return plan, nil
@@ -696,22 +727,3 @@ func (s *AdminService) SetReferralBonusDays(ctx context.Context, adminID int64, 
 	return s.repo.SetSetting(ctx, "referral_bonus_days", fmt.Sprintf("%d", days))
 }
 
-// GetRegionSwitchPrice returns the price for switching regions (in TON)
-func (s *AdminService) GetRegionSwitchPrice(ctx context.Context) (float64, error) {
-	value, err := s.repo.GetSettingFloat(ctx, "region_switch_price")
-	if err != nil {
-		return 0.1, nil // Default to 0.1 TON if not set
-	}
-	return value, nil
-}
-
-// SetRegionSwitchPrice sets the price for switching regions (in TON)
-func (s *AdminService) SetRegionSwitchPrice(ctx context.Context, adminID int64, price float64) error {
-	if ok, _ := s.IsAdmin(ctx, adminID); !ok {
-		return ErrNotAdmin
-	}
-	if price < 0 || price > 10 {
-		return errors.New("цена смены региона должна быть от 0 до 10 TON")
-	}
-	return s.repo.SetSetting(ctx, "region_switch_price", fmt.Sprintf("%.4f", price))
-}

@@ -22,6 +22,9 @@ type Plan struct {
 	// this user. NULL means public to everyone.
 	VisibleToReferrerID *int64    `json:"visible_to_referrer_id,omitempty" db:"visible_to_referrer_id"`
 	CreatedAt           time.Time `json:"created_at" db:"created_at"`
+	// Servers — список серверов, на которые провижинится клиент при активации.
+	// Подтягивается через JOIN с plan_servers, в plans не хранится.
+	Servers []Server `json:"servers" db:"-"`
 }
 
 // TrafficBytes returns traffic limit in bytes

@@ -66,6 +66,10 @@ type Inbound struct {
 	Down    int64 `json:"down"`
 	Total   int64 `json:"total"`
 	AllTime int64 `json:"allTime"`
+	// ClientStats — per-client счётчики, отдаёт сам xui при getInbound. Это
+	// то, что мы используем для bulk-sync трафика в HealthWorker (один запрос
+	// на весь инбаунд вместо N походов GetClientTraffic).
+	ClientStats []Traffic `json:"clientStats"`
 }
 
 type Response struct {
@@ -313,15 +317,41 @@ func clampMaxDevices(maxDevices int) int {
 }
 
 func (c *Client) buildClientConfig(clientID, email string, trafficBytes int64, expiryTime int64, maxDevices int) ClientConfig {
+	return c.buildClientConfigWithEnable(clientID, email, trafficBytes, expiryTime, maxDevices, true)
+}
+
+func (c *Client) buildClientConfigWithEnable(clientID, email string, trafficBytes int64, expiryTime int64, maxDevices int, enable bool) ClientConfig {
 	return ClientConfig{
 		ID:         clientID,
 		Email:      email,
-		Enable:     true,
+		Enable:     enable,
 		Flow:       "xtls-rprx-vision",
 		LimitIP:    clampMaxDevices(maxDevices),
 		TotalGB:    bytesToTotalGB(trafficBytes),
 		ExpiryTime: expiryTime,
 	}
+}
+
+// SetClientEnabled — для центрального enforcement лимита трафика. Не меняет
+// total/expiry/limitIp; их-же надо передать чтобы не потерять. Если xui
+// настоял что клиента нет — игнорируем (sub скоро всё-равно expire'нется).
+func (c *Client) SetClientEnabled(clientUUID, email string, enable bool, trafficLimitBytes, expiryTime int64, maxDevices int) error {
+	cfg := c.buildClientConfigWithEnable(clientUUID, email, trafficLimitBytes, expiryTime, maxDevices, enable)
+	settingsJSON, err := json.Marshal(map[string]interface{}{
+		"clients": []ClientConfig{cfg},
+	})
+	if err != nil {
+		return err
+	}
+	payload := map[string]interface{}{
+		"id":       c.inboundID,
+		"settings": string(settingsJSON),
+	}
+	path := fmt.Sprintf("/panel/api/inbounds/updateClient/%s", clientUUID)
+	if _, err := c.callJSON(http.MethodPost, path, payload); err != nil {
+		return fmt.Errorf("set client enabled: %w", err)
+	}
+	return nil
 }
 
 // AddClient creates a new VLESS client. trafficLimitGB is in gigabytes

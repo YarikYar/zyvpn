@@ -68,8 +68,6 @@ definitions:
         - stars
         - cash
         type: string
-      server_id:
-        type: string
     type: object
   handler.CreateCashPaymentRequest:
     properties:
@@ -96,6 +94,10 @@ definitions:
         type: number
       price_usd:
         type: number
+      server_ids:
+        items:
+          type: string
+        type: array
       sort_order:
         type: integer
       traffic_gb:
@@ -207,16 +209,6 @@ definitions:
       balance:
         type: number
     type: object
-  handler.SetRegionSwitchPriceRequest:
-    properties:
-      price:
-        type: number
-    type: object
-  handler.SwitchServerRequest:
-    properties:
-      server_id:
-        type: string
-    type: object
   handler.TopUpRequest:
     properties:
       amount:
@@ -250,6 +242,13 @@ definitions:
         type: number
       price_usd:
         type: number
+      server_ids:
+        description: |-
+          ServerIDs — UUID серверов, входящих в тариф. nil = не трогаем,
+          [] = очистить (тариф станет неактивируемым).
+        items:
+          type: string
+        type: array
       sort_order:
         type: integer
       traffic_gb:
@@ -364,6 +363,13 @@ definitions:
         type: number
       price_usd:
         type: number
+      servers:
+        description: |-
+          Servers — список серверов, на которые провижинится клиент при активации.
+          Подтягивается через JOIN с plan_servers, в plans не хранится.
+        items:
+          $ref: '#/definitions/model.Server'
+        type: array
       sort_order:
         type: integer
       traffic_gb:
@@ -407,22 +413,18 @@ definitions:
     enum:
     - balance
     - days
-    - region_switch
     - cash_plan
     type: string
     x-enum-comments:
       PromoCodeTypeBalance: Credits TON to balance
       PromoCodeTypeDays: Adds days to subscription
-      PromoCodeTypeRegionSwitch: Adds free region switches
     x-enum-descriptions:
     - Credits TON to balance
     - Adds days to subscription
-    - Adds free region switches
     - ""
     x-enum-varnames:
     - PromoCodeTypeBalance
     - PromoCodeTypeDays
-    - PromoCodeTypeRegionSwitch
     - PromoCodeTypeCashPlan
   model.Server:
     properties:
@@ -551,8 +553,6 @@ definitions:
     type: object
   model.Subscription:
     properties:
-      connection_key:
-        type: string
       created_at:
         type: string
       expires_at:
@@ -563,17 +563,45 @@ definitions:
         type: integer
       plan_id:
         type: string
-      server_id:
-        type: string
+      servers:
+        description: Clients — per-server xui-клиенты этой подписки. JOIN c subscription_clients.
+        items:
+          $ref: '#/definitions/model.SubscriptionClient'
+        type: array
       started_at:
         type: string
       status:
         $ref: '#/definitions/model.SubscriptionStatus'
+      sub_token:
+        type: string
       traffic_limit:
         type: integer
       traffic_used:
         type: integer
       user_id:
+        type: integer
+    type: object
+  model.SubscriptionClient:
+    properties:
+      connection_key:
+        type: string
+      created_at:
+        type: string
+      enabled:
+        type: boolean
+      id:
+        type: string
+      server:
+        allOf:
+        - $ref: '#/definitions/model.Server'
+        description: |-
+          Server — JOIN'нутая инфа о сервере (имя/город/флаг/пинг/статус).
+          Заполняется только в read-методах, иначе nil.
+      server_id:
+        type: string
+      subscription_id:
+        type: string
+      traffic_used:
         type: integer
       xui_client_id:
         type: string
@@ -612,9 +640,6 @@ definitions:
         type: string
       first_name:
         type: string
-      free_region_switches:
-        description: Free region switches from promo codes
-        type: integer
       id:
         type: integer
       language_code:
@@ -639,9 +664,6 @@ definitions:
         type: string
       first_name:
         type: string
-      free_region_switches:
-        description: Free region switches from promo codes
-        type: integer
       id:
         type: integer
       is_admin:
@@ -1280,44 +1302,6 @@ paths:
       summary: Set referral bonus days
       tags:
       - admin
-  /api/admin/settings/region-switch-price:
-    get:
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            additionalProperties: true
-            type: object
-      security:
-      - TelegramInitData: []
-      summary: Get region switch price
-      tags:
-      - admin
-    post:
-      consumes:
-      - application/json
-      parameters:
-      - description: '{price}'
-        in: body
-        name: body
-        required: true
-        schema:
-          $ref: '#/definitions/handler.SetRegionSwitchPriceRequest'
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            additionalProperties: true
-            type: object
-      security:
-      - TelegramInitData: []
-      summary: Set region switch price
-      tags:
-      - admin
   /api/admin/settings/topup-bonus:
     get:
       produces:
@@ -1599,6 +1583,33 @@ paths:
       security:
       - TelegramInitData: []
       summary: Extend subscription
+      tags:
+      - admin
+  /api/admin/users/{user_id}/subscription/rotate-token:
+    post:
+      parameters:
+      - description: telegram user id
+        in: path
+        name: user_id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - TelegramInitData: []
+      summary: Rotate subscription token
       tags:
       - admin
   /api/admin/users/{user_id}/unban:
@@ -2282,28 +2293,6 @@ paths:
       summary: Initiate plan purchase
       tags:
       - subscription
-  /api/subscription/key:
-    get:
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            additionalProperties:
-              type: string
-            type: object
-        "404":
-          description: Not Found
-          schema:
-            additionalProperties:
-              type: string
-            type: object
-      security:
-      - TelegramInitData: []
-      summary: Connection key
-      tags:
-      - subscription
   /api/subscription/status:
     get:
       produces:
@@ -2317,57 +2306,6 @@ paths:
       security:
       - TelegramInitData: []
       summary: Subscription status
-      tags:
-      - subscription
-  /api/subscription/switch-server:
-    post:
-      consumes:
-      - application/json
-      parameters:
-      - description: target server
-        in: body
-        name: body
-        required: true
-        schema:
-          $ref: '#/definitions/handler.SwitchServerRequest'
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            additionalProperties: true
-            type: object
-        "400":
-          description: Bad Request
-          schema:
-            additionalProperties:
-              type: string
-            type: object
-        "402":
-          description: not enough balance
-          schema:
-            additionalProperties:
-              type: string
-            type: object
-      security:
-      - TelegramInitData: []
-      summary: Switch active subscription to another server
-      tags:
-      - subscription
-  /api/subscription/switch-server/info:
-    get:
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            additionalProperties: true
-            type: object
-      security:
-      - TelegramInitData: []
-      summary: Region switch info
       tags:
       - subscription
   /api/subscription/trial:
@@ -2395,6 +2333,28 @@ paths:
       security:
       - TelegramInitData: []
       summary: Activate free trial
+      tags:
+      - subscription
+  /api/subscription/url:
+    get:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - TelegramInitData: []
+      summary: Subscription URL (для VPN-клиента)
       tags:
       - subscription
   /api/user/me:
@@ -2429,6 +2389,30 @@ paths:
               type: string
             type: object
       summary: Liveness probe
+      tags:
+      - public
+  /sub/{token}:
+    get:
+      parameters:
+      - description: subscription token
+        in: path
+        name: token
+        required: true
+        type: string
+      produces:
+      - text/plain
+      responses:
+        "200":
+          description: base64-encoded share links
+          schema:
+            type: string
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Subscription content (для VPN-клиентов)
       tags:
       - public
 schemes:

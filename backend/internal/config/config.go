@@ -21,6 +21,10 @@ type ServerConfig struct {
 	Environment    string
 	AllowOrigins   string
 	InternalSecret string
+	// PublicAPIBaseURL — внешний базовый URL backend'а (тот, что слышит
+	// VPN-клиент). Используется для генерации subscription URL вида
+	// `<base>/sub/<token>`. Пример: "https://api.zaruchevskiy.ru".
+	PublicAPIBaseURL string
 	// InsecureTGAuthBypass disables HMAC validation of Telegram initData.
 	// When true, initData is parsed but not verified, OR the user is
 	// identified by the X-User-ID header. ONLY for fronted dev / debugging
@@ -72,6 +76,7 @@ func Load() (*Config, error) {
 			// set ALLOW_ORIGINS explicitly.
 			AllowOrigins:         getEnv("ALLOW_ORIGINS", ""),
 			InternalSecret:       getEnv("INTERNAL_SECRET", ""),
+			PublicAPIBaseURL:     getEnv("PUBLIC_API_BASE_URL", ""),
 			InsecureTGAuthBypass: getEnv("INSECURE_TG_AUTH_BYPASS", "") == "true",
 		},
 		Database: DatabaseConfig{

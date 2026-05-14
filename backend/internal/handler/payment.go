@@ -111,8 +111,8 @@ func (h *Handler) VerifyTONPayment(c *fiber.Ctx) error {
 		})
 	}
 
-	// Get subscription key for response
-	key, _ := h.subscriptionSvc.GetConnectionKey(c.Context(), userID)
+	// Subscription URL вместо одиночного connection_key
+	subURL, _ := h.subscriptionSvc.GetSubscriptionURLForUser(c.Context(), userID)
 
 	// Send notification via bot
 	if h.bot != nil {
@@ -123,8 +123,8 @@ func (h *Handler) VerifyTONPayment(c *fiber.Ctx) error {
 	}
 
 	return c.JSON(fiber.Map{
-		"success": true,
-		"key":     key,
+		"success":          true,
+		"subscription_url": subURL,
 	})
 }
 
@@ -254,10 +254,10 @@ func (h *Handler) GetPaymentStatus(c *fiber.Ctx) error {
 		"currency":   payment.Currency,
 	}
 
-	// Add subscription key if payment completed
+	// Add subscription URL if payment completed
 	if payment.Status == "completed" && payment.PaymentType == "subscription" {
-		key, _ := h.subscriptionSvc.GetConnectionKey(c.Context(), userID)
-		response["key"] = key
+		subURL, _ := h.subscriptionSvc.GetSubscriptionURLForUser(c.Context(), userID)
+		response["subscription_url"] = subURL
 	}
 
 	// Add new balance if top-up completed

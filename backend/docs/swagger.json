@@ -980,68 +980,6 @@
                 }
             }
         },
-        "/api/admin/settings/region-switch-price": {
-            "get": {
-                "security": [
-                    {
-                        "TelegramInitData": []
-                    }
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "admin"
-                ],
-                "summary": "Get region switch price",
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "type": "object",
-                            "additionalProperties": true
-                        }
-                    }
-                }
-            },
-            "post": {
-                "security": [
-                    {
-                        "TelegramInitData": []
-                    }
-                ],
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "admin"
-                ],
-                "summary": "Set region switch price",
-                "parameters": [
-                    {
-                        "description": "{price}",
-                        "name": "body",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/handler.SetRegionSwitchPriceRequest"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "type": "object",
-                            "additionalProperties": true
-                        }
-                    }
-                }
-            }
-        },
         "/api/admin/settings/topup-bonus": {
             "get": {
                 "security": [
@@ -1489,6 +1427,49 @@
                         "schema": {
                             "type": "object",
                             "additionalProperties": true
+                        }
+                    }
+                }
+            }
+        },
+        "/api/admin/users/{user_id}/subscription/rotate-token": {
+            "post": {
+                "security": [
+                    {
+                        "TelegramInitData": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "admin"
+                ],
+                "summary": "Rotate subscription token",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "telegram user id",
+                        "name": "user_id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
                         }
                     }
                 }
@@ -2582,42 +2563,6 @@
                 }
             }
         },
-        "/api/subscription/key": {
-            "get": {
-                "security": [
-                    {
-                        "TelegramInitData": []
-                    }
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "subscription"
-                ],
-                "summary": "Connection key",
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "type": "object",
-                            "additionalProperties": {
-                                "type": "string"
-                            }
-                        }
-                    },
-                    "404": {
-                        "description": "Not Found",
-                        "schema": {
-                            "type": "object",
-                            "additionalProperties": {
-                                "type": "string"
-                            }
-                        }
-                    }
-                }
-            }
-        },
         "/api/subscription/status": {
             "get": {
                 "security": [
@@ -2632,88 +2577,6 @@
                     "subscription"
                 ],
                 "summary": "Subscription status",
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "type": "object",
-                            "additionalProperties": true
-                        }
-                    }
-                }
-            }
-        },
-        "/api/subscription/switch-server": {
-            "post": {
-                "security": [
-                    {
-                        "TelegramInitData": []
-                    }
-                ],
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "subscription"
-                ],
-                "summary": "Switch active subscription to another server",
-                "parameters": [
-                    {
-                        "description": "target server",
-                        "name": "body",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/handler.SwitchServerRequest"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "type": "object",
-                            "additionalProperties": true
-                        }
-                    },
-                    "400": {
-                        "description": "Bad Request",
-                        "schema": {
-                            "type": "object",
-                            "additionalProperties": {
-                                "type": "string"
-                            }
-                        }
-                    },
-                    "402": {
-                        "description": "not enough balance",
-                        "schema": {
-                            "type": "object",
-                            "additionalProperties": {
-                                "type": "string"
-                            }
-                        }
-                    }
-                }
-            }
-        },
-        "/api/subscription/switch-server/info": {
-            "get": {
-                "security": [
-                    {
-                        "TelegramInitData": []
-                    }
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "subscription"
-                ],
-                "summary": "Region switch info",
                 "responses": {
                     "200": {
                         "description": "OK",
@@ -2758,6 +2621,42 @@
                     },
                     "500": {
                         "description": "Internal Server Error",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/subscription/url": {
+            "get": {
+                "security": [
+                    {
+                        "TelegramInitData": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "subscription"
+                ],
+                "summary": "Subscription URL (для VPN-клиента)",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
                         "schema": {
                             "type": "object",
                             "additionalProperties": {
@@ -2813,6 +2712,43 @@
                 "responses": {
                     "200": {
                         "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/sub/{token}": {
+            "get": {
+                "produces": [
+                    "text/plain"
+                ],
+                "tags": [
+                    "public"
+                ],
+                "summary": "Subscription content (для VPN-клиентов)",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "subscription token",
+                        "name": "token",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "base64-encoded share links",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
                         "schema": {
                             "type": "object",
                             "additionalProperties": {
@@ -2928,9 +2864,6 @@
                         "stars",
                         "cash"
                     ]
-                },
-                "server_id": {
-                    "type": "string"
                 }
             }
         },
@@ -2971,6 +2904,12 @@
                 },
                 "price_usd": {
                     "type": "number"
+                },
+                "server_ids": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
                 },
                 "sort_order": {
                     "type": "integer"
@@ -3144,22 +3083,6 @@
                 }
             }
         },
-        "handler.SetRegionSwitchPriceRequest": {
-            "type": "object",
-            "properties": {
-                "price": {
-                    "type": "number"
-                }
-            }
-        },
-        "handler.SwitchServerRequest": {
-            "type": "object",
-            "properties": {
-                "server_id": {
-                    "type": "string"
-                }
-            }
-        },
         "handler.TopUpRequest": {
             "type": "object",
             "properties": {
@@ -3207,6 +3130,13 @@
                 },
                 "price_usd": {
                     "type": "number"
+                },
+                "server_ids": {
+                    "description": "ServerIDs — UUID серверов, входящих в тариф. nil = не трогаем,\n[] = очистить (тариф станет неактивируемым).",
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
                 },
                 "sort_order": {
                     "type": "integer"
@@ -3379,6 +3309,13 @@
                 "price_usd": {
                     "type": "number"
                 },
+                "servers": {
+                    "description": "Servers — список серверов, на которые провижинится клиент при активации.\nПодтягивается через JOIN с plan_servers, в plans не хранится.",
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/model.Server"
+                    }
+                },
                 "sort_order": {
                     "type": "integer"
                 },
@@ -3439,24 +3376,20 @@
             "enum": [
                 "balance",
                 "days",
-                "region_switch",
                 "cash_plan"
             ],
             "x-enum-comments": {
                 "PromoCodeTypeBalance": "Credits TON to balance",
-                "PromoCodeTypeDays": "Adds days to subscription",
-                "PromoCodeTypeRegionSwitch": "Adds free region switches"
+                "PromoCodeTypeDays": "Adds days to subscription"
             },
             "x-enum-descriptions": [
                 "Credits TON to balance",
                 "Adds days to subscription",
-                "Adds free region switches",
                 ""
             ],
             "x-enum-varnames": [
                 "PromoCodeTypeBalance",
                 "PromoCodeTypeDays",
-                "PromoCodeTypeRegionSwitch",
                 "PromoCodeTypeCashPlan"
             ]
         },
@@ -3646,9 +3579,6 @@
         "model.Subscription": {
             "type": "object",
             "properties": {
-                "connection_key": {
-                    "type": "string"
-                },
                 "created_at": {
                     "type": "string"
                 },
@@ -3664,14 +3594,21 @@
                 "plan_id": {
                     "type": "string"
                 },
-                "server_id": {
-                    "type": "string"
+                "servers": {
+                    "description": "Clients — per-server xui-клиенты этой подписки. JOIN c subscription_clients.",
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/model.SubscriptionClient"
+                    }
                 },
                 "started_at": {
                     "type": "string"
                 },
                 "status": {
                     "$ref": "#/definitions/model.SubscriptionStatus"
+                },
+                "sub_token": {
+                    "type": "string"
                 },
                 "traffic_limit": {
                     "type": "integer"
@@ -3680,6 +3617,40 @@
                     "type": "integer"
                 },
                 "user_id": {
+                    "type": "integer"
+                }
+            }
+        },
+        "model.SubscriptionClient": {
+            "type": "object",
+            "properties": {
+                "connection_key": {
+                    "type": "string"
+                },
+                "created_at": {
+                    "type": "string"
+                },
+                "enabled": {
+                    "type": "boolean"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "server": {
+                    "description": "Server — JOIN'нутая инфа о сервере (имя/город/флаг/пинг/статус).\nЗаполняется только в read-методах, иначе nil.",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/model.Server"
+                        }
+                    ]
+                },
+                "server_id": {
+                    "type": "string"
+                },
+                "subscription_id": {
+                    "type": "string"
+                },
+                "traffic_used": {
                     "type": "integer"
                 },
                 "xui_client_id": {
@@ -3736,10 +3707,6 @@
                 "first_name": {
                     "type": "string"
                 },
-                "free_region_switches": {
-                    "description": "Free region switches from promo codes",
-                    "type": "integer"
-                },
                 "id": {
                     "type": "integer"
                 },
@@ -3775,10 +3742,6 @@
                 },
                 "first_name": {
                     "type": "string"
-                },
-                "free_region_switches": {
-                    "description": "Free region switches from promo codes",
-                    "type": "integer"
                 },
                 "id": {
                     "type": "integer"

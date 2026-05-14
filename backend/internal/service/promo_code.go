@@ -152,20 +152,6 @@ func (s *PromoCodeService) ApplyPromoCode(ctx context.Context, code string, user
 			*promo.CashAmountRUB,
 		)
 
-	case model.PromoCodeTypeRegionSwitch:
-		// Add free region switches to user
-		count := int(promo.Value)
-		if count < 1 {
-			count = 1
-		}
-		if err := s.repo.AddFreeRegionSwitches(ctx, userID, count); err != nil {
-			return nil, fmt.Errorf("failed to add free region switches: %w", err)
-		}
-		if count == 1 {
-			result.Message = "Вам начислена 1 бесплатная смена региона"
-		} else {
-			result.Message = fmt.Sprintf("Вам начислено %d бесплатных смен региона", count)
-		}
 	}
 
 	// Mark promo code as used

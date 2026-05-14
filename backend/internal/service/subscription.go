@@ -2,17 +2,21 @@ package service
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/base64"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"log"
-	"math"
+	"net/url"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
+
 	"github.com/zyvpn/backend/internal/config"
 	"github.com/zyvpn/backend/internal/model"
 	"github.com/zyvpn/backend/internal/repository"
-	"github.com/zyvpn/backend/internal/xui"
 )
 
 var (
@@ -20,6 +24,7 @@ var (
 	ErrSubscriptionNotActive = errors.New("Подписка неактивна")
 	ErrTrialAlreadyUsed      = errors.New("Пробный период уже использован")
 	ErrNoServersAvailable    = errors.New("Нет доступных серверов")
+	ErrPlanHasNoServers      = errors.New("В тарифе не указаны серверы")
 )
 
 type SubscriptionService struct {
@@ -41,123 +46,156 @@ func (s *SubscriptionService) SetServerService(serverSvc *ServerService) {
 	s.serverSvc = serverSvc
 }
 
-// getXUIClientForSubscription returns the appropriate XUI client for a subscription
-func (s *SubscriptionService) getXUIClientForSubscription(ctx context.Context, sub *model.Subscription) (*xui.Client, *model.Server, error) {
-	if s.serverSvc == nil {
-		return nil, nil, fmt.Errorf("server service not available")
-	}
-
-	// If subscription has a server_id, use it
-	if sub.ServerID != nil {
-		return s.serverSvc.GetXUIClient(ctx, *sub.ServerID)
-	}
-
-	// Fall back to default server for old subscriptions without server_id
-	return s.serverSvc.GetXUIClientForDefault(ctx)
-}
-
 func (s *SubscriptionService) GetActiveSubscription(ctx context.Context, userID int64) (*model.Subscription, error) {
-	return s.repo.GetActiveSubscription(ctx, userID)
+	sub, err := s.repo.GetActiveSubscription(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+	clients, err := s.repo.GetSubscriptionClients(ctx, sub.ID)
+	if err != nil {
+		return nil, err
+	}
+	sub.Clients = clients
+	return sub, nil
 }
 
 func (s *SubscriptionService) GetSubscription(ctx context.Context, id uuid.UUID) (*model.Subscription, error) {
-	return s.repo.GetSubscription(ctx, id)
-}
-
-func (s *SubscriptionService) CreateSubscription(ctx context.Context, userID int64, plan *model.Plan) (*model.Subscription, error) {
-	return s.CreateSubscriptionWithServer(ctx, userID, plan, nil)
-}
-
-func (s *SubscriptionService) CreateSubscriptionWithServer(ctx context.Context, userID int64, plan *model.Plan, serverID *uuid.UUID) (*model.Subscription, error) {
-	// Check for existing active subscription - extend it instead of creating new
-	existing, err := s.repo.GetActiveSubscription(ctx, userID)
-	if err == nil && existing.IsActive() {
-		// Extend existing subscription with new plan's days and traffic
-		log.Printf("Extending existing subscription %s for user %d by %d days and %d GB traffic", existing.ID, userID, plan.DurationDays, plan.TrafficGB)
-		if err := s.ExtendSubscriptionWithTraffic(ctx, existing.ID, plan.DurationDays, plan.TrafficBytes()); err != nil {
-			return nil, fmt.Errorf("failed to extend subscription: %w", err)
-		}
-		// Return updated subscription
-		return s.repo.GetSubscription(ctx, existing.ID)
+	sub, err := s.repo.GetSubscription(ctx, id)
+	if err != nil {
+		return nil, err
 	}
+	clients, err := s.repo.GetSubscriptionClients(ctx, sub.ID)
+	if err != nil {
+		return nil, err
+	}
+	sub.Clients = clients
+	return sub, nil
+}
 
+// CreateSubscription активирует тариф: создаёт subscription row, генерит
+// sub_token, провижинит xui-клиента на каждом server'е из plan.Servers,
+// сохраняет subscription_clients. Если у юзера уже есть активная подписка —
+// extend'им её вместо создания новой.
+func (s *SubscriptionService) CreateSubscription(ctx context.Context, userID int64, plan *model.Plan) (*model.Subscription, error) {
 	if s.serverSvc == nil {
 		return nil, ErrNoServersAvailable
 	}
 
-	// Get XUI client for the selected server (or best available)
-	var xuiClientAPI *xui.Client
-	var server *model.Server
-
-	if serverID != nil {
-		xuiClientAPI, server, err = s.serverSvc.GetXUIClient(ctx, *serverID)
-		if err != nil {
-			return nil, fmt.Errorf("failed to get server: %w", err)
-		}
-	} else {
-		// Auto-select best server based on load balancing
-		server, err = s.serverSvc.GetBestServer(ctx)
-		if err != nil {
-			return nil, ErrNoServersAvailable
-		}
-		xuiClientAPI, server, err = s.serverSvc.GetXUIClient(ctx, server.ID)
-		if err != nil {
-			return nil, fmt.Errorf("failed to get server client: %w", err)
+	// Hydrate plan.Servers if caller didn't.
+	if len(plan.Servers) == 0 {
+		if err := s.repo.HydratePlanWithServers(ctx, plan); err != nil {
+			return nil, fmt.Errorf("hydrate plan servers: %w", err)
 		}
 	}
+	if len(plan.Servers) == 0 {
+		return nil, ErrPlanHasNoServers
+	}
 
-	// Generate unique email for 3x-ui client
-	email := fmt.Sprintf("user_%d_%d", userID, time.Now().Unix())
+	// Existing active sub — extend instead of new.
+	existing, err := s.repo.GetActiveSubscription(ctx, userID)
+	if err == nil && existing.IsActive() {
+		log.Printf("Extending existing subscription %s for user %d by %d days, +%d GB",
+			existing.ID, userID, plan.DurationDays, plan.TrafficGB)
+		if err := s.ExtendSubscriptionWithTraffic(ctx, existing.ID, plan.DurationDays, plan.TrafficBytes()); err != nil {
+			return nil, fmt.Errorf("failed to extend subscription: %w", err)
+		}
+		return s.GetSubscription(ctx, existing.ID)
+	}
 
 	maxDevices := plan.MaxDevices
 	if maxDevices <= 0 {
 		maxDevices = 3
 	}
 
-	log.Printf("Creating VPN client for user %d, email: %s, traffic: %d GB, days: %d, devices: %d", userID, email, plan.TrafficGB, plan.DurationDays, maxDevices)
-
-	// Create client in 3x-ui
-	xuiClient, err := xuiClientAPI.AddClient(email, int64(plan.TrafficGB), plan.DurationDays, maxDevices)
-	if err != nil {
-		log.Printf("ERROR: Failed to create VPN client for user %d: %v", userID, err)
-		return nil, fmt.Errorf("failed to create VPN client: %w", err)
-	}
-
-	log.Printf("VPN client created successfully: ID=%s, Email=%s", xuiClient.ID, xuiClient.Email)
-
 	now := time.Now()
 	expiresAt := now.Add(time.Duration(plan.DurationDays) * 24 * time.Hour)
 
-	// Generate connection key
-	connectionKey := s.serverSvc.GenerateConnectionKey(server, xuiClient.ID, email)
-
-	sub := &model.Subscription{
-		UserID:        userID,
-		PlanID:        plan.ID,
-		ServerID:      &server.ID,
-		Status:        model.SubscriptionStatusActive,
-		XUIClientID:   xuiClient.ID,
-		XUIEmail:      email,
-		ConnectionKey: connectionKey,
-		StartedAt:     &now,
-		ExpiresAt:     &expiresAt,
-		TrafficLimit:  plan.TrafficBytes(),
-		TrafficUsed:   0,
-		MaxDevices:    maxDevices,
+	subToken, err := generateSubToken()
+	if err != nil {
+		return nil, fmt.Errorf("generate sub token: %w", err)
 	}
 
+	sub := &model.Subscription{
+		UserID:       userID,
+		PlanID:       plan.ID,
+		Status:       model.SubscriptionStatusActive,
+		SubToken:     subToken,
+		StartedAt:    &now,
+		ExpiresAt:    &expiresAt,
+		TrafficLimit: plan.TrafficBytes(),
+		TrafficUsed:  0,
+		MaxDevices:   maxDevices,
+	}
 	if err := s.repo.CreateSubscription(ctx, sub); err != nil {
-		// Try to cleanup 3x-ui client
-		_ = xuiClientAPI.DeleteClient(xuiClient.ID)
 		return nil, err
 	}
 
-	// Increment server load
-	if err := s.serverSvc.IncrementLoad(ctx, server.ID); err != nil {
-		log.Printf("WARNING: Failed to increment server load: %v", err)
+	// Provision xui клиента на каждом сервере плана.
+	// trafficLimitGB=0 — лимит enforce'ится централизованно (см. EnforceTrafficLimit).
+	created := make([]model.SubscriptionClient, 0, len(plan.Servers))
+	for _, srv := range plan.Servers {
+		if !srv.IsActive {
+			log.Printf("CreateSubscription: skip inactive server %s for sub %s", srv.ID, sub.ID)
+			continue
+		}
+		xuiClientAPI, server, err := s.serverSvc.GetXUIClient(ctx, srv.ID)
+		if err != nil {
+			log.Printf("CreateSubscription: get xui client for server %s failed: %v — rolling back", srv.ID, err)
+			s.rollbackProvisioning(ctx, sub.ID, created)
+			return nil, fmt.Errorf("failed to get server %s: %w", srv.ID, err)
+		}
+		email := fmt.Sprintf("u%d_s%s_%d", userID, shortID(srv.ID), time.Now().Unix())
+
+		xuiClient, err := xuiClientAPI.AddClient(email, 0 /*unlimited, enforce centrally*/, plan.DurationDays, maxDevices)
+		if err != nil {
+			log.Printf("CreateSubscription: AddClient on %s failed: %v — rolling back", server.Name, err)
+			s.rollbackProvisioning(ctx, sub.ID, created)
+			return nil, fmt.Errorf("failed to create VPN client on %s: %w", server.Name, err)
+		}
+		connectionKey := s.serverSvc.GenerateConnectionKey(server, xuiClient.ID, email)
+
+		client := &model.SubscriptionClient{
+			SubscriptionID: sub.ID,
+			ServerID:       server.ID,
+			XUIClientID:    xuiClient.ID,
+			XUIEmail:       email,
+			ConnectionKey:  connectionKey,
+			Enabled:        true,
+		}
+		if err := s.repo.CreateSubscriptionClient(ctx, client); err != nil {
+			_ = xuiClientAPI.DeleteClient(xuiClient.ID)
+			s.rollbackProvisioning(ctx, sub.ID, created)
+			return nil, fmt.Errorf("failed to save subscription_client: %w", err)
+		}
+		created = append(created, *client)
+
+		if err := s.serverSvc.IncrementLoad(ctx, server.ID); err != nil {
+			log.Printf("WARNING: failed to increment load for server %s: %v", server.ID, err)
+		}
 	}
 
+	if len(created) == 0 {
+		// все серверы плана не активны / упали
+		_ = s.repo.UpdateSubscriptionStatus(ctx, sub.ID, model.SubscriptionStatusCancelled)
+		return nil, ErrNoServersAvailable
+	}
+
+	sub.Clients = created
 	return sub, nil
+}
+
+// rollbackProvisioning удаляет xui-клиентов, созданных в рамках частично
+// успешной активации, и помечает подписку cancelled.
+func (s *SubscriptionService) rollbackProvisioning(ctx context.Context, subID uuid.UUID, created []model.SubscriptionClient) {
+	for _, c := range created {
+		xuiClientAPI, _, err := s.serverSvc.GetXUIClient(ctx, c.ServerID)
+		if err == nil {
+			_ = xuiClientAPI.DeleteClient(c.XUIClientID)
+		}
+		_ = s.repo.DeleteSubscriptionClient(ctx, c.ID)
+		_ = s.serverSvc.DecrementLoad(ctx, c.ServerID)
+	}
+	_ = s.repo.UpdateSubscriptionStatus(ctx, subID, model.SubscriptionStatusCancelled)
 }
 
 func (s *SubscriptionService) ExtendSubscription(ctx context.Context, subID uuid.UUID, days int) error {
@@ -169,29 +207,15 @@ func (s *SubscriptionService) ExtendSubscriptionWithTraffic(ctx context.Context,
 	if err != nil {
 		return err
 	}
-
 	if sub.Status != model.SubscriptionStatusActive {
 		return ErrSubscriptionNotActive
 	}
 
-	// Get appropriate XUI client for this subscription
-	xuiClientAPI, _, err := s.getXUIClientForSubscription(ctx, sub)
+	clients, err := s.repo.GetSubscriptionClients(ctx, subID)
 	if err != nil {
-		return fmt.Errorf("failed to get XUI client: %w", err)
+		return err
 	}
 
-	// Calculate new traffic limit
-	oldTrafficLimitGB := float64(sub.TrafficLimit) / (1024 * 1024 * 1024)
-	additionalTrafficGB := float64(additionalTrafficBytes) / (1024 * 1024 * 1024)
-	newTrafficLimit := sub.TrafficLimit + additionalTrafficBytes
-	newTrafficLimitGB := float64(newTrafficLimit) / (1024 * 1024 * 1024)
-
-	log.Printf("ExtendSubscriptionWithTraffic: subID=%s, oldLimit=%.2f GB, adding=%.2f GB, newLimit=%.2f GB, days=%d",
-		subID, oldTrafficLimitGB, additionalTrafficGB, newTrafficLimitGB, days)
-
-	// Compute new expiry from the later of now / current expiry — protects
-	// against extending from a past timestamp if the expiry-checker hasn't
-	// run yet.
 	now := time.Now()
 	base := now
 	if sub.ExpiresAt != nil && sub.ExpiresAt.After(now) {
@@ -203,113 +227,136 @@ func (s *SubscriptionService) ExtendSubscriptionWithTraffic(ctx context.Context,
 	if maxDevices <= 0 {
 		maxDevices = 3
 	}
-	if err := xuiClientAPI.UpdateClientTraffic(sub.XUIClientID, sub.XUIEmail, newTrafficLimit, newExpiry.UnixMilli(), maxDevices); err != nil {
-		return fmt.Errorf("failed to update VPN client: %w", err)
+
+	// Обновляем expiry на каждом xui-клиенте подписки. Трафик лимит на стороне
+	// xui остаётся 0 (unlimited) — суммарный лимит мы enforce'им сами.
+	for _, c := range clients {
+		xuiClientAPI, _, err := s.serverSvc.GetXUIClient(ctx, c.ServerID)
+		if err != nil {
+			log.Printf("ExtendSubscription: get xui client for server %s failed: %v — пропускаю", c.ServerID, err)
+			continue
+		}
+		if err := xuiClientAPI.UpdateClientTraffic(c.XUIClientID, c.XUIEmail, 0 /*unlimited*/, newExpiry.UnixMilli(), maxDevices); err != nil {
+			log.Printf("ExtendSubscription: update xui client %s failed: %v", c.XUIClientID, err)
+		}
+		// Если был disabled из-за лимита — снова включаем при расширении лимита.
+		if !c.Enabled && additionalTrafficBytes > 0 {
+			_ = s.repo.SetSubscriptionClientEnabled(ctx, c.ID, true)
+		}
 	}
 
-	// Only extend in database after 3x-ui succeeded.
-	if err := s.repo.SetSubscriptionExpiryAndTraffic(ctx, subID, newExpiry, additionalTrafficBytes); err != nil {
-		return err
-	}
-
-	log.Printf("ExtendSubscriptionWithTraffic: subscription %s updated successfully", subID)
-	return nil
+	return s.repo.SetSubscriptionExpiryAndTraffic(ctx, subID, newExpiry, additionalTrafficBytes)
 }
 
 func (s *SubscriptionService) CancelSubscription(ctx context.Context, subID uuid.UUID) error {
-	sub, err := s.repo.GetSubscription(ctx, subID)
+	clients, err := s.repo.GetSubscriptionClients(ctx, subID)
 	if err != nil {
 		return err
 	}
-
-	// Delete from 3x-ui
-	if sub.XUIClientID != "" {
-		xuiClientAPI, _, err := s.getXUIClientForSubscription(ctx, sub)
-		if err != nil {
-			log.Printf("WARNING: Failed to get XUI client for subscription %s: %v", subID, err)
-		} else {
-			if err := xuiClientAPI.DeleteClient(sub.XUIClientID); err != nil {
-				return fmt.Errorf("failed to delete VPN client: %w", err)
+	for _, c := range clients {
+		xuiClientAPI, _, err := s.serverSvc.GetXUIClient(ctx, c.ServerID)
+		if err == nil {
+			if err := xuiClientAPI.DeleteClient(c.XUIClientID); err != nil {
+				log.Printf("CancelSubscription: DeleteClient %s on server %s: %v",
+					c.XUIClientID, c.ServerID, err)
 			}
 		}
+		_ = s.serverSvc.DecrementLoad(ctx, c.ServerID)
+		_ = s.repo.DeleteSubscriptionClient(ctx, c.ID)
 	}
-
-	// Decrement server load
-	if sub.ServerID != nil && s.serverSvc != nil {
-		if err := s.serverSvc.DecrementLoad(ctx, *sub.ServerID); err != nil {
-			log.Printf("WARNING: Failed to decrement server load: %v", err)
-		}
-	}
-
 	return s.repo.UpdateSubscriptionStatus(ctx, subID, model.SubscriptionStatusCancelled)
 }
 
 func (s *SubscriptionService) ExpireSubscription(ctx context.Context, subID uuid.UUID) error {
-	sub, err := s.repo.GetSubscription(ctx, subID)
+	clients, err := s.repo.GetSubscriptionClients(ctx, subID)
 	if err != nil {
 		return err
 	}
-
-	// Delete from 3x-ui
-	if sub.XUIClientID != "" {
-		xuiClientAPI, _, err := s.getXUIClientForSubscription(ctx, sub)
-		if err != nil {
-			log.Printf("WARNING: Failed to get XUI client for subscription %s: %v", subID, err)
-		} else {
-			if err := xuiClientAPI.DeleteClient(sub.XUIClientID); err != nil {
-				// Log error but continue with expiration
-				log.Printf("Failed to delete VPN client %s: %v", sub.XUIClientID, err)
+	for _, c := range clients {
+		xuiClientAPI, _, err := s.serverSvc.GetXUIClient(ctx, c.ServerID)
+		if err == nil {
+			if err := xuiClientAPI.DeleteClient(c.XUIClientID); err != nil {
+				log.Printf("ExpireSubscription: DeleteClient %s on server %s: %v",
+					c.XUIClientID, c.ServerID, err)
 			}
 		}
+		_ = s.serverSvc.DecrementLoad(ctx, c.ServerID)
+		_ = s.repo.DeleteSubscriptionClient(ctx, c.ID)
 	}
-
-	// Decrement server load
-	if sub.ServerID != nil && s.serverSvc != nil {
-		if err := s.serverSvc.DecrementLoad(ctx, *sub.ServerID); err != nil {
-			log.Printf("WARNING: Failed to decrement server load: %v", err)
-		}
-	}
-
 	return s.repo.UpdateSubscriptionStatus(ctx, subID, model.SubscriptionStatusExpired)
 }
 
+// SyncTraffic — устаревший fast-path (по-клиентный pull). Сохранён для
+// бот-флоу и handler /api/subscription, чтобы юзер не ждал тика HealthWorker'а.
+// Под капотом ходит по всем клиентам подписки и суммирует.
 func (s *SubscriptionService) SyncTraffic(ctx context.Context, subID uuid.UUID) error {
+	clients, err := s.repo.GetSubscriptionClients(ctx, subID)
+	if err != nil {
+		return err
+	}
+	var total int64
+	for _, c := range clients {
+		xuiClientAPI, _, err := s.serverSvc.GetXUIClient(ctx, c.ServerID)
+		if err != nil {
+			log.Printf("SyncTraffic: get xui for server %s failed: %v", c.ServerID, err)
+			continue
+		}
+		t, err := xuiClientAPI.GetClientTraffic(c.XUIEmail)
+		if err != nil || t == nil {
+			continue
+		}
+		used := t.Up + t.Down
+		_ = s.repo.UpdateSubscriptionClientTraffic(ctx, c.ID, used)
+		total += used
+	}
+	if err := s.repo.UpdateSubscriptionTraffic(ctx, subID, total); err != nil {
+		return err
+	}
+	return s.EnforceTrafficLimit(ctx, subID)
+}
+
+// EnforceTrafficLimit — если суммарный traffic_used ≥ traffic_limit (и лимит
+// не безлимит), отключаем всех xui-клиентов этой подписки. Идемпотентно:
+// если уже disabled — не дёргаем xui повторно.
+func (s *SubscriptionService) EnforceTrafficLimit(ctx context.Context, subID uuid.UUID) error {
 	sub, err := s.repo.GetSubscription(ctx, subID)
 	if err != nil {
 		return err
 	}
-
-	xuiClientAPI, _, err := s.getXUIClientForSubscription(ctx, sub)
-	if err != nil {
-		return fmt.Errorf("failed to get XUI client: %w", err)
+	if sub.TrafficLimit <= 0 {
+		return nil // unlimited
 	}
-
-	traffic, err := xuiClientAPI.GetClientTraffic(sub.XUIEmail)
-	if err != nil {
-		return fmt.Errorf("failed to get traffic: %w", err)
-	}
-
-	if traffic == nil {
-		// Client doesn't exist on XUI panel anymore — keep DB value, don't crash.
-		log.Printf("SyncTraffic: client %s not found on panel for subscription %s", sub.XUIEmail, subID)
+	if sub.TrafficUsed < sub.TrafficLimit {
 		return nil
 	}
-
-	totalUsed := traffic.Up + traffic.Down
-	return s.repo.UpdateSubscriptionTraffic(ctx, subID, totalUsed)
-}
-
-func (s *SubscriptionService) GetConnectionKey(ctx context.Context, userID int64) (string, error) {
-	sub, err := s.repo.GetActiveSubscription(ctx, userID)
+	clients, err := s.repo.GetSubscriptionClients(ctx, subID)
 	if err != nil {
-		return "", err
+		return err
 	}
-
-	if !sub.IsActive() {
-		return "", ErrSubscriptionNotActive
+	var expiryMs int64
+	if sub.ExpiresAt != nil {
+		expiryMs = sub.ExpiresAt.UnixMilli()
 	}
-
-	return sub.ConnectionKey, nil
+	maxDevices := sub.MaxDevices
+	if maxDevices <= 0 {
+		maxDevices = 3
+	}
+	for _, c := range clients {
+		if !c.Enabled {
+			continue
+		}
+		xuiClientAPI, _, err := s.serverSvc.GetXUIClient(ctx, c.ServerID)
+		if err != nil {
+			log.Printf("EnforceTrafficLimit: get xui for server %s failed: %v", c.ServerID, err)
+			continue
+		}
+		if err := xuiClientAPI.SetClientEnabled(c.XUIClientID, c.XUIEmail, false, 0 /*unlimited на стороне xui*/, expiryMs, maxDevices); err != nil {
+			log.Printf("EnforceTrafficLimit: disable xui client %s failed: %v", c.XUIClientID, err)
+			continue
+		}
+		_ = s.repo.SetSubscriptionClientEnabled(ctx, c.ID, false)
+	}
+	return nil
 }
 
 func (s *SubscriptionService) ProcessExpiredSubscriptions(ctx context.Context) error {
@@ -317,13 +364,11 @@ func (s *SubscriptionService) ProcessExpiredSubscriptions(ctx context.Context) e
 	if err != nil {
 		return err
 	}
-
 	for _, sub := range expired {
 		if err := s.ExpireSubscription(ctx, sub.ID); err != nil {
-			fmt.Printf("Failed to expire subscription %s: %v\n", sub.ID, err)
+			log.Printf("Failed to expire subscription %s: %v", sub.ID, err)
 		}
 	}
-
 	return nil
 }
 
@@ -332,127 +377,16 @@ func (s *SubscriptionService) GetExpiringSubscriptions(ctx context.Context, with
 	return s.repo.GetExpiringSubscriptions(ctx, before)
 }
 
-// SwitchServer switches an active subscription to a different server
-func (s *SubscriptionService) SwitchServer(ctx context.Context, userID int64, newServerID uuid.UUID) (*model.Subscription, error) {
-	// Get current active subscription
-	sub, err := s.repo.GetActiveSubscription(ctx, userID)
-	if err != nil {
-		return nil, fmt.Errorf("no active subscription found")
-	}
-
-	if !sub.IsActive() {
-		return nil, ErrSubscriptionNotActive
-	}
-
-	// Check if already on this server
-	if sub.ServerID != nil && *sub.ServerID == newServerID {
-		return sub, nil // Already on this server
-	}
-
-	// Get the new server
-	newXUIClient, newServer, err := s.serverSvc.GetXUIClient(ctx, newServerID)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get new server: %w", err)
-	}
-
-	if !newServer.IsOnline() {
-		return nil, fmt.Errorf("selected server is not available")
-	}
-
-	// Delete client from old server
-	if sub.XUIClientID != "" {
-		oldXUIClient, _, err := s.getXUIClientForSubscription(ctx, sub)
-		if err != nil {
-			log.Printf("WARNING: Failed to get old XUI client: %v", err)
-		} else {
-			if err := oldXUIClient.DeleteClient(sub.XUIClientID); err != nil {
-				log.Printf("WARNING: Failed to delete client from old server: %v", err)
-			}
-		}
-	}
-
-	// Decrement old server load
-	if sub.ServerID != nil {
-		if err := s.serverSvc.DecrementLoad(ctx, *sub.ServerID); err != nil {
-			log.Printf("WARNING: Failed to decrement old server load: %v", err)
-		}
-	}
-
-	// Calculate remaining time and traffic, rounding up so the user doesn't
-	// lose a partial day or partial gigabyte during the switch.
-	remainingDays := int(math.Ceil(time.Until(*sub.ExpiresAt).Hours() / 24))
-	if remainingDays < 1 {
-		remainingDays = 1
-	}
-	remainingBytes := sub.TrafficLimit - sub.TrafficUsed
-	if remainingBytes < 0 {
-		remainingBytes = 0
-	}
-	remainingTrafficGB := int(math.Ceil(float64(remainingBytes) / float64(1024*1024*1024)))
-	if remainingTrafficGB < 1 {
-		remainingTrafficGB = 1
-	}
-
-	// Generate new email for XUI client
-	email := fmt.Sprintf("user_%d_%d", userID, time.Now().Unix())
-
-	maxDevices := sub.MaxDevices
-	if maxDevices <= 0 {
-		maxDevices = 3
-	}
-
-	log.Printf("Switching user %d to server %s, email: %s, traffic: %d GB, days: %d", userID, newServer.Name, email, remainingTrafficGB, remainingDays)
-
-	// Create client on new server
-	newClient, err := newXUIClient.AddClient(email, int64(remainingTrafficGB), remainingDays, maxDevices)
-	if err != nil {
-		log.Printf("ERROR: Failed to create VPN client on new server: %v", err)
-		return nil, fmt.Errorf("failed to create VPN client on new server: %w", err)
-	}
-
-	log.Printf("VPN client created on new server: ID=%s, Email=%s", newClient.ID, newClient.Email)
-
-	// Generate new connection key
-	connectionKey := s.serverSvc.GenerateConnectionKey(newServer, newClient.ID, email)
-
-	// Update subscription in database. New XUI client was created with
-	// `remainingTrafficGB` GB quota and zero used; mirror that in our row
-	// so the miniapp shows the correct limit/used pair after a switch.
-	newLimitBytes := int64(remainingTrafficGB) * 1024 * 1024 * 1024
-	sub.ServerID = &newServer.ID
-	sub.XUIClientID = newClient.ID
-	sub.XUIEmail = email
-	sub.ConnectionKey = connectionKey
-	sub.TrafficLimit = newLimitBytes
-	sub.TrafficUsed = 0
-
-	if err := s.repo.UpdateSubscriptionServer(ctx, sub.ID, newServer.ID, newClient.ID, email, connectionKey, newLimitBytes); err != nil {
-		// Try to cleanup new client
-		_ = newXUIClient.DeleteClient(newClient.ID)
-		return nil, fmt.Errorf("failed to update subscription: %w", err)
-	}
-
-	// Increment new server load
-	if err := s.serverSvc.IncrementLoad(ctx, newServer.ID); err != nil {
-		log.Printf("WARNING: Failed to increment new server load: %v", err)
-	}
-
-	return sub, nil
-}
-
 // HasUsedTrial checks if user has already used trial
 func (s *SubscriptionService) HasUsedTrial(ctx context.Context, userID int64) (bool, error) {
 	return s.repo.HasUsedTrial(ctx, userID)
 }
 
 func (s *SubscriptionService) ActivateTrial(ctx context.Context, userID int64) (*model.Subscription, error) {
-	// Check if user already has active subscription
 	existing, err := s.repo.GetActiveSubscription(ctx, userID)
 	if err == nil && existing.IsActive() {
 		return nil, ErrSubscriptionActive
 	}
-
-	// Check if user already used trial
 	hasUsedTrial, err := s.repo.HasUsedTrial(ctx, userID)
 	if err != nil {
 		return nil, err
@@ -460,35 +394,134 @@ func (s *SubscriptionService) ActivateTrial(ctx context.Context, userID int64) (
 	if hasUsedTrial {
 		return nil, ErrTrialAlreadyUsed
 	}
-
-	// Get trial plan
 	plan, err := s.repo.GetTrialPlan(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("trial plan not found: %w", err)
 	}
-
-	// Create subscription
+	if err := s.repo.HydratePlanWithServers(ctx, plan); err != nil {
+		return nil, err
+	}
 	return s.CreateSubscription(ctx, userID, plan)
 }
 
 // ActivateTrialWithDays creates a subscription with custom days (for promo codes)
 func (s *SubscriptionService) ActivateTrialWithDays(ctx context.Context, userID int64, days int) (*model.Subscription, error) {
-	// Check if user already has active subscription
 	existing, err := s.repo.GetActiveSubscription(ctx, userID)
 	if err == nil && existing.IsActive() {
 		return nil, ErrSubscriptionActive
 	}
-
-	// Get trial plan as base
 	plan, err := s.repo.GetTrialPlan(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("trial plan not found: %w", err)
 	}
-
-	// Override duration with custom days
+	if err := s.repo.HydratePlanWithServers(ctx, plan); err != nil {
+		return nil, err
+	}
 	customPlan := *plan
 	customPlan.DurationDays = days
-
-	// Create subscription
 	return s.CreateSubscription(ctx, userID, &customPlan)
+}
+
+// BuildSubscriptionContent рендерит ответ для /sub/<token>: base64(joined \n
+// share-links) + Subscription-Userinfo заголовок. Если подписка не активна
+// или не найдена — возвращает ErrSubscriptionNotActive.
+type SubscriptionContent struct {
+	Body            []byte
+	UserInfoHeader  string // Subscription-Userinfo
+	ProfileTitle    string
+	UpdateInterval  int // часы для Profile-Update-Interval
+	ContentTypeHint string
+}
+
+func (s *SubscriptionService) BuildSubscriptionContent(ctx context.Context, token string) (*SubscriptionContent, error) {
+	sub, err := s.repo.GetSubscriptionByToken(ctx, token)
+	if err != nil {
+		return nil, err
+	}
+	if !sub.IsActive() {
+		return nil, ErrSubscriptionNotActive
+	}
+	clients, err := s.repo.GetSubscriptionClients(ctx, sub.ID)
+	if err != nil {
+		return nil, err
+	}
+	plan, err := s.repo.GetPlan(ctx, sub.PlanID)
+	if err != nil {
+		return nil, err
+	}
+
+	links := make([]string, 0, len(clients))
+	for _, c := range clients {
+		if !c.Enabled {
+			continue
+		}
+		links = append(links, c.ConnectionKey)
+	}
+	plaintext := strings.Join(links, "\n")
+	body := []byte(base64.StdEncoding.EncodeToString([]byte(plaintext)))
+
+	// Subscription-Userinfo header. expire — UNIX-секунды, 0 если бессрочно.
+	var expire int64
+	if sub.ExpiresAt != nil {
+		expire = sub.ExpiresAt.Unix()
+	}
+	header := fmt.Sprintf("upload=0; download=%d; total=%d; expire=%d",
+		sub.TrafficUsed, sub.TrafficLimit, expire)
+
+	return &SubscriptionContent{
+		Body:            body,
+		UserInfoHeader:  header,
+		ProfileTitle:    "ZyVPN — " + plan.Name,
+		UpdateInterval:  24,
+		ContentTypeHint: "text/plain; charset=utf-8",
+	}, nil
+}
+
+// GetSubscriptionURLForUser возвращает subscription URL активной подписки
+// юзера. Используется для нотификаций (бот, payment success) — теперь вместо
+// одного connection_key даём ссылку, которую юзер вставляет в VPN-клиент.
+func (s *SubscriptionService) GetSubscriptionURLForUser(ctx context.Context, userID int64) (string, error) {
+	sub, err := s.repo.GetActiveSubscription(ctx, userID)
+	if err != nil {
+		return "", err
+	}
+	if !sub.IsActive() {
+		return "", ErrSubscriptionNotActive
+	}
+	return s.BuildSubscriptionURL(sub), nil
+}
+
+// BuildSubscriptionURL — публичная ссылка которую отдаём фронту в /api/subscription.
+func (s *SubscriptionService) BuildSubscriptionURL(sub *model.Subscription) string {
+	base := strings.TrimRight(s.cfg.Server.PublicAPIBaseURL, "/")
+	if base == "" {
+		return "/sub/" + url.PathEscape(sub.SubToken)
+	}
+	return base + "/sub/" + url.PathEscape(sub.SubToken)
+}
+
+// RotateSubToken — администратор/юзер просит выпустить новый токен (если
+// старый утёк). Старый перестаёт работать сразу.
+func (s *SubscriptionService) RotateSubToken(ctx context.Context, subID uuid.UUID) (string, error) {
+	tok, err := generateSubToken()
+	if err != nil {
+		return "", err
+	}
+	if err := s.repo.RotateSubscriptionToken(ctx, subID, tok); err != nil {
+		return "", err
+	}
+	return tok, nil
+}
+
+func generateSubToken() (string, error) {
+	b := make([]byte, 24) // 24 bytes → 48 hex chars
+	if _, err := rand.Read(b); err != nil {
+		return "", err
+	}
+	return hex.EncodeToString(b), nil
+}
+
+func shortID(id uuid.UUID) string {
+	s := id.String()
+	return strings.ReplaceAll(s[:8], "-", "")
 }

@@ -9,9 +9,8 @@ import (
 type PromoCodeType string
 
 const (
-	PromoCodeTypeBalance      PromoCodeType = "balance"       // Credits TON to balance
-	PromoCodeTypeDays         PromoCodeType = "days"          // Adds days to subscription
-	PromoCodeTypeRegionSwitch PromoCodeType = "region_switch" // Adds free region switches
+	PromoCodeTypeBalance PromoCodeType = "balance" // Credits TON to balance
+	PromoCodeTypeDays    PromoCodeType = "days"    // Adds days to subscription
 	// PromoCodeTypeCashPlan unlocks a specific plan at a discounted cash
 	// price. Redeeming the code creates a pending cash payment for the
 	// bound plan and amount; admin approval delivers the subscription.

@@ -232,8 +232,9 @@ func (s *PaymentService) CompletePayment(ctx context.Context, paymentID uuid.UUI
 		return err
 	}
 
-	// Create subscription with selected server (or auto-select if not specified)
-	sub, err := s.subscriptionSvc.CreateSubscriptionWithServer(ctx, payment.UserID, plan, payment.ServerID)
+	// Создаём подписку — серверы определяются тарифом (plan_servers),
+	// payment.server_id больше не учитывается.
+	sub, err := s.subscriptionSvc.CreateSubscription(ctx, payment.UserID, plan)
 	if err != nil {
 		return fmt.Errorf("failed to create subscription: %w", err)
 	}

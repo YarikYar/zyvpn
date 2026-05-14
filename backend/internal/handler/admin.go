@@ -13,13 +13,18 @@ import (
 
 // AdminHandler handles admin panel requests
 type AdminHandler struct {
-	adminSvc   *service.AdminService
-	paymentSvc *service.PaymentService
+	adminSvc        *service.AdminService
+	paymentSvc      *service.PaymentService
+	subscriptionSvc *service.SubscriptionService
 }
 
 // NewAdminHandler creates a new admin handler
-func NewAdminHandler(adminSvc *service.AdminService, paymentSvc *service.PaymentService) *AdminHandler {
-	return &AdminHandler{adminSvc: adminSvc, paymentSvc: paymentSvc}
+func NewAdminHandler(adminSvc *service.AdminService, paymentSvc *service.PaymentService, subscriptionSvc *service.SubscriptionService) *AdminHandler {
+	return &AdminHandler{
+		adminSvc:        adminSvc,
+		paymentSvc:      paymentSvc,
+		subscriptionSvc: subscriptionSvc,
+	}
 }
 
 // --- Stats ---
@@ -470,11 +475,11 @@ func (h *AdminHandler) CreatePromoCode(c *fiber.Ctx) error {
 	}
 
 	switch req.Type {
-	case model.PromoCodeTypeBalance, model.PromoCodeTypeDays, model.PromoCodeTypeRegionSwitch, model.PromoCodeTypeCashPlan:
+	case model.PromoCodeTypeBalance, model.PromoCodeTypeDays, model.PromoCodeTypeCashPlan:
 		// ok
 	default:
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-			"error": "invalid promo code type, must be 'balance', 'days', 'region_switch' or 'cash_plan'",
+			"error": "invalid promo code type, must be 'balance', 'days' or 'cash_plan'",
 		})
 	}
 
@@ -545,7 +550,7 @@ func (h *AdminHandler) CreateBulkPromoCodes(c *fiber.Ctx) error {
 	}
 
 	switch req.Type {
-	case model.PromoCodeTypeBalance, model.PromoCodeTypeDays, model.PromoCodeTypeRegionSwitch, model.PromoCodeTypeCashPlan:
+	case model.PromoCodeTypeBalance, model.PromoCodeTypeDays, model.PromoCodeTypeCashPlan:
 		// ok
 	default:
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
@@ -698,6 +703,9 @@ type UpdatePlanRequest struct {
 	// ClearVisibility=true forces plan back to public regardless of
 	// VisibleToReferrerID (which would otherwise mean "leave as-is").
 	ClearVisibility bool `json:"clear_visibility,omitempty"`
+	// ServerIDs — UUID серверов, входящих в тариф. nil = не трогаем,
+	// [] = очистить (тариф станет неактивируемым).
+	ServerIDs *[]string `json:"server_ids,omitempty"`
 }
 
 // UpdatePlan updates a plan; nil-fields are unchanged.
@@ -722,6 +730,21 @@ func (h *AdminHandler) UpdatePlan(c *fiber.Ctx) error {
 		})
 	}
 
+	var serverIDsParsed *[]uuid.UUID
+	if req.ServerIDs != nil {
+		parsed := make([]uuid.UUID, 0, len(*req.ServerIDs))
+		for _, sid := range *req.ServerIDs {
+			id, err := uuid.Parse(sid)
+			if err != nil {
+				return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+					"error": "Невалидный server_id: " + sid,
+				})
+			}
+			parsed = append(parsed, id)
+		}
+		serverIDsParsed = &parsed
+	}
+
 	plan, err := h.adminSvc.UpdatePlan(c.Context(), adminID, planID, service.UpdatePlanParams{
 		Name:                req.Name,
 		Description:         req.Description,
@@ -735,6 +758,7 @@ func (h *AdminHandler) UpdatePlan(c *fiber.Ctx) error {
 		SortOrder:           req.SortOrder,
 		VisibleToReferrerID: req.VisibleToReferrerID,
 		ClearVisibility:     req.ClearVisibility,
+		ServerIDs:           serverIDsParsed,
 	})
 	if err != nil {
 		return respondInternalError(c, err)
@@ -744,16 +768,17 @@ func (h *AdminHandler) UpdatePlan(c *fiber.Ctx) error {
 }
 
 type CreatePlanRequest struct {
-	Name                string  `json:"name"`
-	Description         string  `json:"description"`
-	DurationDays        int     `json:"duration_days"`
-	TrafficGB           int     `json:"traffic_gb"`
-	MaxDevices          int     `json:"max_devices"`
-	PriceTON            float64 `json:"price_ton"`
-	PriceStars          int     `json:"price_stars"`
-	PriceUSD            float64 `json:"price_usd"`
-	SortOrder           int     `json:"sort_order"`
-	VisibleToReferrerID *int64  `json:"visible_to_referrer_id,omitempty"`
+	Name                string   `json:"name"`
+	Description         string   `json:"description"`
+	DurationDays        int      `json:"duration_days"`
+	TrafficGB           int      `json:"traffic_gb"`
+	MaxDevices          int      `json:"max_devices"`
+	PriceTON            float64  `json:"price_ton"`
+	PriceStars          int      `json:"price_stars"`
+	PriceUSD            float64  `json:"price_usd"`
+	SortOrder           int      `json:"sort_order"`
+	VisibleToReferrerID *int64   `json:"visible_to_referrer_id,omitempty"`
+	ServerIDs           []string `json:"server_ids"`
 }
 
 // CreatePlan creates a new plan.
@@ -785,6 +810,21 @@ func (h *AdminHandler) CreatePlan(c *fiber.Ctx) error {
 	if req.MaxDevices <= 0 {
 		req.MaxDevices = 3
 	}
+	if len(req.ServerIDs) == 0 {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "Нужно выбрать хотя бы один сервер",
+		})
+	}
+	serverIDs := make([]uuid.UUID, 0, len(req.ServerIDs))
+	for _, sid := range req.ServerIDs {
+		id, err := uuid.Parse(sid)
+		if err != nil {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+				"error": "Невалидный server_id: " + sid,
+			})
+		}
+		serverIDs = append(serverIDs, id)
+	}
 
 	plan, err := h.adminSvc.CreatePlan(c.Context(), adminID, service.CreatePlanParams{
 		Name:                req.Name,
@@ -797,6 +837,7 @@ func (h *AdminHandler) CreatePlan(c *fiber.Ctx) error {
 		PriceUSD:            req.PriceUSD,
 		SortOrder:           req.SortOrder,
 		VisibleToReferrerID: req.VisibleToReferrerID,
+		ServerIDs:           serverIDs,
 	})
 	if err != nil {
 		return respondInternalError(c, err)
@@ -996,56 +1037,6 @@ func (h *AdminHandler) SetReferralBonusDays(c *fiber.Ctx) error {
 	return c.JSON(fiber.Map{"success": true, "referral_bonus_days": req.Days})
 }
 
-// GetRegionSwitchPrice returns region switch price (TON).
-//
-//	@Summary	Get region switch price
-//	@Tags		admin
-//	@Produce	json
-//	@Success	200	{object}	map[string]interface{}
-//	@Router		/api/admin/settings/region-switch-price [get]
-//	@Security	TelegramInitData
-func (h *AdminHandler) GetRegionSwitchPrice(c *fiber.Ctx) error {
-	price, err := h.adminSvc.GetRegionSwitchPrice(c.Context())
-	if err != nil {
-		return respondInternalError(c, err)
-	}
-
-	return c.JSON(fiber.Map{"region_switch_price": price})
-}
-
-type SetRegionSwitchPriceRequest struct {
-	Price float64 `json:"price"`
-}
-
-// SetRegionSwitchPrice sets region switch price.
-//
-//	@Summary	Set region switch price
-//	@Tags		admin
-//	@Accept		json
-//	@Produce	json
-//	@Param		body	body		SetRegionSwitchPriceRequest	true	"{price}"
-//	@Success	200		{object}	map[string]interface{}
-//	@Router		/api/admin/settings/region-switch-price [post]
-//	@Security	TelegramInitData
-func (h *AdminHandler) SetRegionSwitchPrice(c *fiber.Ctx) error {
-	adminID := middleware.GetAdminID(c)
-
-	var req SetRegionSwitchPriceRequest
-	if err := c.BodyParser(&req); err != nil {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-			"error": "Неверный формат запроса",
-		})
-	}
-
-	if err := h.adminSvc.SetRegionSwitchPrice(c.Context(), adminID, req.Price); err != nil {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-			"error": err.Error(),
-		})
-	}
-
-	return c.JSON(fiber.Map{"success": true, "region_switch_price": req.Price})
-}
-
 // --- Cash payments admin actions ---
 
 type CreateCashPaymentRequest struct {
@@ -1176,3 +1167,39 @@ func (h *AdminHandler) RejectCashPayment(c *fiber.Ctx) error {
 	}
 	return c.JSON(fiber.Map{"success": true})
 }
+
+// --- Subscription admin actions ---
+
+// RotateUserSubToken — выпустить новый sub_token для активной подписки юзера.
+// Старый URL сразу перестаёт работать. Используется при компрометации
+// ссылки или жалобе юзера на «слил кому-то».
+//
+//	@Summary	Rotate subscription token
+//	@Tags		admin
+//	@Produce	json
+//	@Param		user_id	path	int	true	"telegram user id"
+//	@Success	200	{object}	map[string]interface{}
+//	@Failure	404	{object}	map[string]string
+//	@Router		/api/admin/users/{user_id}/subscription/rotate-token [post]
+//	@Security	TelegramInitData
+func (h *AdminHandler) RotateUserSubToken(c *fiber.Ctx) error {
+	userIDStr := c.Params("user_id")
+	userID, err := strconv.ParseInt(userIDStr, 10, 64)
+	if err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "invalid user_id"})
+	}
+	sub, err := h.subscriptionSvc.GetActiveSubscription(c.Context(), userID)
+	if err != nil {
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "no active subscription"})
+	}
+	newToken, err := h.subscriptionSvc.RotateSubToken(c.Context(), sub.ID)
+	if err != nil {
+		return respondInternalError(c, err)
+	}
+	sub.SubToken = newToken
+	return c.JSON(fiber.Map{
+		"success":          true,
+		"subscription_url": h.subscriptionSvc.BuildSubscriptionURL(sub),
+	})
+}
+

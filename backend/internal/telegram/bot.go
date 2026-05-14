@@ -271,11 +271,11 @@ func (b *Bot) handleStatus(c tele.Context) error {
 
 func (b *Bot) handleKey(c tele.Context) error {
 	user := c.Sender()
-	key, err := b.subscriptionSvc.GetConnectionKey(context.Background(), user.ID)
+	subURL, err := b.subscriptionSvc.GetSubscriptionURLForUser(context.Background(), user.ID)
 	if err != nil {
-		text := `❌ <b>Ключ недоступен</b>
+		text := `❌ <b>Подписка не активна</b>
 
-У вас нет активной подписки. Оформите подписку, чтобы получить ключ подключения.`
+У вас нет активной подписки. Оформите подписку, чтобы получить ссылку подключения.`
 
 		keyboard := &tele.ReplyMarkup{}
 		keyboard.Inline(
@@ -287,14 +287,14 @@ func (b *Bot) handleKey(c tele.Context) error {
 		return c.Send(text, keyboard, tele.ModeHTML)
 	}
 
-	text := fmt.Sprintf(`🔑 <b>Ваш ключ подключения:</b>
+	text := fmt.Sprintf(`🔑 <b>Ваша ссылка подписки:</b>
 
 <code>%s</code>
 
-📱 Скопируйте ключ и вставьте в приложение:
-• iOS: Streisand, V2Box
-• Android: V2rayNG, NekoBox
-• Windows/Mac: Nekoray, V2rayN`, key)
+📱 Вставьте её в VPN-клиент — он сам подтянет все серверы:
+• iOS: Streisand, V2Box, Shadowrocket
+• Android: v2rayNG, Hiddify, NekoBox
+• Windows/Mac: Nekoray, v2rayN, Hiddify`, subURL)
 
 	keyboard := &tele.ReplyMarkup{}
 	keyboard.Inline(

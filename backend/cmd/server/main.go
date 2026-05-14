@@ -100,7 +100,7 @@ func main() {
 
 	// Create handlers
 	h := handler.New(cfg, userService, planService, subscriptionSvc, paymentSvc, referralSvc, ratesSvc, balanceSvc, promoCodeSvc, adminSvc, bot)
-	adminHandler := handler.NewAdminHandler(adminSvc, paymentSvc)
+	adminHandler := handler.NewAdminHandler(adminSvc, paymentSvc, subscriptionSvc)
 	serverHandler := handler.NewServerHandler(serverSvc)
 
 	// Create Fiber app
@@ -137,6 +137,10 @@ func main() {
 	// Public API (no auth required)
 	app.Get("/api/rates", h.GetRates)
 
+	// Subscription URL для VPN-клиентов (v2rayNG/Hiddify/...). Без auth —
+	// токен в пути сам по себе авторизация.
+	app.Get("/sub/:token", h.GetSubscriptionPublic)
+
 	// 60 requests / minute / IP for the user-facing API. Trial-spam,
 	// promo-code brute force и тому подобное.
 	apiLimiter := limiter.New(limiter.Config{
@@ -164,11 +168,9 @@ func main() {
 
 	// Subscription
 	api.Post("/subscription/buy", h.BuySubscription)
-	api.Get("/subscription/key", h.GetSubscriptionKey)
+	api.Get("/subscription/url", h.GetSubscriptionURL)
 	api.Get("/subscription/status", h.GetSubscriptionStatus)
 	api.Post("/subscription/trial", h.ActivateTrial)
-	api.Get("/subscription/switch-server/info", h.GetSwitchServerInfo)
-	api.Post("/subscription/switch-server", h.SwitchServer)
 
 	// Payments
 	api.Get("/payment/ton/init", h.InitTONPayment)
@@ -216,6 +218,7 @@ func main() {
 	admin.Post("/users/:user_id/balance/add", adminHandler.AddBalance)
 	admin.Post("/users/:user_id/subscription/extend", adminHandler.ExtendSubscription)
 	admin.Post("/users/:user_id/subscription/cancel", adminHandler.CancelSubscription)
+	admin.Post("/users/:user_id/subscription/rotate-token", adminHandler.RotateUserSubToken)
 	admin.Post("/users/:user_id/cash-payment", adminHandler.CreateCashPayment)
 
 	// Admin - Ban management
@@ -253,8 +256,6 @@ func main() {
 	admin.Post("/settings/referral-bonus", adminHandler.SetReferralBonus)
 	admin.Get("/settings/referral-bonus-days", adminHandler.GetReferralBonusDays)
 	admin.Post("/settings/referral-bonus-days", adminHandler.SetReferralBonusDays)
-	admin.Get("/settings/region-switch-price", adminHandler.GetRegionSwitchPrice)
-	admin.Post("/settings/region-switch-price", adminHandler.SetRegionSwitchPrice)
 
 	// Admin - Servers
 	admin.Get("/servers", serverHandler.GetAllServers)
@@ -312,8 +313,9 @@ func main() {
 	// Start TON transaction verification worker
 	go tonWorker.Start(ctx)
 
-	// Start server health checker
-	healthWorker := service.NewHealthWorker(repo, serverSvc)
+	// Start server health checker (бэк-tик 30s: ping + traffic bulk-sync +
+	// enforce subscription traffic limit).
+	healthWorker := service.NewHealthWorker(repo, serverSvc, subscriptionSvc)
 	go healthWorker.Start(ctx)
 
 	go runSubscriptionChecker(ctx, subscriptionSvc, bot)
