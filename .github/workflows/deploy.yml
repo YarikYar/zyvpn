@@ -2,11 +2,11 @@ name: Deploy
 
 on:
   push:
-    branches: [main]
+    branches: [corevpn-dev]
   workflow_dispatch: {}
 
 concurrency:
-  group: deploy-main
+  group: deploy-prod
   cancel-in-progress: false
 
 jobs:
