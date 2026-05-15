@@ -44,9 +44,19 @@ jobs:
           git fetch origin
           git checkout corevpn-dev
           git reset --hard origin/corevpn-dev
+          echo "--- HEAD ---"
+          git log --oneline -1
+          echo "--- deploy.sh ---"
+          cat scripts/deploy.sh
 
       - name: Run deploy script
         run: bash /opt/compose/zyvpn/scripts/deploy.sh
+
+      - name: Inspect containers post-deploy
+        run: |
+          docker ps --format '{{.Names}}\t{{.Image}}\t{{.Status}}' | grep -E "zyvpn|corevpn" || true
+          echo "--- backend image label ---"
+          docker inspect zyvpn-backend --format '{{.Created}} {{.Image}}' 2>/dev/null || true
 
       - name: Smoke test
         run: |
