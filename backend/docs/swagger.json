@@ -1273,6 +1273,49 @@
                 }
             }
         },
+        "/api/admin/users/{user_id}/subscription/reconcile": {
+            "post": {
+                "security": [
+                    {
+                        "TelegramInitData": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "admin"
+                ],
+                "summary": "Reconcile subscription with plan servers",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "telegram user id",
+                        "name": "user_id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            }
+        },
         "/api/admin/users/{user_id}/subscription/rotate-token": {
             "post": {
                 "security": [

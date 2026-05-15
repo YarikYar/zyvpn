@@ -1454,6 +1454,33 @@ paths:
       summary: Extend subscription
       tags:
       - admin
+  /api/admin/users/{user_id}/subscription/reconcile:
+    post:
+      parameters:
+      - description: telegram user id
+        in: path
+        name: user_id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - TelegramInitData: []
+      summary: Reconcile subscription with plan servers
+      tags:
+      - admin
   /api/admin/users/{user_id}/subscription/rotate-token:
     post:
       parameters:

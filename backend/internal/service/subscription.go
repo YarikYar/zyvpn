@@ -549,6 +549,89 @@ func (s *SubscriptionService) BuildSubscriptionURL(sub *model.Subscription) stri
 	return base + "/sub/" + url.PathEscape(sub.SubToken)
 }
 
+// ReconcileSubscriptionClients добивает subscription_clients подписки до
+// набора серверов из её плана. Идемпотентно — для серверов где клиент уже
+// есть ничего не делает. Для отсутствующих — создаёт xui-клиента и пишет
+// строку в subscription_clients. Серверы которых больше нет в plan_servers
+// сейчас не трогает (пусть юзер ими пока пользуется — decommission отдельно).
+func (s *SubscriptionService) ReconcileSubscriptionClients(ctx context.Context, subID uuid.UUID) (int, error) {
+	if s.serverSvc == nil {
+		return 0, ErrNoServersAvailable
+	}
+	sub, err := s.repo.GetSubscription(ctx, subID)
+	if err != nil {
+		return 0, err
+	}
+	plan, err := s.repo.GetPlan(ctx, sub.PlanID)
+	if err != nil {
+		return 0, err
+	}
+	if err := s.repo.HydratePlanWithServers(ctx, plan); err != nil {
+		return 0, err
+	}
+	if len(plan.Servers) == 0 {
+		return 0, ErrPlanHasNoServers
+	}
+	existing, err := s.repo.GetSubscriptionClients(ctx, subID)
+	if err != nil {
+		return 0, err
+	}
+	have := make(map[uuid.UUID]struct{}, len(existing))
+	for _, c := range existing {
+		have[c.ServerID] = struct{}{}
+	}
+
+	maxDevices := sub.MaxDevices
+	if maxDevices <= 0 {
+		maxDevices = 3
+	}
+	expiryDays := 0
+	if sub.ExpiresAt != nil {
+		expiryDays = int(time.Until(*sub.ExpiresAt).Hours()/24) + 1
+		if expiryDays < 1 {
+			expiryDays = 1
+		}
+	}
+
+	added := 0
+	for _, srv := range plan.Servers {
+		if !srv.IsActive {
+			continue
+		}
+		if _, ok := have[srv.ID]; ok {
+			continue
+		}
+		xuiClientAPI, server, err := s.serverSvc.GetXUIClient(ctx, srv.ID)
+		if err != nil {
+			log.Printf("Reconcile sub=%s: get xui for %s failed: %v", subID, srv.ID, err)
+			continue
+		}
+		email := fmt.Sprintf("u%d_s%s_%d", sub.UserID, shortID(srv.ID), time.Now().Unix())
+		xuiClient, err := xuiClientAPI.AddClient(email, 0, expiryDays, maxDevices)
+		if err != nil {
+			log.Printf("Reconcile sub=%s server=%s: AddClient failed: %v", subID, srv.Name, err)
+			continue
+		}
+		connectionKey := s.serverSvc.GenerateConnectionKey(server, xuiClient.ID, email)
+		c := &model.SubscriptionClient{
+			SubscriptionID: subID,
+			ServerID:       server.ID,
+			XUIClientID:    xuiClient.ID,
+			XUIEmail:       email,
+			ConnectionKey:  connectionKey,
+			Enabled:        true,
+		}
+		if err := s.repo.CreateSubscriptionClient(ctx, c); err != nil {
+			_ = xuiClientAPI.DeleteClient(xuiClient.ID)
+			log.Printf("Reconcile sub=%s server=%s: insert failed: %v", subID, srv.Name, err)
+			continue
+		}
+		_ = s.serverSvc.IncrementLoad(ctx, server.ID)
+		added++
+	}
+	return added, nil
+}
+
 // RotateSubToken — администратор/юзер просит выпустить новый токен (если
 // старый утёк). Старый перестаёт работать сразу.
 func (s *SubscriptionService) RotateSubToken(ctx context.Context, subID uuid.UUID) (string, error) {

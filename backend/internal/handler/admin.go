@@ -1040,3 +1040,35 @@ func (h *AdminHandler) RotateUserSubToken(c *fiber.Ctx) error {
 	})
 }
 
+// ReconcileUserSubscription добивает subscription_clients подписки до набора
+// серверов из её плана. Идемпотентно. Нужно для существующих юзеров после
+// миграции 000016 (у них пустой набор клиентов).
+//
+//	@Summary	Reconcile subscription with plan servers
+//	@Tags		admin
+//	@Produce	json
+//	@Param		user_id	path	int	true	"telegram user id"
+//	@Success	200	{object}	map[string]interface{}
+//	@Failure	404	{object}	map[string]string
+//	@Router		/api/admin/users/{user_id}/subscription/reconcile [post]
+//	@Security	TelegramInitData
+func (h *AdminHandler) ReconcileUserSubscription(c *fiber.Ctx) error {
+	userIDStr := c.Params("user_id")
+	userID, err := strconv.ParseInt(userIDStr, 10, 64)
+	if err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "invalid user_id"})
+	}
+	sub, err := h.subscriptionSvc.GetActiveSubscription(c.Context(), userID)
+	if err != nil {
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "no active subscription"})
+	}
+	added, err := h.subscriptionSvc.ReconcileSubscriptionClients(c.Context(), sub.ID)
+	if err != nil {
+		return respondInternalError(c, err)
+	}
+	return c.JSON(fiber.Map{
+		"success":  true,
+		"added":    added,
+	})
+}
+

@@ -217,6 +217,7 @@ func main() {
 	admin.Post("/users/:user_id/subscription/extend", adminHandler.ExtendSubscription)
 	admin.Post("/users/:user_id/subscription/cancel", adminHandler.CancelSubscription)
 	admin.Post("/users/:user_id/subscription/rotate-token", adminHandler.RotateUserSubToken)
+	admin.Post("/users/:user_id/subscription/reconcile", adminHandler.ReconcileUserSubscription)
 
 	// Admin - Ban management
 	admin.Get("/bans", adminHandler.ListBans)
