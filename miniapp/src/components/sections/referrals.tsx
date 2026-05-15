@@ -68,7 +68,7 @@ export function ReferralsSection() {
     if (navigator.share) {
       try {
         await navigator.share({
-          title: "ZYVPN",
+          title: "Core VPN",
           text: t.referrals.shareText,
           url: referralLink,
         })

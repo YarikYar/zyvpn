@@ -1,7 +1,6 @@
 import {
   CreditCard,
   Gift,
-  Globe2,
   House,
   Settings,
   type LucideIcon,
@@ -9,7 +8,6 @@ import {
 
 export type NavKey =
   | "Main"
-  | "Region"
   | "Subscription"
   | "Referrals"
   | "Settings"
@@ -22,7 +20,6 @@ export type NavItem = {
 
 export const navItems: NavItem[] = [
   { key: "Main", label: "Main", icon: House },
-  { key: "Region", label: "Region", icon: Globe2 },
   { key: "Subscription", label: "Subscription", icon: CreditCard },
   { key: "Referrals", label: "Referrals", icon: Gift },
   { key: "Settings", label: "Settings", icon: Settings },

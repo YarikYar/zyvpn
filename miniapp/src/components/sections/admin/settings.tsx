@@ -1,6 +1,5 @@
 import { useEffect, useState } from "react"
 import {
-  ArrowLeftRight,
   Gift,
   TrendingUp,
   Wallet,
@@ -64,16 +63,6 @@ export function AdminSettingsView() {
         inputMode="numeric"
         mutation={m.referralBonusDays}
         toBody={(value) => ({ days: Math.round(value) })}
-      />
-      <SettingRow
-        icon={ArrowLeftRight}
-        title={t.admin.settingsTab.regionSwitchPrice}
-        help={t.admin.settingsTab.regionSwitchPriceHelp}
-        initial={data?.region_switch_price_ton ?? 0}
-        unit={t.admin.settingsTab.tonUnit}
-        inputMode="decimal"
-        mutation={m.regionSwitchPrice}
-        toBody={(value) => ({ price_ton: value })}
       />
     </div>
   )

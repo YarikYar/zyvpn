@@ -27,8 +27,6 @@ export const queryKeys = {
   me: ["me"] as const,
   plans: ["plans"] as const,
   subscriptionStatus: ["subscription", "status"] as const,
-  subscriptionKey: ["subscription", "key"] as const,
-  switchServerInfo: ["switch-server", "info"] as const,
   servers: ["servers"] as const,
   serverUptimeDaily: (serverId: string | undefined, days?: number) =>
     ["servers", "uptime-daily", serverId ?? "", days ?? 30] as const,
@@ -45,10 +43,11 @@ export const queryKeys = {
   adminUsers: (params?: { search?: string; limit?: number; offset?: number }) =>
     ["admin", "users", params ?? {}] as const,
   adminUser: (id: number) => ["admin", "users", id] as const,
+  adminUserSubscription: (id: number) =>
+    ["admin", "users", id, "subscription"] as const,
   adminBans: ["admin", "bans"] as const,
   adminBansIp: ["admin", "bans", "ip"] as const,
   adminPromos: ["admin", "promos"] as const,
-  adminCashPending: ["admin", "cash", "pending"] as const,
   adminPlans: ["admin", "plans"] as const,
   adminServers: ["admin", "servers"] as const,
   adminSettings: ["admin", "settings"] as const,
@@ -80,21 +79,6 @@ export function useSubscriptionStatus() {
   })
 }
 
-export function useSubscriptionKey() {
-  return useQuery({
-    queryKey: queryKeys.subscriptionKey,
-    queryFn: () => api.subscriptionKey(),
-    enabled: hasInitData(),
-  })
-}
-
-export function useSwitchServerInfo() {
-  return useQuery({
-    queryKey: queryKeys.switchServerInfo,
-    queryFn: () => api.switchServerInfo(),
-  })
-}
-
 export function useBuySubscription() {
   const qc = useQueryClient()
   return useMutation({
@@ -115,20 +99,6 @@ export function useActivateTrial() {
     },
   })
 }
-
-export function useSwitchServer() {
-  const qc = useQueryClient()
-  return useMutation({
-    mutationFn: api.switchServer,
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: queryKeys.subscriptionStatus })
-      qc.invalidateQueries({ queryKey: queryKeys.subscriptionKey })
-      qc.invalidateQueries({ queryKey: queryKeys.switchServerInfo })
-      qc.invalidateQueries({ queryKey: queryKeys.balance })
-    },
-  })
-}
-
 
 export function useServers() {
   return useQuery({
@@ -303,10 +273,14 @@ export function useAdminUserMutations(id: number | null) {
     mutationFn: () => api.adminUserSubscriptionCancel(id!),
     onSuccess: invalidate,
   })
-  const cashPayment = useMutation({
-    mutationFn: (body: { plan_id: string; amount_rub?: number; note?: string }) =>
-      api.adminUserCashPayment(id!, body),
-    onSuccess: invalidate,
+  const rotateSubscriptionToken = useMutation({
+    mutationFn: () => api.adminUserSubscriptionRotateToken(id!),
+    onSuccess: () => {
+      invalidate()
+      if (typeof id === "number") {
+        qc.invalidateQueries({ queryKey: queryKeys.adminUserSubscription(id) })
+      }
+    },
   })
   const ban = useMutation({
     mutationFn: (body?: { reason?: string }) => api.adminUserBan(id!, body),
@@ -321,10 +295,18 @@ export function useAdminUserMutations(id: number | null) {
     balanceAdd,
     subscriptionExtend,
     subscriptionCancel,
-    cashPayment,
+    rotateSubscriptionToken,
     ban,
     unban,
   }
+}
+
+export function useAdminUserSubscription(id: number | null) {
+  return useQuery({
+    queryKey: queryKeys.adminUserSubscription(id ?? 0),
+    queryFn: () => api.adminUserSubscription(id!),
+    enabled: typeof id === "number" && id > 0,
+  })
 }
 
 export function useAdminBans() {
@@ -384,37 +366,6 @@ export function useAdminPromoDeactivate() {
     mutationFn: api.adminPromoDeactivate,
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: queryKeys.adminPromos })
-    },
-  })
-}
-
-export function useAdminCashPending() {
-  return useQuery({
-    queryKey: queryKeys.adminCashPending,
-    queryFn: () => api.adminCashPending(),
-    refetchInterval: 15_000,
-  })
-}
-
-export function useAdminCashApprove() {
-  const qc = useQueryClient()
-  return useMutation({
-    mutationFn: api.adminCashApprove,
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: queryKeys.adminCashPending })
-      qc.invalidateQueries({ queryKey: queryKeys.adminStats })
-    },
-  })
-}
-
-export function useAdminCashReject() {
-  const qc = useQueryClient()
-  return useMutation({
-    mutationFn: ({ id, reason }: { id: string; reason?: string }) =>
-      api.adminCashReject(id, reason ? { reason } : undefined),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: queryKeys.adminCashPending })
-      qc.invalidateQueries({ queryKey: queryKeys.adminStats })
     },
   })
 }
@@ -541,11 +492,7 @@ export function useAdminSettingMutations() {
     mutationFn: api.adminSettingReferralBonusDays,
     onSuccess: invalidate,
   })
-  const regionSwitchPrice = useMutation({
-    mutationFn: api.adminSettingRegionSwitchPrice,
-    onSuccess: invalidate,
-  })
-  return { topupBonus, referralBonus, referralBonusDays, regionSwitchPrice }
+  return { topupBonus, referralBonus, referralBonusDays }
 }
 
 export function useAdminLogs(params?: {

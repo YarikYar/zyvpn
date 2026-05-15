@@ -72,7 +72,7 @@ export function SiteBrandChip({ className }: { className?: string }) {
             transition={{ duration: 0.18, ease: "easeOut" }}
             className="text-foreground text-sm font-semibold tracking-tight whitespace-nowrap"
           >
-            {isBack ? t.common.back : "ZYVPN"}
+            {isBack ? t.common.back : "Core VPN"}
           </motion.span>
         </AnimatePresence>
       </motion.button>

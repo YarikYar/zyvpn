@@ -26,7 +26,6 @@ type PluralForms = {
 type StaticMessages = {
   nav: {
     main: string
-    region: string
     subscription: string
     referrals: string
     settings: string
@@ -70,20 +69,21 @@ type StaticMessages = {
       night: string
     }
     daysUsage: (used: number, total: number) => string
+    noSubscriptionTitle: string
+    noSubscriptionSubtitle: string
+    noSubscriptionCta: string
   }
-  region: {
+  servers: {
     title: string
     intro: string
+    empty: string
     load: Record<Load, string>
     offline: string
     countries: Record<CountryCode, { country: string; city: string }>
-    checkout: {
-      title: string
-      intro: string
-      newRegion: string
-      switchPrice: string
-      payCta: (ton: number) => string
-    }
+    copyKey: string
+    keyCopied: string
+    keyMissing: string
+    status: { online: string; offline: string }
   }
   subscription: {
     title: string
@@ -94,36 +94,49 @@ type StaticMessages = {
     devicesValue: (n: number) => string
     composeDescription: (days: number, trafficGb: number | null) => string
     fields: { term: string; traffic: string; devices: string; price: string }
+    includedServers: (n: number) => string
+    moreServers: (n: number) => string
     checkout: {
       title: string
       paymentMethod: string
       payWithBalance: (ton: number) => string
       payTon: (ton: number) => string
       payStars: (stars: number) => string
-      submitCash: string
       methods: {
         balance: { name: string; enough: string; insufficient: string }
         ton: { name: string }
         stars: { name: string }
-        cash: { name: string; subtitle: (rub: number) => string }
       }
     }
     success: {
       title: string
       banner: { title: string; subtitle: string }
-      vlessKey: string
-      copyKey: string
-      switch: string
-      switchPrice: string
       howToConnect: string
       stepTitleInstall: string
-      stepCopyKey: string
-      stepAddFromClipboard: string
+      stepPasteUrl: string
+      stepPickServer: string
       stepConnect: string
       platformIos: string
       platformAndroid: string
       platformDesktop: string
     }
+    url: {
+      title: string
+      helper: string
+      copy: string
+      copied: string
+      share: string
+      shareText: string
+      qrCaption: string
+      openInstructions: string
+      hideInstructions: string
+    }
+    serversList: {
+      title: string
+      count: (n: number) => string
+      regionCount: (n: number) => string
+    }
+    renew: string
   }
   referrals: {
     title: string
@@ -163,7 +176,6 @@ type StaticMessages = {
       users: { title: string; subtitle: string }
       bans: { title: string; subtitle: string }
       promo: { title: string; subtitle: string }
-      cash: { title: string; subtitle: string }
       plans: { title: string; subtitle: string }
       servers: { title: string; subtitle: string }
       settings: { title: string; subtitle: string }
@@ -177,7 +189,6 @@ type StaticMessages = {
       revenueTon: string
       revenueRub: string
       revenue30d: string
-      cashPending: string
       trialUsed: string
       serversOnline: string
       bansActive: string
@@ -196,18 +207,26 @@ type StaticMessages = {
         setBalance: string
         extendDays: string
         cancelSubscription: string
-        cashPayment: string
+        rotateToken: string
         ban: string
         unban: string
       }
       promptAmount: string
       promptDays: string
       promptReason: string
-      promptPlan: string
-      promptRub: string
       confirmCancel: string
+      confirmRotate: string
       confirmBan: string
       confirmUnban: string
+      subscriptionCard: {
+        title: string
+        url: string
+        helper: string
+        copy: string
+        copied: string
+        serversLabel: (n: number) => string
+        empty: string
+      }
     }
     bans: {
       tabUsers: string
@@ -244,15 +263,6 @@ type StaticMessages = {
       generatedTitle: string
       copyAll: string
     }
-    cash: {
-      empty: string
-      approve: string
-      reject: string
-      rejectReason: string
-      plan: string
-      amount: string
-      submitted: string
-    }
     plans: {
       empty: string
       createCta: string
@@ -280,6 +290,16 @@ type StaticMessages = {
       active: string
       inactive: string
       popularLabel: string
+      serverPicker: {
+        title: string
+        intro: string
+        empty: string
+        loading: string
+        none: string
+        selectAll: string
+        clearAll: string
+        summary: (servers: number, regions: number) => string
+      }
     }
     servers: {
       empty: string
@@ -314,11 +334,8 @@ type StaticMessages = {
       referralBonusHelp: string
       referralBonusDays: string
       referralBonusDaysHelp: string
-      regionSwitchPrice: string
-      regionSwitchPriceHelp: string
       percentUnit: string
       daysUnit: string
-      tonUnit: string
       save: string
       saved: string
     }
@@ -409,7 +426,6 @@ function formatIncidentDurationRu(seconds: number): string {
 const en: StaticMessages = {
   nav: {
     main: "Main",
-    region: "Region",
     subscription: "Subscription",
     referrals: "Referrals",
     settings: "Settings",
@@ -454,10 +470,15 @@ const en: StaticMessages = {
     },
     daysUsage: (used, total) =>
       `${used} of ${total} ${plural("en", total, { one: "day", other: "days" })}`,
+    noSubscriptionTitle: "No active subscription",
+    noSubscriptionSubtitle:
+      "Pick a plan to unlock all regions on a single subscription link.",
+    noSubscriptionCta: "Browse plans",
   },
-  region: {
-    title: "Regions",
-    intro: "Pick the closest server for the best speed.",
+  servers: {
+    title: "Available servers",
+    intro: "All servers included in your plan. Tap to copy a per-server key.",
+    empty: "Servers will appear here as soon as your subscription is active.",
     load: { low: "Low load", medium: "Moderate load", high: "High load" },
     offline: "Offline",
     countries: {
@@ -468,14 +489,10 @@ const en: StaticMessages = {
       JP: { country: "Japan", city: "Tokyo" },
       SG: { country: "Singapore", city: "Singapore" },
     },
-    checkout: {
-      title: "Change region",
-      intro:
-        "Switch to a different server. Active sessions will reroute through the new region.",
-      newRegion: "New region",
-      switchPrice: "0.10 TON",
-      payCta: (ton) => `Pay ${formatTonPurchase(ton)} TON`,
-    },
+    copyKey: "Copy server key",
+    keyCopied: "Server key copied",
+    keyMissing: "Key not available",
+    status: { online: "Online", offline: "Offline" },
   },
   subscription: {
     title: "Subscription",
@@ -522,13 +539,15 @@ const en: StaticMessages = {
       devices: "Devices",
       price: "Price",
     },
+    includedServers: (n) =>
+      `${n} ${plural("en", n, { one: "server", other: "servers" })} included`,
+    moreServers: (n) => `+${n} more`,
     checkout: {
       title: "Checkout",
       paymentMethod: "Payment method",
       payWithBalance: (ton) => `Pay with balance (${formatTonPurchase(ton)} TON)`,
       payTon: (ton) => `Pay ${formatTonPurchase(ton)} TON`,
       payStars: (stars) => `Pay ${stars} Stars`,
-      submitCash: "Submit cash request",
       methods: {
         balance: {
           name: "Balance",
@@ -537,32 +556,44 @@ const en: StaticMessages = {
         },
         ton: { name: "TON" },
         stars: { name: "Telegram Stars" },
-        cash: {
-          name: "Cash to agent",
-          subtitle: (rub) => `≈${rub} ₽ – activation after confirmation`,
-        },
       },
     },
     success: {
-      title: "Your key",
+      title: "Your subscription",
       banner: {
         title: "Payment successful",
         subtitle:
-          "Your subscription is now active. Connect using the key below.",
+          "Your subscription is now active. Scan the QR or copy the URL below.",
       },
-      vlessKey: "VLESS key",
-      copyKey: "Copy key",
-      switch: "Switch",
-      switchPrice: "(0.10 TON)",
       howToConnect: "How to connect",
       stepTitleInstall: "Install a VPN client",
-      stepCopyKey: "Copy the key above",
-      stepAddFromClipboard: "In the app, choose “Add from clipboard”",
-      stepConnect: "Connect – and you're online.",
+      stepPasteUrl: "In the app, add a new subscription URL or scan the QR",
+      stepPickServer: "Pick any server inside the app",
+      stepConnect: "Tap connect — and you’re online.",
       platformIos: "iOS:",
       platformAndroid: "Android:",
       platformDesktop: "Windows / Mac:",
     },
+    url: {
+      title: "Subscription link",
+      helper:
+        "Add this URL to any VPN client (v2rayNG, Hiddify, Streisand, Shadowrocket). The client will auto-sync all servers.",
+      copy: "Copy link",
+      copied: "Link copied",
+      share: "Share",
+      shareText: "My VPN subscription link",
+      qrCaption: "Scan with a VPN client",
+      openInstructions: "How to connect",
+      hideInstructions: "Hide steps",
+    },
+    serversList: {
+      title: "Servers in this plan",
+      count: (n) =>
+        `${n} ${plural("en", n, { one: "server", other: "servers" })}`,
+      regionCount: (n) =>
+        `${n} ${plural("en", n, { one: "region", other: "regions" })}`,
+    },
+    renew: "Renew",
   },
   referrals: {
     title: "Referrals",
@@ -594,7 +625,7 @@ const en: StaticMessages = {
           `${percent}% of every payment your friend makes lands on your balance.`,
       },
     },
-    shareText: "Join me on ZYVPN – fast, private and a free bonus on me.",
+    shareText: "Join me on Core VPN – fast, private and a free bonus on me.",
   },
   settings: {
     title: "Settings",
@@ -640,10 +671,9 @@ const en: StaticMessages = {
       users: { title: "Users", subtitle: "Search, balance, subscriptions, ban" },
       bans: { title: "Bans", subtitle: "User and IP bans" },
       promo: { title: "Promo codes", subtitle: "Create, bulk, deactivate" },
-      cash: { title: "Cash payments", subtitle: "Approve or reject requests" },
-      plans: { title: "Plans", subtitle: "Tariffs, prices, visibility" },
+      plans: { title: "Plans", subtitle: "Tariffs, prices, server bundles" },
       servers: { title: "Servers", subtitle: "Endpoints, health, region" },
-      settings: { title: "Bonuses & pricing", subtitle: "Top-up, referral, region switch" },
+      settings: { title: "Bonuses", subtitle: "Top-up and referral bonuses" },
       logs: { title: "Logs", subtitle: "Backend events" },
     },
     stats: {
@@ -654,7 +684,6 @@ const en: StaticMessages = {
       revenueTon: "Revenue, TON",
       revenueRub: "Revenue, ₽",
       revenue30d: "Last 30 days",
-      cashPending: "Cash pending",
       trialUsed: "Trial used",
       serversOnline: "Servers online",
       bansActive: "Active bans",
@@ -673,18 +702,28 @@ const en: StaticMessages = {
         setBalance: "Set balance",
         extendDays: "Extend days",
         cancelSubscription: "Cancel subscription",
-        cashPayment: "Add cash payment",
+        rotateToken: "Reissue subscription URL",
         ban: "Ban user",
         unban: "Unban user",
       },
       promptAmount: "Amount (TON)",
       promptDays: "Days to add",
       promptReason: "Reason (optional)",
-      promptPlan: "Plan ID",
-      promptRub: "Amount (₽)",
       confirmCancel: "Cancel the active subscription?",
+      confirmRotate:
+        "Reissue subscription URL? The old URL will stop working immediately.",
       confirmBan: "Ban this user?",
       confirmUnban: "Unban this user?",
+      subscriptionCard: {
+        title: "Subscription URL",
+        url: "URL",
+        helper: "Share with support only. Reissue invalidates the old link.",
+        copy: "Copy",
+        copied: "Copied",
+        serversLabel: (n) =>
+          `${n} ${plural("en", n, { one: "server", other: "servers" })}`,
+        empty: "User has no active subscription",
+      },
     },
     bans: {
       tabUsers: "Users",
@@ -722,15 +761,6 @@ const en: StaticMessages = {
       generatedTitle: "Generated codes",
       copyAll: "Copy all",
     },
-    cash: {
-      empty: "No pending cash payments",
-      approve: "Approve",
-      reject: "Reject",
-      rejectReason: "Reason (optional)",
-      plan: "Plan",
-      amount: "Amount",
-      submitted: "Submitted",
-    },
     plans: {
       empty: "No plans yet",
       createCta: "New plan",
@@ -758,6 +788,17 @@ const en: StaticMessages = {
       active: "Active",
       inactive: "Hidden",
       popularLabel: "Popular",
+      serverPicker: {
+        title: "Servers in this plan",
+        intro: "Pick which servers are exposed via the subscription URL.",
+        empty: "Pick at least one server",
+        loading: "Loading servers…",
+        none: "No servers available",
+        selectAll: "All in region",
+        clearAll: "Clear",
+        summary: (servers, regions) =>
+          `${servers} ${plural("en", servers, { one: "server", other: "servers" })} · ${regions} ${plural("en", regions, { one: "region", other: "regions" })}`,
+      },
     },
     servers: {
       empty: "No servers yet",
@@ -792,11 +833,8 @@ const en: StaticMessages = {
       referralBonusHelp: "Share of referee payments credited to referrer.",
       referralBonusDays: "Referral free days",
       referralBonusDaysHelp: "Bonus days for the referee on first paid plan.",
-      regionSwitchPrice: "Region switch price",
-      regionSwitchPriceHelp: "Cost of switching server outside the free quota.",
       percentUnit: "%",
       daysUnit: "days",
-      tonUnit: "TON",
       save: "Save",
       saved: "Saved",
     },
@@ -831,7 +869,6 @@ const en: StaticMessages = {
 const ru: StaticMessages = {
   nav: {
     main: "Главная",
-    region: "Регион",
     subscription: "Подписка",
     referrals: "Рефералы",
     settings: "Настройки",
@@ -877,10 +914,15 @@ const ru: StaticMessages = {
     },
     daysUsage: (used, total) =>
       `${used} из ${total} ${plural("ru", total, { one: "дня", few: "дней", many: "дней", other: "дней" })}`,
+    noSubscriptionTitle: "Подписки пока нет",
+    noSubscriptionSubtitle:
+      "Выбери тариф — получишь одну ссылку, в которой сразу все регионы.",
+    noSubscriptionCta: "Посмотреть тарифы",
   },
-  region: {
-    title: "Регионы",
-    intro: "Выбери ближайший сервер – будет быстрее.",
+  servers: {
+    title: "Доступные серверы",
+    intro: "Все серверы из твоего тарифа. Тапни, чтобы скопировать ключ для одного сервера.",
+    empty: "Серверы появятся здесь, как только подписка активируется.",
     load: { low: "Низкая нагрузка", medium: "Умеренная нагрузка", high: "Высокая нагрузка" },
     offline: "Не в сети",
     countries: {
@@ -891,14 +933,10 @@ const ru: StaticMessages = {
       JP: { country: "Япония", city: "Токио" },
       SG: { country: "Сингапур", city: "Сингапур" },
     },
-    checkout: {
-      title: "Смена региона",
-      intro:
-        "Сменить сервер. Активные сессии переключатся через новый регион.",
-      newRegion: "Новый регион",
-      switchPrice: "0.10 TON",
-      payCta: (ton) => `Оплатить ${formatTonPurchase(ton)} TON`,
-    },
+    copyKey: "Скопировать ключ",
+    keyCopied: "Ключ скопирован",
+    keyMissing: "Ключ недоступен",
+    status: { online: "Онлайн", offline: "Офлайн" },
   },
   subscription: {
     title: "Подписка",
@@ -945,13 +983,15 @@ const ru: StaticMessages = {
       devices: "Устройства",
       price: "Цена",
     },
+    includedServers: (n) =>
+      `${n} ${plural("ru", n, { one: "сервер", few: "сервера", many: "серверов", other: "серверов" })} в тарифе`,
+    moreServers: (n) => `+ещё ${n}`,
     checkout: {
       title: "Оплата",
       paymentMethod: "Способ оплаты",
       payWithBalance: (ton) => `Оплатить с баланса (${formatTonPurchase(ton)} TON)`,
       payTon: (ton) => `Оплатить ${formatTonPurchase(ton)} TON`,
       payStars: (stars) => `Оплатить ${stars} Stars`,
-      submitCash: "Запросить оплату наличными",
       methods: {
         balance: {
           name: "Баланс",
@@ -960,31 +1000,43 @@ const ru: StaticMessages = {
         },
         ton: { name: "TON" },
         stars: { name: "Telegram Stars" },
-        cash: {
-          name: "Наличными представителю",
-          subtitle: (rub) => `≈${rub} ₽ – активация после подтверждения`,
-        },
       },
     },
     success: {
-      title: "Ваш ключ",
+      title: "Ваша подписка",
       banner: {
         title: "Оплата прошла",
-        subtitle: "Подписка активна. Подключайся по ключу ниже.",
+        subtitle: "Подписка активна. Сканируй QR или скопируй ссылку ниже.",
       },
-      vlessKey: "VLESS-ключ",
-      copyKey: "Скопировать ключ",
-      switch: "Сменить",
-      switchPrice: "(0.10 TON)",
       howToConnect: "Как подключиться",
-      stepTitleInstall: "Установи VPN-клиент",
-      stepCopyKey: "Скопируй ключ выше",
-      stepAddFromClipboard: "В приложении выбери «Добавить из буфера»",
-      stepConnect: "Подключайся – и ты в сети.",
+      stepTitleInstall: "Поставь VPN-клиент",
+      stepPasteUrl: "В приложении добавь подписку по URL или сканируй QR",
+      stepPickServer: "Выбери любой сервер внутри клиента",
+      stepConnect: "Жми Connect — ты в сети.",
       platformIos: "iOS:",
       platformAndroid: "Android:",
       platformDesktop: "Windows / Mac:",
     },
+    url: {
+      title: "Ссылка подписки",
+      helper:
+        "Добавь эту ссылку в любой VPN-клиент (v2rayNG, Hiddify, Streisand, Shadowrocket). Клиент сам подтянет все серверы.",
+      copy: "Скопировать ссылку",
+      copied: "Скопировано",
+      share: "Поделиться",
+      shareText: "Моя ссылка подписки VPN",
+      qrCaption: "Сканируй из VPN-клиента",
+      openInstructions: "Как подключиться",
+      hideInstructions: "Скрыть шаги",
+    },
+    serversList: {
+      title: "Серверы тарифа",
+      count: (n) =>
+        `${n} ${plural("ru", n, { one: "сервер", few: "сервера", many: "серверов", other: "серверов" })}`,
+      regionCount: (n) =>
+        `${n} ${plural("ru", n, { one: "регион", few: "региона", many: "регионов", other: "регионов" })}`,
+    },
+    renew: "Продлить",
   },
   referrals: {
     title: "Рефералы",
@@ -1016,7 +1068,7 @@ const ru: StaticMessages = {
           `${percent}% от каждого платежа друга падает тебе на баланс.`,
       },
     },
-    shareText: "Залетай в ZYVPN – быстро, приватно, и бонус от меня.",
+    shareText: "Залетай в Core VPN – быстро, приватно, и бонус от меня.",
   },
   settings: {
     title: "Настройки",
@@ -1062,10 +1114,9 @@ const ru: StaticMessages = {
       users: { title: "Пользователи", subtitle: "Поиск, баланс, подписки, бан" },
       bans: { title: "Баны", subtitle: "Юзеры и IP-адреса" },
       promo: { title: "Промокоды", subtitle: "Создание, пачкой, деактивация" },
-      cash: { title: "Оплаты налом", subtitle: "Подтверждай или отклоняй заявки" },
-      plans: { title: "Тарифы", subtitle: "Цены, видимость, активность" },
+      plans: { title: "Тарифы", subtitle: "Цены, видимость, серверы тарифа" },
       servers: { title: "Серверы", subtitle: "Точки, здоровье, регион" },
-      settings: { title: "Бонусы и цены", subtitle: "Пополнение, рефералка, смена региона" },
+      settings: { title: "Бонусы", subtitle: "Пополнение и рефералка" },
       logs: { title: "Логи", subtitle: "События бэкенда" },
     },
     stats: {
@@ -1076,7 +1127,6 @@ const ru: StaticMessages = {
       revenueTon: "Выручка, TON",
       revenueRub: "Выручка, ₽",
       revenue30d: "За 30 дней",
-      cashPending: "Налом в ожидании",
       trialUsed: "Триалов",
       serversOnline: "Серверов онлайн",
       bansActive: "Активных банов",
@@ -1095,18 +1145,29 @@ const ru: StaticMessages = {
         setBalance: "Установить баланс",
         extendDays: "Продлить дни",
         cancelSubscription: "Отменить подписку",
-        cashPayment: "Добавить оплату налом",
+        rotateToken: "Перевыпустить URL подписки",
         ban: "Забанить",
         unban: "Разбанить",
       },
       promptAmount: "Сумма (TON)",
       promptDays: "Сколько дней добавить",
       promptReason: "Причина (опционально)",
-      promptPlan: "ID тарифа",
-      promptRub: "Сумма (₽)",
       confirmCancel: "Отменить активную подписку?",
+      confirmRotate:
+        "Перевыпустить URL подписки? Старая ссылка сразу перестанет работать.",
       confirmBan: "Забанить пользователя?",
       confirmUnban: "Разбанить пользователя?",
+      subscriptionCard: {
+        title: "URL подписки",
+        url: "URL",
+        helper:
+          "Делись только с саппортом. Перевыпуск моментально аннулирует старую ссылку.",
+        copy: "Скопировать",
+        copied: "Скопировано",
+        serversLabel: (n) =>
+          `${n} ${plural("ru", n, { one: "сервер", few: "сервера", many: "серверов", other: "серверов" })}`,
+        empty: "У пользователя нет активной подписки",
+      },
     },
     bans: {
       tabUsers: "Юзеры",
@@ -1144,15 +1205,6 @@ const ru: StaticMessages = {
       generatedTitle: "Сгенерированные коды",
       copyAll: "Скопировать всё",
     },
-    cash: {
-      empty: "Заявок на оплату налом нет",
-      approve: "Подтвердить",
-      reject: "Отклонить",
-      rejectReason: "Причина (опционально)",
-      plan: "Тариф",
-      amount: "Сумма",
-      submitted: "Создана",
-    },
     plans: {
       empty: "Тарифов пока нет",
       createCta: "Новый тариф",
@@ -1180,6 +1232,17 @@ const ru: StaticMessages = {
       active: "Активен",
       inactive: "Скрыт",
       popularLabel: "Популярный",
+      serverPicker: {
+        title: "Серверы тарифа",
+        intro: "Выбери серверы, которые попадут в subscription URL.",
+        empty: "Выбери хотя бы один сервер",
+        loading: "Загрузка серверов…",
+        none: "Серверов нет",
+        selectAll: "Все в регионе",
+        clearAll: "Сбросить",
+        summary: (servers, regions) =>
+          `${servers} ${plural("ru", servers, { one: "сервер", few: "сервера", many: "серверов", other: "серверов" })} · ${regions} ${plural("ru", regions, { one: "регион", few: "региона", many: "регионов", other: "регионов" })}`,
+      },
     },
     servers: {
       empty: "Серверов пока нет",
@@ -1214,11 +1277,8 @@ const ru: StaticMessages = {
       referralBonusHelp: "Какой процент уходит рефереру с платежа друга.",
       referralBonusDays: "Реф. бонусные дни",
       referralBonusDaysHelp: "Бесплатные дни приглашённому при первой покупке.",
-      regionSwitchPrice: "Цена смены региона",
-      regionSwitchPriceHelp: "Сколько стоит смена сервера сверх бесплатной квоты.",
       percentUnit: "%",
       daysUnit: "дней",
-      tonUnit: "TON",
       save: "Сохранить",
       saved: "Сохранено",
     },

@@ -4,9 +4,8 @@ import { Dock } from "@/components/ui/dock"
 import { useLocale } from "@/lib/i18n"
 import { navItems, type NavKey } from "@/lib/nav"
 
-const navLabelKeys: Record<NavKey, "main" | "region" | "subscription" | "referrals" | "settings"> = {
+const navLabelKeys: Record<NavKey, "main" | "subscription" | "referrals" | "settings"> = {
   Main: "main",
-  Region: "region",
   Subscription: "subscription",
   Referrals: "referrals",
   Settings: "settings",

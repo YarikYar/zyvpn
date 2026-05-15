@@ -9,6 +9,8 @@ import {
   CheckCircle2,
   Crown,
   Gift,
+  Globe2,
+  Loader2,
   Moon,
   Shield,
   Sparkles,
@@ -19,17 +21,20 @@ import {
 } from "lucide-react"
 
 import { SectionHeading } from "@/components/sections/section-heading"
+import { ServerListRow } from "@/components/server-list-row"
+import { ServerChipsRow } from "@/components/server-chip"
+import { SubscriptionUrlCard } from "@/components/subscription-url-card"
+import { flagFor } from "@/lib/flags"
 import { useLocale, type Locale } from "@/lib/i18n"
 import {
   useMe,
   useServerIncidents,
   useServerUptimeDaily,
-  useServers,
   useSubscriptionStatus,
 } from "@/lib/queries"
 import type {
   DailyUptimePoint,
-  Server,
+  ServerEntry,
   ServerIncident,
   SubscriptionStatus,
 } from "@/lib/api"
@@ -137,6 +142,13 @@ function mapUptimePoint(point: DailyUptimePoint): UptimeDay | null {
   return { date, fraction, status: uptimeStatus(fraction) }
 }
 
+function distinctRegionCount(servers: ServerEntry[] | undefined): number {
+  if (!servers || servers.length === 0) return 0
+  const codes = new Set<string>()
+  for (const s of servers) codes.add((s.country ?? "").toUpperCase())
+  return codes.size
+}
+
 export function MainSection({
   onShowKey,
 }: {
@@ -145,7 +157,6 @@ export function MainSection({
   const { t } = useLocale()
   const meQuery = useMe()
   const statusQuery = useSubscriptionStatus()
-  const serversQuery = useServers()
   const [timeKey] = useState<TimeOfDay>(() => getTimeOfDayKey())
   const Icon = timeIcons[timeKey]
   const greeting = t.main.greetings[timeKey]
@@ -154,30 +165,15 @@ export function MainSection({
     : (meQuery.data?.first_name ?? "")
 
   const status = statusQuery.data
-  const showActive = !!status?.active && !!status.subscription
+  const sub = status?.subscription ?? null
+  const showActive = !!status?.active && !!sub
+  const servers = sub?.servers ?? []
+  const subscriptionUrl = sub?.subscription_url ?? ""
 
-  const myServerId = status?.subscription?.server_id
-  const activeServer = useMemo<Server | undefined>(
-    () =>
-      myServerId
-        ? serversQuery.data?.find((s) => s.id === myServerId)
-        : undefined,
-    [serversQuery.data, myServerId],
-  )
-
-  const uptimeQuery = useServerUptimeDaily(activeServer?.id, 30)
   const incidentsQuery = useServerIncidents({ hours: 720, limit: 10 })
 
-  const uptimeDays = useMemo<UptimeDay[]>(
-    () =>
-      (uptimeQuery.data?.days ?? [])
-        .map(mapUptimePoint)
-        .filter((d): d is UptimeDay => d !== null),
-    [uptimeQuery.data],
-  )
-
   const incidents = incidentsQuery.data ?? []
-  const showUptime = activeServer && uptimeDays.length > 0
+  const showUptime = showActive && servers.length > 0
   const showIncidents = incidents.length > 0
 
   return (
@@ -199,12 +195,59 @@ export function MainSection({
         </>
       )}
 
+      {showActive && subscriptionUrl && (
+        <div className="mt-4">
+          <SubscriptionUrlCard url={subscriptionUrl} />
+        </div>
+      )}
+
+      {showActive && servers.length > 0 && (
+        <>
+          <div className="mt-10 flex items-baseline justify-between gap-3">
+            <h3 className="text-foreground text-lg font-semibold tracking-tight">
+              {t.servers.title}
+            </h3>
+            <p className="text-muted-foreground text-xs font-medium tracking-tight tabular-nums">
+              {t.subscription.serversList.count(servers.length)}
+              {distinctRegionCount(servers) > 1 &&
+                ` · ${t.subscription.serversList.regionCount(distinctRegionCount(servers))}`}
+            </p>
+          </div>
+          <p className="text-muted-foreground mt-1 text-sm">
+            {t.servers.intro}
+          </p>
+          <ul className="mt-4 space-y-3">
+            {servers.map((s) => (
+              <li key={s.id}>
+                <ServerListRow server={s} />
+              </li>
+            ))}
+          </ul>
+        </>
+      )}
+
+      {showActive && servers.length === 0 && (
+        <p className="text-muted-foreground mt-6 text-sm">
+          {t.servers.empty}
+        </p>
+      )}
+
+      {!showActive && (
+        <NoSubscriptionBlock onShowKey={onShowKey} />
+      )}
+
       {showUptime && (
         <>
           <h3 className="text-foreground mt-10 text-lg font-semibold tracking-tight">
             {t.main.serverUptime}
           </h3>
-          <UptimeBlock days={uptimeDays} />
+          <ul className="mt-3 space-y-2.5">
+            {servers.map((s) => (
+              <li key={s.id}>
+                <ServerUptimeCard server={s} />
+              </li>
+            ))}
+          </ul>
         </>
       )}
 
@@ -221,6 +264,38 @@ export function MainSection({
         </>
       )}
     </section>
+  )
+}
+
+function NoSubscriptionBlock({
+  onShowKey,
+}: {
+  onShowKey?: () => void
+}) {
+  const { t } = useLocale()
+  return (
+    <div className="border-border bg-card relative mt-10 overflow-hidden rounded-2xl border bg-gradient-to-br from-sky-500/12 via-blue-500/8 to-transparent p-6 shadow-lg">
+      <Globe2
+        aria-hidden
+        strokeWidth={1.2}
+        className="text-sky-500/20 pointer-events-none absolute -right-3 -bottom-8 size-36 sm:-right-4 sm:-bottom-10 sm:size-44"
+      />
+      <p className="text-muted-foreground inline-flex items-center gap-2 text-xs font-semibold tracking-[0.18em] uppercase">
+        <Sparkles className="size-3.5" strokeWidth={2.25} />
+        {t.main.noSubscriptionTitle}
+      </p>
+      <p className="text-foreground relative mt-3 max-w-[80%] text-lg font-semibold leading-snug tracking-tight sm:text-xl">
+        {t.main.noSubscriptionSubtitle}
+      </p>
+      <button
+        type="button"
+        onClick={onShowKey}
+        className="bg-foreground text-background hover:bg-foreground/90 relative mt-5 inline-flex h-12 items-center justify-center gap-2 rounded-2xl px-5 text-sm font-semibold tracking-tight transition-colors"
+      >
+        {t.main.noSubscriptionCta}
+        <ArrowRight className="size-4" strokeWidth={2.5} />
+      </button>
+    </div>
   )
 }
 
@@ -252,6 +327,8 @@ function ActiveSubscriptionBlock({
       ? t.common.unlimited
       : `${status.traffic_gb.limit} ${t.common.gb}`
   const endDateLabel = safeFormat(makeDateFmt(locale), endsAt)
+  const serverCount = sub.servers?.length ?? 0
+  const regionCount = distinctRegionCount(sub.servers)
 
   return (
     <div
@@ -283,7 +360,7 @@ function ActiveSubscriptionBlock({
             onClick={onShowKey}
             className="text-foreground/85 hover:text-foreground inline-flex shrink-0 items-center gap-1 text-xs font-semibold tracking-tight transition-colors"
           >
-            {t.main.showKey}
+            {t.subscription.renew}
             <ArrowRight className="size-3.5" strokeWidth={2.5} />
           </button>
         )}
@@ -312,6 +389,24 @@ function ActiveSubscriptionBlock({
           meta={trafficLabel}
         />
       </div>
+
+      {serverCount > 0 && (
+        <div className="mt-4">
+          <p className="text-muted-foreground text-[10px] font-semibold tracking-[0.16em] uppercase">
+            {t.subscription.serversList.title} ·{" "}
+            <span className="tabular-nums">
+              {t.subscription.serversList.count(serverCount)}
+              {regionCount > 1 &&
+                ` · ${t.subscription.serversList.regionCount(regionCount)}`}
+            </span>
+          </p>
+          <ServerChipsRow
+            servers={sub.servers}
+            className="mt-2"
+            max={6}
+          />
+        </div>
+      )}
     </div>
   )
 }
@@ -353,8 +448,43 @@ const dayBarTone: Record<DayStatus, string> = {
   major: "bg-red-500",
 }
 
-function UptimeBlock({ days }: { days: UptimeDay[] }) {
+function ServerUptimeCard({ server }: { server: ServerEntry }) {
   const { t, locale } = useLocale()
+  const uptimeQuery = useServerUptimeDaily(server.id, 30)
+  const days = useMemo<UptimeDay[]>(
+    () =>
+      (uptimeQuery.data?.days ?? [])
+        .map(mapUptimePoint)
+        .filter((d): d is UptimeDay => d !== null),
+    [uptimeQuery.data],
+  )
+
+  const code = (server.country ?? "").toUpperCase()
+  const Flag = flagFor(code)
+  const meta = code
+    ? t.servers.countries[code as keyof typeof t.servers.countries]
+    : undefined
+  const country = meta?.country ?? code
+  const city =
+    meta?.city ?? server.city?.trim() ?? server.name?.trim() ?? ""
+
+  if (uptimeQuery.isPending) {
+    return (
+      <div className="border-border bg-card flex items-center gap-3 rounded-2xl border p-4">
+        <span className="bg-muted size-8 shrink-0 animate-pulse rounded-lg" />
+        <div className="min-w-0 flex-1 space-y-1.5">
+          <span className="bg-muted block h-3 w-24 animate-pulse rounded" />
+          <span className="bg-muted/70 block h-2 w-16 animate-pulse rounded" />
+        </div>
+        <Loader2 className="text-muted-foreground size-4 animate-spin" />
+      </div>
+    )
+  }
+
+  if (days.length === 0) {
+    return null
+  }
+
   const okCount = days.filter((d) => d.status === "ok").length
   const totalFraction =
     days.reduce((acc, d) => acc + d.fraction, 0) / Math.max(1, days.length)
@@ -364,11 +494,8 @@ function UptimeBlock({ days }: { days: UptimeDay[] }) {
   const dateFmt = makeShortDateFmt(locale)
 
   const gradient = hasIssues
-    ? "from-amber-500/12 via-amber-500/4"
-    : "from-emerald-500/12 via-emerald-500/4"
-  const decoColor = hasIssues
-    ? "text-amber-500/20"
-    : "text-emerald-500/20"
+    ? "from-amber-500/10 via-amber-500/3"
+    : "from-emerald-500/10 via-emerald-500/3"
 
   const statusLabel: Record<DayStatus, string> = {
     ok: t.main.operational,
@@ -379,44 +506,55 @@ function UptimeBlock({ days }: { days: UptimeDay[] }) {
   return (
     <div
       className={cn(
-        "border-border bg-card relative mt-3 overflow-hidden rounded-2xl border bg-gradient-to-br to-transparent p-5 shadow-lg",
+        "border-border bg-card relative overflow-hidden rounded-2xl border bg-gradient-to-br to-transparent p-4 shadow-sm",
         gradient,
       )}
     >
-      <Activity
-        aria-hidden
-        strokeWidth={1.2}
-        className={cn(
-          "pointer-events-none absolute -right-3 -bottom-8 size-36 sm:-right-4 sm:-bottom-10 sm:size-44",
-          decoColor,
-        )}
-      />
-
       <div className="relative flex items-center justify-between gap-3">
-        <p className="text-muted-foreground inline-flex items-center gap-2 text-xs font-semibold tracking-[0.18em] uppercase">
-          <Activity className="size-3.5" strokeWidth={2.5} />
-          {t.main.lastNDays(days.length)}
-        </p>
-        <p className="text-foreground text-sm font-semibold tabular-nums">
+        <div className="inline-flex min-w-0 items-center gap-2.5">
+          {Flag ? (
+            <Flag aria-hidden className="h-5 w-[30px] shrink-0 rounded-[3px] object-cover" />
+          ) : (
+            <Activity className="text-muted-foreground size-4 shrink-0" strokeWidth={2.25} />
+          )}
+          <div className="min-w-0">
+            <p className="text-foreground truncate text-sm font-semibold tracking-tight">
+              {country}
+            </p>
+            {city && (
+              <p className="text-muted-foreground -mt-0.5 truncate text-[11px]">
+                {city}
+              </p>
+            )}
+          </div>
+        </div>
+        <p
+          className={cn(
+            "shrink-0 text-sm font-semibold tabular-nums",
+            hasIssues
+              ? "text-amber-600 dark:text-amber-400"
+              : "text-emerald-600 dark:text-emerald-400",
+          )}
+        >
           {uptimePct.toFixed(1)}%
         </p>
       </div>
 
-      <div className="relative mt-4 flex items-stretch gap-[3px]">
+      <div className="relative mt-3 flex items-stretch gap-[2px]">
         {days.map((d, i) => (
           <span
             key={i}
             title={`${safeFormat(dateFmt, d.date)} · ${statusLabel[d.status]} · ${(d.fraction * 100).toFixed(2)}%`}
             className={cn(
-              "h-7 flex-1 rounded-sm transition-colors duration-300 ease-out",
+              "h-5 flex-1 rounded-[2px] transition-colors duration-300 ease-out",
               dayBarTone[d.status],
-              d.status === "ok" && "opacity-90 hover:opacity-100",
+              d.status === "ok" && "opacity-90",
             )}
           />
         ))}
       </div>
 
-      <div className="text-muted-foreground relative mt-3 flex justify-between text-[11px] tabular-nums">
+      <div className="text-muted-foreground relative mt-2 flex justify-between text-[10px] tabular-nums">
         <span>{safeFormat(dateFmt, firstDate ?? null)}</span>
         <span>{t.common.today}</span>
       </div>

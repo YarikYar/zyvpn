@@ -1,7 +1,8 @@
-import { useState } from "react"
+import { useMemo, useState } from "react"
 import { Pencil, Plus, Star, Trash2 } from "lucide-react"
 import { AnimatePresence, motion } from "motion/react"
 
+import { ServerPicker } from "@/components/server-picker"
 import { useLocale } from "@/lib/i18n"
 import {
   useAdminPlanCreate,
@@ -57,6 +58,10 @@ export function AdminPlansView() {
             <ul className="mt-4 space-y-2">
               {plans.data.map((p) => {
                 const active = p.is_active !== false
+                const planServers = p.servers ?? []
+                const planRegions = new Set(
+                  planServers.map((s) => (s.country ?? "").toUpperCase()),
+                ).size
                 return (
                   <li
                     key={p.id}
@@ -92,6 +97,14 @@ export function AdminPlansView() {
                             : `${p.traffic_gb} GB`}{" "}
                           · {formatTonBalance(p.price_ton)} TON
                         </p>
+                        {planServers.length > 0 && (
+                          <p className="text-muted-foreground mt-1 text-[11px] tabular-nums">
+                            {t.admin.plans.serverPicker.summary(
+                              planServers.length,
+                              planRegions,
+                            )}
+                          </p>
+                        )}
                         {p.description && (
                           <p className="text-muted-foreground mt-2 line-clamp-2 text-xs">
                             {p.description}
@@ -182,6 +195,11 @@ function PlanForm({
       ? String(plan.visible_to_referrer_id)
       : "",
   )
+  const initialServerIds = useMemo(
+    () => (plan?.servers ?? []).map((s) => s.id),
+    [plan],
+  )
+  const [serverIds, setServerIds] = useState<string[]>(initialServerIds)
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -197,6 +215,7 @@ function PlanForm({
       is_active: isActive,
       popular,
       visible_to_referrer_id: referrerId ? Number(referrerId) : null,
+      server_ids: serverIds,
     }
     try {
       if (plan) {
@@ -308,6 +327,15 @@ function PlanForm({
           onChange={(e) => setReferrerId(e.target.value)}
           placeholder="0"
         />
+      </FormField>
+
+      <FormField label={t.admin.plans.serverPicker.title}>
+        <ServerPicker selectedIds={serverIds} onChange={setServerIds} />
+        {serverIds.length === 0 && (
+          <p className="text-rose-500 mt-2 text-[11px]">
+            {t.admin.plans.serverPicker.empty}
+          </p>
+        )}
       </FormField>
 
       <div className="border-border/60 bg-background flex items-center justify-between rounded-xl border px-3.5 py-3">

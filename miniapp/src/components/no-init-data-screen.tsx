@@ -15,7 +15,7 @@ export function NoInitDataScreen() {
         Open inside Telegram
       </h1>
       <p className="text-muted-foreground mt-3 max-w-md text-base sm:text-[17px]">
-        ZyVPN is a Telegram Mini App and needs to be launched from{" "}
+        Core VPN is a Telegram Mini App and needs to be launched from{" "}
         <a
           href={BOT_LINK}
           target="_blank"

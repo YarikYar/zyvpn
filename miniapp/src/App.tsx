@@ -9,7 +9,6 @@ import { SiteHeader } from '@/components/site-header'
 import { AdminSection } from '@/components/sections/admin'
 import { MainSection } from '@/components/sections/main'
 import { ReferralsSection } from '@/components/sections/referrals'
-import { RegionSection } from '@/components/sections/region'
 import { SettingsSection } from '@/components/sections/settings'
 import {
   SubscriptionSection,
@@ -180,7 +179,6 @@ function AppShell() {
             ) : (
               <>
                 {active === 'Main' && <MainSection onShowKey={handleShowKey} />}
-                {active === 'Region' && <RegionSection />}
                 {active === 'Subscription' && (
                   <SubscriptionSection
                     requestView={pendingSubView}

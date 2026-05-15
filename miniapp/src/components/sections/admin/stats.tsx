@@ -1,6 +1,5 @@
 import {
   BarChart3,
-  Banknote,
   Calendar,
   Gift,
   ServerCog,
@@ -68,11 +67,6 @@ export function AdminStatsView() {
         label={t.admin.stats.revenueRub}
         value={fmtRub(rub30)}
         meta={t.admin.stats.revenue30d}
-      />
-      <StatTile
-        icon={Banknote}
-        label={t.admin.stats.cashPending}
-        value={fmtCount(s?.payments_pending)}
       />
       <StatTile
         icon={Gift}

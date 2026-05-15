@@ -1,13 +1,17 @@
 import { useEffect, useState } from "react"
 import {
-  ArrowRight,
   Ban,
   Calendar,
   CalendarPlus,
+  Check,
   ChevronRight,
   CircleSlash,
+  Copy,
+  KeyRound,
+  Link2,
   Loader2,
   Plus,
+  RotateCcw,
   Search,
   ShieldAlert,
   ShieldCheck,
@@ -17,13 +21,16 @@ import {
 } from "lucide-react"
 import { AnimatePresence, motion } from "motion/react"
 
+import { ServerChipsRow } from "@/components/server-chip"
 import { useLocale } from "@/lib/i18n"
 import {
   useAdminUser,
   useAdminUserMutations,
+  useAdminUserSubscription,
   useAdminUsers,
 } from "@/lib/queries"
 import { formatTonBalance } from "@/lib/format"
+import { copyToClipboard, triggerHaptic } from "@/lib/telegram"
 import { cn } from "@/lib/utils"
 import type { AdminUser } from "@/lib/api"
 
@@ -165,7 +172,7 @@ function UserSheet({
     m.balanceSet.isPending ||
     m.subscriptionCancel.isPending ||
     m.subscriptionExtend.isPending ||
-    m.cashPayment.isPending ||
+    m.rotateSubscriptionToken.isPending ||
     m.ban.isPending ||
     m.unban.isPending
 
@@ -219,15 +226,10 @@ function UserSheet({
       await m.subscriptionCancel.mutateAsync()
     })
 
-  const handleCashPayment = () =>
-    wrap(t.admin.users.actions.cashPayment, async () => {
-      const planId = askText(t.admin.users.promptPlan)
-      if (!planId) return
-      const rub = askNumber(t.admin.users.promptRub)
-      await m.cashPayment.mutateAsync({
-        plan_id: planId,
-        amount_rub: rub ?? undefined,
-      })
+  const handleRotateToken = () =>
+    wrap(t.admin.users.actions.rotateToken, async () => {
+      if (!window.confirm(t.admin.users.confirmRotate)) return
+      await m.rotateSubscriptionToken.mutateAsync()
     })
 
   const handleBan = () =>
@@ -334,6 +336,8 @@ function UserSheet({
           </p>
         )}
 
+        <UserSubscriptionCard userId={user.id} />
+
         <div className="mt-5 grid grid-cols-2 gap-2.5">
           <PrimaryButton onClick={handleAddBalance} disabled={isBusy}>
             <Plus className="size-4" strokeWidth={2.25} />
@@ -353,11 +357,11 @@ function UserSheet({
           </GhostButton>
           <GhostButton
             className="col-span-2"
-            onClick={handleCashPayment}
+            onClick={handleRotateToken}
             disabled={isBusy}
           >
-            <ArrowRight className="size-4" strokeWidth={2} />
-            {t.admin.users.actions.cashPayment}
+            <RotateCcw className="size-4" strokeWidth={2} />
+            {t.admin.users.actions.rotateToken}
           </GhostButton>
           {u.is_banned ? (
             <PrimaryButton
@@ -381,6 +385,89 @@ function UserSheet({
         </div>
       </motion.div>
     </motion.div>
+  )
+}
+
+function UserSubscriptionCard({ userId }: { userId: number }) {
+  const { t } = useLocale()
+  const subQuery = useAdminUserSubscription(userId)
+  const [copied, setCopied] = useState(false)
+  const sub = subQuery.data ?? null
+  const url = sub?.subscription_url ?? ""
+  const servers = sub?.servers ?? []
+
+  const handleCopy = async () => {
+    if (!url) return
+    const ok = await copyToClipboard(url)
+    if (!ok) return
+    triggerHaptic({ type: "notification", status: "success" })
+    setCopied(true)
+    window.setTimeout(() => setCopied(false), 1600)
+  }
+
+  return (
+    <div className="border-border bg-card mt-5 rounded-2xl border p-4">
+      <div className="flex items-center justify-between gap-2">
+        <p className="text-muted-foreground inline-flex items-center gap-1.5 text-[10px] font-semibold tracking-[0.18em] uppercase">
+          <Link2 className="size-3" strokeWidth={2.5} />
+          {t.admin.users.subscriptionCard.title}
+        </p>
+        {subQuery.isPending && (
+          <Loader2 className="text-muted-foreground size-3.5 animate-spin" />
+        )}
+      </div>
+      {subQuery.isError && (
+        <p className="text-muted-foreground mt-2 text-xs">
+          {t.admin.users.subscriptionCard.empty}
+        </p>
+      )}
+      {sub && !url && (
+        <p className="text-muted-foreground mt-2 text-xs">
+          {t.admin.users.subscriptionCard.empty}
+        </p>
+      )}
+      {url && (
+        <>
+          <p
+            className="text-foreground/90 mt-2 font-mono text-[11px] leading-relaxed break-all sm:text-[12px]"
+            style={{ fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace" }}
+          >
+            {url}
+          </p>
+          <p className="text-muted-foreground mt-2 text-[11px] leading-snug">
+            {t.admin.users.subscriptionCard.helper}
+          </p>
+          <div className="mt-3 flex items-center justify-between gap-2">
+            {servers.length > 0 && (
+              <p className="text-muted-foreground inline-flex items-center gap-1.5 text-[11px] tabular-nums">
+                <KeyRound className="size-3" strokeWidth={2.25} />
+                {t.admin.users.subscriptionCard.serversLabel(servers.length)}
+              </p>
+            )}
+            <button
+              type="button"
+              onClick={handleCopy}
+              className="border-border bg-background hover:bg-muted/60 text-foreground inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-[11px] font-semibold tracking-tight transition-colors"
+            >
+              {copied ? (
+                <>
+                  <Check className="size-3" strokeWidth={2.5} />
+                  {t.admin.users.subscriptionCard.copied}
+                </>
+              ) : (
+                <>
+                  <Copy className="size-3" strokeWidth={2} />
+                  {t.admin.users.subscriptionCard.copy}
+                </>
+              )}
+            </button>
+          </div>
+          {servers.length > 0 && (
+            <ServerChipsRow servers={servers} className="mt-3" max={6} />
+          )}
+        </>
+      )}
+    </div>
   )
 }
 

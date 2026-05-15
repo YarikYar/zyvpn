@@ -3,12 +3,8 @@ import { useEffect, useMemo, useState } from "react"
 import {
   ArrowRight,
   BarChart3,
-  Banknote,
   Calendar,
-  Check,
   CheckCircle2,
-  ChevronRight,
-  Copy,
   CreditCard,
   KeyRound,
   Loader2,
@@ -18,13 +14,13 @@ import {
   Wallet,
 } from "lucide-react"
 import { AnimatePresence, motion } from "motion/react"
-import { QRCodeSVG } from "qrcode.react"
 
 import { TonIcon } from "@/components/icons/ton"
 import { SectionHeading } from "@/components/sections/section-heading"
-import { api, type Plan as ApiPlan } from "@/lib/api"
+import { ServerChipsRow } from "@/components/server-chip"
+import { SubscriptionUrlCard } from "@/components/subscription-url-card"
+import { api, type Plan as ApiPlan, type ServerEntry } from "@/lib/api"
 import { useRegisterBack } from "@/lib/back-button"
-import { flagFor, regionTintFor } from "@/lib/flags"
 import { formatRubPurchase, formatTonBalance, formatTonPurchase } from "@/lib/format"
 import { useLocale } from "@/lib/i18n"
 import type { Rates } from "@/lib/api"
@@ -40,10 +36,9 @@ import {
   usePaymentStatus,
   usePlans,
   useRates,
-  useServers,
-  useSubscriptionKey,
   useSubscriptionStatus,
 } from "@/lib/queries"
+import { openExternalLink, openInvoice } from "@/lib/telegram"
 import { scrollMainToTop, useScrollResetOnChange } from "@/lib/use-scroll-reset"
 import { cn } from "@/lib/utils"
 
@@ -75,6 +70,13 @@ const slideVariants = {
 
 function trafficLabel(plan: ApiPlan, gb: string) {
   return plan.traffic_gb === null ? "∞" : `${plan.traffic_gb} ${gb}`
+}
+
+function distinctRegionCount(servers: ServerEntry[] | undefined): number {
+  if (!servers || servers.length === 0) return 0
+  const codes = new Set<string>()
+  for (const s of servers) codes.add((s.country ?? "").toUpperCase())
+  return codes.size
 }
 
 export type SubscriptionView = "list" | "checkout" | "success"
@@ -240,6 +242,7 @@ function PlansListView({ onPick }: { onPick: (id: string) => void }) {
             const Icon = meta.Icon
             const isActive = activeId === p.id
             const tierLabel = t.subscription.plans[meta.variant].tier
+            const serverList = p.servers ?? []
             return (
               <li key={p.id}>
                 <motion.button
@@ -326,6 +329,19 @@ function PlansListView({ onPick }: { onPick: (id: string) => void }) {
                     />
                   </div>
 
+                  {serverList.length > 0 && (
+                    <div className="relative mt-4">
+                      <p className="text-muted-foreground text-[10px] font-semibold tracking-[0.16em] uppercase">
+                        {t.subscription.includedServers(serverList.length)}
+                      </p>
+                      <ServerChipsRow
+                        servers={serverList}
+                        className="mt-2"
+                        max={4}
+                      />
+                    </div>
+                  )}
+
                   <div className="relative mt-4 flex items-baseline justify-between gap-3">
                     <p className="text-muted-foreground text-xs font-semibold tracking-[0.16em] uppercase">
                       {t.subscription.fields.price}
@@ -382,7 +398,7 @@ function PlanStat({
   )
 }
 
-type PaymentMethodId = "balance" | "ton" | "stars" | "cash"
+type PaymentMethodId = "balance" | "ton" | "stars"
 
 type PaymentMethod = {
   id: PaymentMethodId
@@ -409,7 +425,6 @@ function buildMethods(
   const m = t.subscription.checkout.methods
   const rubApprox = formatRubPurchase(plan.price_ton, rates)
   const rubSuffix = rubApprox ? ` ≈ ${rubApprox} ₽` : ""
-  const rubForCash = rubApprox ? Number(rubApprox) : 0
   return [
     {
       id: "balance",
@@ -442,16 +457,6 @@ function buildMethods(
       iconColor: "text-yellow-500 dark:text-yellow-300",
       available: true,
       ctaLabel: t.subscription.checkout.payStars(plan.price_stars),
-    },
-    {
-      id: "cash",
-      name: m.cash.name,
-      subtitle: rubApprox ? m.cash.subtitle(rubForCash) : m.cash.name,
-      icon: Banknote,
-      iconBg: "bg-emerald-500/15",
-      iconColor: "text-emerald-500",
-      available: !!rubApprox,
-      ctaLabel: t.subscription.checkout.submitCash,
     },
   ]
 }
@@ -513,10 +518,6 @@ function CheckoutView({
         provider: method.id,
       })
       const paymentIdReturned = result.payment_id
-      if (method.id === "cash") {
-        onPay()
-        return
-      }
       if (!paymentIdReturned) {
         setPayError("Backend did not return payment_id")
         return
@@ -592,6 +593,13 @@ function CheckoutView({
                 {trafficLabel(plan, t.common.gb)}
               </span>
             </div>
+            {plan.servers && plan.servers.length > 0 && (
+              <ServerChipsRow
+                servers={plan.servers}
+                className="mt-3"
+                max={5}
+              />
+            )}
           </div>
           <div className="shrink-0 text-right leading-none">
             {(() => {
@@ -722,44 +730,10 @@ function SuccessView({
 }) {
   useRegisterBack(onBack)
   const { t } = useLocale()
-  const keyQuery = useSubscriptionKey()
-  const serversQuery = useServers()
   const statusQuery = useSubscriptionStatus()
-  const myServerId = statusQuery.data?.subscription?.server_id
-
-  const activeServer =
-    (myServerId
-      ? serversQuery.data?.find((s) => s.id === myServerId)
-      : undefined) ?? serversQuery.data?.[0]
-  const serverCode = activeServer?.country?.toUpperCase() ?? ""
-  const Flag = serverCode ? flagFor(serverCode) : null
-  const regionTint = regionTintFor(serverCode)
-  const regionMeta = serverCode
-    ? t.region.countries[serverCode as keyof typeof t.region.countries]
-    : null
-  const serverLocation =
-    activeServer?.city?.trim() || activeServer?.name?.trim() || ""
-
-  const connectApps = [
-    { platform: t.subscription.success.platformIos, apps: "Streisand, V2Box" },
-    { platform: t.subscription.success.platformAndroid, apps: "V2rayNG, NekoBox" },
-    { platform: t.subscription.success.platformDesktop, apps: "Nekoray, V2rayN" },
-  ]
-
-  const [copied, setCopied] = useState(false)
-
-  const vlessKey = keyQuery.data?.key ?? ""
-
-  const handleCopy = async () => {
-    if (!vlessKey) return
-    try {
-      await navigator.clipboard.writeText(vlessKey)
-      setCopied(true)
-      window.setTimeout(() => setCopied(false), 1600)
-    } catch {
-      /* noop */
-    }
-  }
+  const sub = statusQuery.data?.subscription ?? null
+  const subscriptionUrl = sub?.subscription_url ?? ""
+  const servers = sub?.servers ?? []
 
   return (
     <>
@@ -786,181 +760,33 @@ function SuccessView({
         </motion.div>
       )}
 
-      {activeServer && (
-        <div
-          className={cn(
-            "bg-card border-border relative overflow-hidden rounded-2xl border bg-gradient-to-br to-transparent p-5 shadow-lg",
-            showPaymentBanner ? "mt-4" : "mt-6",
-            regionTint,
-          )}
-        >
-          {Flag && (
-            <Flag
-              aria-hidden
-              className="pointer-events-none absolute -right-3 -bottom-3 h-20 aspect-[3/2] rounded-xl opacity-25 sm:-right-4 sm:-bottom-4 sm:h-24"
-            />
-          )}
-          <div className="relative flex items-center gap-3">
-            <div className="min-w-0 flex-1">
-              <p className="text-foreground text-xl font-semibold tracking-tight sm:text-2xl">
-                {regionMeta?.country ?? serverCode}
-              </p>
-              {(regionMeta?.city || serverLocation) && (
-                <p className="text-muted-foreground mt-0.5 text-sm">
-                  {regionMeta?.city ?? serverLocation}
-                </p>
-              )}
-            </div>
-            <button
-              type="button"
-              className="border-border bg-background hover:bg-muted/60 text-foreground inline-flex shrink-0 items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-semibold tracking-tight transition-colors sm:text-sm"
-            >
-              {t.subscription.success.switch}
-              <span className="text-muted-foreground tabular-nums">
-                {t.subscription.success.switchPrice}
-              </span>
-              <ChevronRight
-                className="text-muted-foreground size-4"
-                strokeWidth={2.4}
-              />
-            </button>
-          </div>
+      {statusQuery.isPending && (
+        <div className="mt-8 flex items-center justify-center py-12">
+          <Loader2 className="text-muted-foreground size-6 animate-spin" />
         </div>
       )}
 
-      <div className="bg-card border-border mt-3 flex aspect-square items-center justify-center rounded-2xl border p-5">
-        <div className="flex aspect-square h-full w-full items-center justify-center rounded-xl bg-white">
-          {keyQuery.isPending && (
-            <Loader2 className="text-muted-foreground size-8 animate-spin" />
-          )}
-          {keyQuery.error && (
-            <p className="px-4 text-center text-xs text-rose-500">
-              {keyQuery.error instanceof Error
-                ? keyQuery.error.message
-                : "Failed to load key"}
-            </p>
-          )}
-          {vlessKey && (
-            <QRCodeSVG
-              value={vlessKey}
-              size={Math.round(220)}
-              level="M"
-              bgColor="#ffffff"
-              fgColor="#000000"
-              className="h-[88%] w-[88%]"
-            />
-          )}
+      {!statusQuery.isPending && subscriptionUrl && (
+        <div className="mt-6">
+          <SubscriptionUrlCard url={subscriptionUrl} />
         </div>
-      </div>
+      )}
 
-      <div className="bg-card border-border mt-3 rounded-2xl border p-4">
-        <p className="text-muted-foreground text-xs font-semibold tracking-[0.18em] uppercase">
-          {t.subscription.success.vlessKey}
-        </p>
-        <p
-          className="text-foreground/90 mt-2 font-mono text-[12px] leading-relaxed break-all sm:text-[13px]"
-          style={{ fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace" }}
-        >
-          {keyQuery.isPending ? "…" : vlessKey || "—"}
-        </p>
-      </div>
-
-      <button
-        type="button"
-        onClick={handleCopy}
-        disabled={!vlessKey}
-        className="bg-foreground text-background hover:bg-foreground/90 disabled:bg-muted disabled:text-muted-foreground mt-3 inline-flex h-14 w-full items-center justify-center gap-2 rounded-2xl text-base font-semibold tracking-tight transition-colors disabled:cursor-not-allowed"
-      >
-        <motion.span
-          key={copied ? "check" : "copy"}
-          initial={{ opacity: 0, scale: 0.7 }}
-          animate={{ opacity: 1, scale: 1 }}
-          className="inline-flex items-center gap-2"
-        >
-          {copied ? (
-            <>
-              <Check className="size-5" strokeWidth={2.5} />
-              {t.common.copied}
-            </>
-          ) : (
-            <>
-              <Copy className="size-5" strokeWidth={2} />
-              {t.subscription.success.copyKey}
-            </>
-          )}
-        </motion.span>
-      </button>
-
-      <h3 className="text-foreground mt-8 text-lg font-semibold tracking-tight">
-        {t.subscription.success.howToConnect}
-      </h3>
-      <ol className="mt-4 space-y-3">
-        <li className="bg-card border-border rounded-2xl border p-4">
-          <div className="flex items-start gap-3">
-            <span className="bg-muted text-foreground inline-flex size-7 shrink-0 items-center justify-center rounded-lg text-xs font-semibold tabular-nums">
-              1
+      {servers.length > 0 && (
+        <div className="mt-6">
+          <p className="text-muted-foreground text-[10px] font-semibold tracking-[0.16em] uppercase">
+            {t.subscription.serversList.title} ·{" "}
+            <span className="tabular-nums">
+              {t.subscription.serversList.count(servers.length)}
+              {distinctRegionCount(servers) > 1 &&
+                ` · ${t.subscription.serversList.regionCount(distinctRegionCount(servers))}`}
             </span>
-            <div className="min-w-0 flex-1">
-              <p className="text-foreground font-semibold tracking-tight">
-                {t.subscription.success.stepTitleInstall}
-              </p>
-              <ul className="text-muted-foreground mt-2 space-y-1 text-sm">
-                {connectApps.map((row) => (
-                  <li key={row.platform} className="flex gap-2">
-                    <span className="text-foreground/85 w-28 shrink-0 font-medium">
-                      {row.platform}
-                    </span>
-                    <span>{row.apps}</span>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          </div>
-        </li>
-        {[
-          t.subscription.success.stepCopyKey,
-          t.subscription.success.stepAddFromClipboard,
-          t.subscription.success.stepConnect,
-        ].map((step, i) => (
-          <li
-            key={step}
-            className="bg-card border-border flex items-center gap-3 rounded-2xl border p-4"
-          >
-            <span className="bg-muted text-foreground inline-flex size-7 shrink-0 items-center justify-center rounded-lg text-xs font-semibold tabular-nums">
-              {i + 2}
-            </span>
-            <p className="text-foreground/90 text-sm">{step}</p>
-          </li>
-        ))}
-      </ol>
+          </p>
+          <ServerChipsRow servers={servers} className="mt-2" max={8} />
+        </div>
+      )}
     </>
   )
-}
-
-function openExternalLink(url: string) {
-  const tg = (window as { Telegram?: { WebApp?: { openLink?: (url: string) => void } } }).Telegram?.WebApp
-  if (tg?.openLink) {
-    tg.openLink(url)
-    return
-  }
-  window.open(url, "_blank", "noopener,noreferrer")
-}
-
-type InvoiceCallback = (status: "paid" | "failed" | "cancelled" | "pending") => void
-
-function openInvoice(url: string, callback: InvoiceCallback) {
-  const tg = (window as {
-    Telegram?: {
-      WebApp?: {
-        openInvoice?: (url: string, callback: InvoiceCallback) => void
-      }
-    }
-  }).Telegram?.WebApp
-  if (tg?.openInvoice) {
-    tg.openInvoice(url, callback)
-    return
-  }
-  openExternalLink(url)
 }
 
 export type { PlanMeta }

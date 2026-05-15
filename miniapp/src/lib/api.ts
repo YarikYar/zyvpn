@@ -142,6 +142,19 @@ export type User = {
   is_admin?: boolean
 }
 
+export type ServerStatus = "online" | "offline"
+
+export type ServerEntry = {
+  id: string
+  name?: string
+  country: string
+  city?: string
+  flag?: string
+  ping_ms?: number
+  status?: ServerStatus | string
+  connection_key?: string
+}
+
 export type Plan = {
   id: string
   name: string
@@ -155,6 +168,7 @@ export type Plan = {
   is_active?: boolean
   visible_to_referrer_id?: number | null
   popular?: boolean
+  servers?: ServerEntry[]
 }
 
 export type SubscriptionStatus = {
@@ -165,13 +179,12 @@ export type SubscriptionStatus = {
     started_at: string
     ends_at: string
     auto_renew?: boolean
-    server_id?: string
+    subscription_url: string
+    servers: ServerEntry[]
   } | null
   days_remaining: number
   traffic_gb: { used: number; limit: number | null }
 }
-
-export type ServerStatus = "online" | "offline"
 
 export type Server = {
   id: string
@@ -187,11 +200,6 @@ export type Server = {
   uptime_7d?: number
   traffic_all_time?: number
   is_active?: boolean
-}
-
-export type SwitchServerInfo = {
-  price_ton: number
-  free_switches_remaining: number
 }
 
 export type Balance = {
@@ -335,19 +343,6 @@ export type AdminPromoCreate = {
   expires_at?: string | null
 }
 
-export type AdminCashPayment = {
-  id: string
-  user_id: number
-  username?: string
-  first_name?: string
-  plan_id: string
-  plan_name?: string
-  amount_rub?: number
-  amount_ton?: number
-  note?: string
-  created_at?: string
-}
-
 export type AdminPlanInput = {
   id?: string
   name: string
@@ -360,6 +355,15 @@ export type AdminPlanInput = {
   visible_to_referrer_id?: number | null
   popular?: boolean
   description?: string
+  server_ids?: string[]
+}
+
+export type AdminUserSubscription = {
+  subscription_url: string
+  servers: ServerEntry[]
+  plan_id?: string
+  plan_name?: string
+  expires_at?: string
 }
 
 export type AdminServerInput = {
@@ -382,7 +386,6 @@ export type AdminSettings = {
   topup_bonus_percent?: number
   referral_bonus_percent?: number
   referral_bonus_days?: number
-  region_switch_price_ton?: number
 }
 
 export type AdminLogLevel = "info" | "warn" | "error" | "debug" | string
@@ -407,12 +410,9 @@ export const api = {
   plans: () => listRequest<Plan>("/api/plans"),
   subscriptionStatus: () =>
     request<SubscriptionStatus>("/api/subscription/status"),
-  subscriptionKey: () =>
-    request<{ key: string }>("/api/subscription/key"),
   buy: (input: {
     plan_id: string
-    server_id?: string
-    provider: "ton" | "stars" | "balance" | "cash"
+    provider: "ton" | "stars" | "balance"
   }) =>
     request<{ payment_id?: string; subscription_id?: string }>(
       "/api/subscription/buy",
@@ -420,13 +420,6 @@ export const api = {
     ),
   trial: () =>
     request<{ ok: boolean }>("/api/subscription/trial", { method: "POST" }),
-  switchServerInfo: () =>
-    request<SwitchServerInfo>("/api/subscription/switch-server/info"),
-  switchServer: (input: { server_id: string; provider?: "balance" | "ton" | "stars" }) =>
-    request<{ ok: boolean; payment_id?: string }>(
-      "/api/subscription/switch-server",
-      { method: "POST", body: input },
-    ),
 
   servers: () => listRequest<Server>("/api/servers"),
   serverUptimeDaily: (serverId: string, days?: number) =>
@@ -533,14 +526,13 @@ export const api = {
     request<{ ok: boolean }>(`/api/admin/users/${id}/subscription/cancel`, {
       method: "POST",
     }),
-  adminUserCashPayment: (
-    id: number,
-    body: { plan_id: string; amount_rub?: number; note?: string },
-  ) =>
-    request<{ ok: boolean }>(`/api/admin/users/${id}/cash-payment`, {
-      method: "POST",
-      body,
-    }),
+  adminUserSubscription: (id: number) =>
+    request<AdminUserSubscription>(`/api/admin/users/${id}/subscription`),
+  adminUserSubscriptionRotateToken: (id: number) =>
+    request<{ subscription_url: string }>(
+      `/api/admin/users/${id}/subscription/rotate-token`,
+      { method: "POST" },
+    ),
   adminUserBan: (id: number, body?: { reason?: string }) =>
     request<{ ok: boolean }>(`/api/admin/users/${id}/ban`, {
       method: "POST",
@@ -575,19 +567,6 @@ export const api = {
       method: "POST",
       body,
     }),
-
-  adminCashPending: () =>
-    listRequest<AdminCashPayment>("/api/admin/payments/cash/pending"),
-  adminCashApprove: (id: string) =>
-    request<{ ok: boolean }>(
-      `/api/admin/payments/cash/${encodeURIComponent(id)}/approve`,
-      { method: "POST" },
-    ),
-  adminCashReject: (id: string, body?: { reason?: string }) =>
-    request<{ ok: boolean }>(
-      `/api/admin/payments/cash/${encodeURIComponent(id)}/reject`,
-      { method: "POST", body },
-    ),
 
   adminPlans: () => listRequest<Plan>("/api/admin/plans"),
   adminPlanCreate: (body: AdminPlanInput) =>
@@ -638,12 +617,6 @@ export const api = {
       method: "POST",
       body,
     }),
-  adminSettingRegionSwitchPrice: (body: { price_ton: number }) =>
-    request<{ ok: boolean }>("/api/admin/settings/region-switch-price", {
-      method: "POST",
-      body,
-    }),
-
   adminLogs: (params?: { limit?: number; offset?: number; level?: string }) =>
     listRequest<AdminLog>("/api/admin/logs", { query: params }),
 }
