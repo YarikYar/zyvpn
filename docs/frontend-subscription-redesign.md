@@ -23,7 +23,7 @@
 - ❌ **уходит:** `free_region_switches`
 - ✅ всё остальное без изменений (включая `is_admin`)
 
-### `GET /api/subscription`
+### `GET /api/subscription/status`
 
 Старый shape:
 ```json
@@ -39,55 +39,109 @@
 }
 ```
 
-Новый shape:
+Новый shape (реальный, проверено по коду):
 ```json
 {
   "active": true,
+  "subscription_url": "https://api.zaruchevskiy.ru/sub/abc123def",
+  "days_remaining": 25,
+  "traffic_gb": { "used": 12, "limit": 100, "remaining": 88 },
   "subscription": {
-    "id": "...",
-    "plan_id": "...",
+    "id": "uuid",
+    "user_id": 12345,
+    "plan_id": "uuid",
     "status": "active",
-    "expires_at": "...",
-    "subscription_url": "https://api.zaruchevskiy.ru/sub/abc123def",
+    "sub_token": "abc123def",
+    "started_at": "2026-05-01T10:00:00Z",
+    "expires_at": "2026-05-31T10:00:00Z",
+    "traffic_limit": 107374182400,
+    "traffic_used": 12884901888,
+    "max_devices": 3,
+    "created_at": "2026-05-01T10:00:00Z",
     "servers": [
       {
-        "id": "...",
-        "name": "Germany 1",
-        "country": "DE",
-        "city": "Frankfurt",
-        "flag": "🇩🇪",
-        "ping_ms": 45,
-        "status": "online",
-        "connection_key": "vless://..."
-      },
-      { "id": "...", "name": "Netherlands 1", "country": "NL", ... }
+        "id": "uuid (subscription_client id, НЕ сервер)",
+        "subscription_id": "uuid",
+        "server_id": "uuid (вот это id сервера)",
+        "xui_client_id": "uuid",
+        "xui_email": "u12345_s1a2b3c4_1700000000",
+        "connection_key": "vless://...",
+        "traffic_used": 5000000000,
+        "enabled": true,
+        "created_at": "2026-05-01T10:00:00Z",
+        "server": {
+          "id": "uuid",
+          "name": "Germany 1",
+          "country": "DE",
+          "city": "Frankfurt",
+          "flag_emoji": "🇩🇪",
+          "server_address": "62.60.x.x",
+          "server_port": 14549,
+          "is_active": true,
+          "sort_order": 0,
+          "capacity": 100,
+          "current_load": 23,
+          "ping_ms": 45,
+          "status": "online",
+          "last_check_at": "2026-05-15T18:55:00Z",
+          "created_at": "...",
+          "updated_at": "..."
+        }
+      }
     ]
-  },
-  "days_remaining": 25,
-  "traffic_gb": { "used": 12, "limit": 100, "remaining": 88 }
+  }
 }
 ```
 
-Поля `subscription.server_id` / `subscription.connection_key` / `subscription.xui_email` на верхнем уровне — **нет**. Это всё теперь внутри `subscription.servers[]`.
+Важно:
+- `subscription_url` — **топ-уровень**, не внутри `subscription`.
+- `subscription.servers[]` — массив `SubscriptionClient`, у каждого `id` это id клиента (не сервера). Реальный id сервера — в `server_id` и внутри `server.id`.
+- `connection_key` живёт **на уровне SubscriptionClient** (`servers[i].connection_key`), а не внутри `server` — это VLESS URI для конкретного юзера на этом сервере.
+- Поля `subscription.traffic_limit/traffic_used` — в **байтах**, не GB. Отдельно есть `traffic_gb` объект на топ-уровне в GB.
+- `sub_token` присутствует в `subscription` — это секрет, не показывать в UI открыто.
+- Поля верхнего уровня `subscription.server_id` / `connection_key` / `xui_email` / `xui_client_id` — **удалены**, всё переехало в `servers[]`.
 
 ### `GET /api/plans`
 
-К каждому плану добавляется `servers[]`:
+К каждому плану добавляется `servers[]` (массив **полных** `Server` объектов — те же поля что и в `subscription.servers[].server`):
 ```json
 {
-  "id": "...",
+  "id": "uuid",
   "name": "Standard",
-  "price_ton": 5,
+  "description": "...",
   "duration_days": 30,
-  "traffic_limit_gb": 100,
+  "traffic_gb": 100,
+  "max_devices": 3,
+  "price_ton": 5,
+  "price_stars": 500,
+  "price_usd": 4.99,
+  "is_active": true,
+  "sort_order": 0,
+  "created_at": "...",
   "servers": [
-    { "id": "...", "name": "Germany 1", "country": "DE", "city": "Frankfurt", "flag": "🇩🇪" },
-    { "id": "...", "name": "Netherlands 1", "country": "NL", "city": "Amsterdam", "flag": "🇳🇱" }
+    {
+      "id": "uuid",
+      "name": "Germany 1",
+      "country": "DE",
+      "city": "Frankfurt",
+      "flag_emoji": "🇩🇪",
+      "server_address": "...",
+      "server_port": 443,
+      "is_active": true,
+      "ping_ms": 45,
+      "status": "online",
+      "capacity": 100,
+      "current_load": 23,
+      "...": "и т.д."
+    }
   ]
 }
 ```
 
-Юзеру в карточке плана показываем список флажков-регионов с тултипами «Germany — Frankfurt» etc.
+Важно:
+- Поле `traffic_gb`, не `traffic_limit_gb` (моя ошибка ранее).
+- Поле флага сервера — **`flag_emoji`**, не `flag`.
+- Юзеру в карточке плана показываем список флажков-регионов с тултипами «Germany — Frankfurt».
 
 ### `POST /api/subscription/switch-region`
 
@@ -109,18 +163,22 @@ VPN-клиент (v2rayNG/Hiddify) сам этот URL ходит и тянет 
 {
   "name": "...",
   "description": "...",
-  "price_ton": 5,
   "duration_days": 30,
-  "traffic_limit_gb": 100,
+  "traffic_gb": 100,
+  "max_devices": 3,
+  "price_ton": 5,
+  "price_stars": 500,
+  "price_usd": 4.99,
+  "sort_order": 0,
   "server_ids": ["uuid1", "uuid2", "uuid3"]
 }
 ```
 
-`PATCH /api/admin/plans/:id` — то же, `server_ids` можно менять.
+`PUT /api/admin/plans/:plan_id` (метод PUT, параметр `:plan_id`) — те же поля все опциональны через указатели, `server_ids: []` можно менять (nil = не трогать, `[]` = очистить).
 
-`GET /api/admin/users/:id/subscription` — возвращает subscription URL и список серверов (для саппорта).
+`GET /api/admin/users/:user_id` — возвращает `UserWithSubscription`. **Важно:** subscription там сейчас отдаётся «голой», без `servers[]` и без `subscription_url`. Если для саппорта нужен URL — используй ротацию (она его возвращает) или мы добавим отдельный endpoint позже.
 
-`POST /api/admin/users/:id/subscription/rotate-token` — ротировать token (если URL утёк/скомпрометировали).
+`POST /api/admin/users/:user_id/subscription/rotate-token` — выпустить новый sub_token (старый URL сразу умирает). Ответ: `{"success": true, "subscription_url": "https://.../sub/<new_token>"}`. Подойдёт для саппорта если URL утёк или нужно отозвать доступ.
 
 ## Изменения в UI
 
@@ -136,9 +194,9 @@ VPN-клиент (v2rayNG/Hiddify) сам этот URL ходит и тянет 
 
 `handleShowKey` ранее открывал `success` view с одним connection_key — теперь open subscription card с URL.
 
-### `RegionSection` (она же `admin/servers` это не тот случай!)
+### `RegionSection` (юзерская «Регионы», не путать с `admin/servers`)
 
-Юзерская секция «Регионы» — **радикальный пересмотр**:
+**Радикальный пересмотр:**
 - ❌ убрать «выбрать регион для смены»
 - ✅ показать список всех серверов из подписки:
   - Флажок, имя, город, ping, status indicator (online/offline)
@@ -195,13 +253,32 @@ VPN-клиент (v2rayNG/Hiddify) сам этот URL ходит и тянет 
 
 - Тип `Subscription`:
   - ❌ удалить `server_id`, `connection_key`, `xui_email`, `xui_client_id` с верхнего уровня
-  - ✅ добавить `subscription_url: string`
-  - ✅ добавить `servers: ServerEntry[]`
+  - ✅ добавить `sub_token: string` (но НЕ светить в UI открыто)
+  - ✅ добавить `servers: SubscriptionClient[]`
+- Тип `SubscriptionStatusResponse` (то что отдаёт `/api/subscription/status`):
+  - `subscription_url: string` — **топ-уровень**, не внутри `subscription`
+  - `subscription: Subscription`
+  - `traffic_gb: { used, limit, remaining }`
+  - `days_remaining: number`
+  - `active: boolean`
+- Новый тип `SubscriptionClient`:
+  - `id: string` (id клиента, не сервера)
+  - `server_id: string`
+  - `xui_client_id: string`
+  - `xui_email: string`
+  - `connection_key: string` — VLESS URI для этого юзера на этом сервере
+  - `traffic_used: number` (bytes)
+  - `enabled: boolean`
+  - `server: Server` — вложенный полный объект сервера
+- Тип `Server` (то что в `subscription.servers[].server` и в `plan.servers[]`):
+  - `id, name, country, city, flag_emoji` (имя поля `flag_emoji`!)
+  - `server_address, server_port, is_active, sort_order`
+  - `capacity, current_load, ping_ms?, status, last_check_at?`
 - Тип `Plan`:
-  - ✅ добавить `servers: ServerEntry[]`
+  - ✅ добавить `servers: Server[]`
+  - Поле трафика называется `traffic_gb` (не `traffic_limit_gb`)
 - Тип `User`:
   - ❌ удалить `free_region_switches`
-- Новый тип `ServerEntry { id, name, country, city, flag, ping_ms?, status?, connection_key? }`
 
 ### `lib/queries.ts`
 
