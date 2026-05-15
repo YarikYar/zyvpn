@@ -545,7 +545,14 @@ type CreatePlanParams struct {
 
 // ListAllPlans lists all plans including inactive
 func (s *AdminService) ListAllPlans(ctx context.Context) ([]model.Plan, error) {
-	return s.repo.GetAllPlans(ctx)
+	plans, err := s.repo.GetAllPlans(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if err := s.repo.HydratePlansWithServers(ctx, plans); err != nil {
+		return nil, err
+	}
+	return plans, nil
 }
 
 // UpdatePlan updates a plan
