@@ -1,14 +1,15 @@
 #!/usr/bin/env bash
 # Deploy script run on the docker host (192.168.1.223) by CI or manually.
 #
-# Idempotent: pulls latest main, rebuilds changed images, recreates only
-# affected services. The .env file with secrets is provisioned out of band
-# and lives at /opt/compose/zyvpn/.env (not in git).
+# Idempotent: pulls latest DEPLOY_BRANCH (default corevpn-dev), rebuilds
+# changed images, recreates only affected services. The .env file with
+# secrets is provisioned out of band and lives at /opt/compose/zyvpn/.env
+# (not in git).
 
 set -euo pipefail
 
 REPO_DIR="/opt/compose/zyvpn"
-BRANCH="${DEPLOY_BRANCH:-main}"
+BRANCH="${DEPLOY_BRANCH:-corevpn-dev}"
 
 cd "$REPO_DIR"
 
