@@ -215,13 +215,17 @@ func (r *Repository) CountActiveSubscriptionsByServer(ctx context.Context, serve
 	return count, err
 }
 
-// SyncAllServerLoads updates current_load for all servers based on actual subscriptions
+// SyncAllServerLoads updates current_load for all servers based on актуальные
+// subscription_clients (один enabled client = +1 нагрузка).
 func (r *Repository) SyncAllServerLoads(ctx context.Context) error {
 	_, err := r.db.ExecContext(ctx, `
 		UPDATE servers s
 		SET current_load = COALESCE((
-			SELECT COUNT(*) FROM subscriptions sub
-			WHERE sub.server_id = s.id AND sub.status = 'active'
+			SELECT COUNT(*) FROM subscription_clients sc
+			JOIN subscriptions sub ON sub.id = sc.subscription_id
+			WHERE sc.server_id = s.id
+			  AND sc.enabled = true
+			  AND sub.status = 'active'
 		), 0)
 	`)
 	return err
