@@ -149,15 +149,56 @@ func (h *Handler) GetSubscriptionStatus(c *fiber.Ctx) error {
 	_ = h.subscriptionSvc.SyncTraffic(c.Context(), sub.ID)
 	sub, _ = h.subscriptionSvc.GetSubscription(c.Context(), sub.ID)
 
+	// Имя тарифа — best-effort.
+	planName := ""
+	if plan, perr := h.planService.GetPlan(c.Context(), sub.PlanID); perr == nil && plan != nil {
+		planName = plan.Name
+	}
+
+	// Flatten servers: фронт ждёт ServerEntry с полями вверху, не вложенный
+	// SubscriptionClient.server.
+	servers := make([]fiber.Map, 0, len(sub.Clients))
+	for _, c := range sub.Clients {
+		entry := fiber.Map{
+			"id":             c.ServerID,
+			"connection_key": c.ConnectionKey,
+		}
+		if c.Server != nil {
+			entry["name"] = c.Server.Name
+			entry["country"] = c.Server.Country
+			if c.Server.City != nil {
+				entry["city"] = *c.Server.City
+			}
+			entry["flag"] = c.Server.FlagEmoji
+			entry["status"] = c.Server.Status
+			if c.Server.PingMs != nil {
+				entry["ping_ms"] = *c.Server.PingMs
+			}
+		}
+		servers = append(servers, entry)
+	}
+
+	trafficLimitGB := float64(sub.TrafficLimit) / (1024 * 1024 * 1024)
+	var limit any = trafficLimitGB
+	if sub.TrafficLimit <= 0 {
+		limit = nil // безлимит
+	}
+
 	return c.JSON(fiber.Map{
-		"active":           sub.IsActive(),
-		"subscription":     sub,
-		"subscription_url": h.subscriptionSvc.BuildSubscriptionURL(sub),
-		"days_remaining":   sub.DaysRemaining(),
+		"active": sub.IsActive(),
+		"subscription": fiber.Map{
+			"plan_id":          sub.PlanID,
+			"plan_name":        planName,
+			"started_at":       sub.StartedAt,
+			"ends_at":          sub.ExpiresAt,
+			"auto_renew":       false,
+			"subscription_url": h.subscriptionSvc.BuildSubscriptionURL(sub),
+			"servers":          servers,
+		},
+		"days_remaining": sub.DaysRemaining(),
 		"traffic_gb": fiber.Map{
-			"used":      float64(sub.TrafficUsed) / (1024 * 1024 * 1024),
-			"limit":     float64(sub.TrafficLimit) / (1024 * 1024 * 1024),
-			"remaining": sub.RemainingTrafficGB(),
+			"used":  float64(sub.TrafficUsed) / (1024 * 1024 * 1024),
+			"limit": limit,
 		},
 	})
 }
