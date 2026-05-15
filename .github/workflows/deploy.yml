@@ -36,6 +36,15 @@ jobs:
     # talk to local services without exposing SSH publicly.
     runs-on: [self-hosted, docker-host]
     steps:
+      - name: Sync /opt/compose/zyvpn to deploy branch
+        # deploy.sh делает git pull в локальном клоне. Гарантируем что
+        # клон сидит на нужной ветке (а не на старом main).
+        run: |
+          cd /opt/compose/zyvpn
+          git fetch origin
+          git checkout corevpn-dev
+          git reset --hard origin/corevpn-dev
+
       - name: Run deploy script
         run: bash /opt/compose/zyvpn/scripts/deploy.sh
 
